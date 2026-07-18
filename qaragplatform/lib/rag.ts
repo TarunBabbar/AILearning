@@ -64,7 +64,7 @@ ${context}`
 
   const sources = results.map(r => ({
     documentId: r.docId,
-    docName: r.docName,
+    docName: (r.docName && r.docName !== 'Unknown' ? r.docName : documentStore.get(r.docId)?.name) || 'Unknown',
     chunkIndex: r.chunkIndex,
     text: r.text.substring(0, 200) + (r.text.length > 200 ? '...' : ''),
   }))
