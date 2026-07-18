@@ -83,3 +83,28 @@ body {
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
 }
+
+/* Markdown table styles */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  font-size: 12px;
+}
+th, td {
+  border: 1px solid #E8E2D9;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #F5F0E8;
+  font-weight: 600;
+  color: #2D2D2D;
+}
+td {
+  color: #4A4A4A;
+}
+tr:nth-child(even) td {
+  background: #FAF7F2;
+}

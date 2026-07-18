@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Bot, User, BookOpen, ChevronDown, FileText, ChevronUp } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { FREE_MODELS, DEFAULT_MODEL } from '@/lib/openrouter'
 
 interface Source {
@@ -242,7 +243,7 @@ export default function AIPage() {
                   {msg.role === 'assistant' ? 'AI Agent' : 'You'}
                 </p>
                 <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7 }}>
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                 </div>
 
                 {msg.sources && msg.sources.length > 0 && (
