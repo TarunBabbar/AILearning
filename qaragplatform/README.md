@@ -2,6 +2,20 @@
 
 A Retrieval-Augmented Generation (RAG) application that lets you upload documents and ask AI-powered questions about their content. Built with Next.js 14, OpenRouter free models, and Pinecone for vector search.
 
+## Screenshots
+
+| Dashboard | Upload Documents |
+|---|---|
+| ![Dashboard](screenshots/dashboard.png) | ![Upload](screenshots/upload.png) |
+
+| AI Q&A Agent | Migration Studio |
+|---|---|
+| ![AI Q&A](screenshots/ai.png) | ![Migration](screenshots/migration.png) |
+
+| Project Scanner | Documents Manager |
+|---|---|
+| ![Scanner](screenshots/scanner.png) | ![Documents](screenshots/documents.png) |
+
 ## Features
 
 - **Document Upload** — Upload `.txt`, `.md`, `.csv`, and `.docx` files via drag-and-drop
