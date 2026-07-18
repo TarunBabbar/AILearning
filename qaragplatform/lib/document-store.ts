@@ -46,11 +46,8 @@ export const documentStore = {
 
   async delete(id: string) {
     globalStore.documents.delete(id)
-    // Also delete from vector store (non-blocking)
-    try {
-      const store = await getVectorStore()
-      await store.deleteDocument(id)
-    } catch {}
+    const store = await getVectorStore()
+    await store.deleteDocument(id)
   },
 
   async getStats(): Promise<{ totalDocs: number; totalChunks: number; totalSize: number }> {
