@@ -54,6 +54,8 @@ Do NOT cite source names or chunk numbers inline in your answer — keep it natu
 Reference sections are shown separately below the answer.
 Keep answers concise but thorough.
 
+IMPORTANT: The context may include a "--- Document Summary ---" section with document-level statistics like total rows, column names, and value distributions. Use this summary data to answer aggregate questions (counts, totals, distributions, column info). Do NOT try to count rows manually from individual chunks to derive totals — the summary data is the authoritative source for aggregate information.
+
 Context:
 ${context}`
     },

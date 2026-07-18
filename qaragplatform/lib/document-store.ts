@@ -1,4 +1,5 @@
 import { getVectorStore, DocMetadata } from './vector-store'
+import { summarizeContent } from './summarizer'
 
 // In-memory fallback store
 interface RawDocument {
@@ -20,10 +21,16 @@ export interface Document extends RawDocument {}
 export const documentStore = {
   async add(doc: Document) {
     globalStore.documents.set(doc.id, doc)
-    // Also persist metadata to vector store (non-blocking)
+
+    // Generate summary chunk for document-level stats
+    const summary = summarizeContent(doc.name, doc.content, doc.type)
+    const allChunks = summary
+      ? [summary.text, ...doc.chunks]
+      : doc.chunks
+
     try {
       const store = await getVectorStore()
-      await store.indexChunks(doc.id, doc.name, doc.chunks.map((text, index) => ({ text, index })))
+      await store.indexChunks(doc.id, doc.name, allChunks.map((text, index) => ({ text, index })))
     } catch {}
   },
 
