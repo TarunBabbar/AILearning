@@ -23,7 +23,7 @@ A Retrieval-Augmented Generation (RAG) web application that lets users upload do
 ### Dependencies
 ```
 next@^14.2.0, react@^18.3.0, react-dom@^18.3.0,
-lucide-react@^0.400.0, mammoth@^1.9.0, @pinecone-database/pinecone@^5.0.0,
+lucide-react@^0.400.0, mammoth@^1.9.0, xlsx@^0.18.5, @pinecone-database/pinecone@^5.0.0,
 react-markdown@^9.0.0 (unused), openai@^4.50.0 (unused)
 ```
 
@@ -175,7 +175,7 @@ interface Document {
 - **Core RAG Flow** — Upload → Chunk → Embed → Retrieve → Answer ✅
 - **UI Framework** — Sidebar, layout, routing, styling ✅
 - **Dashboard** — Live stats, quick actions ✅
-- **Document Upload** — Drag-drop, chunking, storage (supports .txt, .md, .csv, .docx via mammoth) ✅
+- **Document Upload** — Drag-drop, chunking, storage (supports .txt, .md, .csv, .docx via mammoth, .xlsx via SheetJS) ✅
 - **Document Management** — List, delete, metadata ✅
 - **AI Chat** — Full conversational UI, model switching, doc filtering, source citations ✅
 - **Migration Studio** — Source categories, ZIP upload, API endpoint ✅

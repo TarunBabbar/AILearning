@@ -22,7 +22,7 @@ export default function UploadPage() {
     e.preventDefault()
     setDragOver(false)
     const droppedFiles = Array.from(e.dataTransfer.files).filter(f =>
-      f.type === 'text/plain' || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.csv') || f.name.endsWith('.docx')
+      f.type === 'text/plain' || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.csv') || f.name.endsWith('.docx') || f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
     )
     if (droppedFiles.length > 0) setFiles(prev => [...prev, ...droppedFiles])
   }
@@ -67,7 +67,7 @@ export default function UploadPage() {
     <div style={{ padding: 32, maxWidth: 800, margin: '0 auto' }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>Upload Documents</h1>
       <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 24px' }}>
-        Upload text files to build your knowledge base. Supports .txt, .md, .csv, and .docx files.
+        Upload files to build your knowledge base. Supports .txt, .md, .csv, .docx, and .xlsx files.
       </p>
 
       {/* Drop Zone */}
@@ -88,9 +88,9 @@ export default function UploadPage() {
           <span style={{ color: '#D97706', fontWeight: 600 }}>Click to browse</span> or drag files here
         </p>
         <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>
-          TXT, MD, CSV, DOCX files supported
+          TXT, MD, CSV, DOCX, XLSX files supported
         </p>
-        <input ref={inputRef} type="file" multiple accept=".txt,.md,.csv,.docx,text/plain" onChange={handleFileSelect} style={{ display: 'none' }} />
+        <input ref={inputRef} type="file" multiple accept=".txt,.md,.csv,.docx,.xlsx,.xls,text/plain" onChange={handleFileSelect} style={{ display: 'none' }} />
       </div>
 
       {/* File List */}

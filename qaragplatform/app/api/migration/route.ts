@@ -14,11 +14,25 @@ export async function POST(req: NextRequest) {
 
     for (const file of files) {
       let text: string
-      if (file.name.endsWith('.docx')) {
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      if (ext === 'docx') {
         const mammoth = require('mammoth')
         const buffer = Buffer.from(await file.arrayBuffer())
         const result = await mammoth.extractRawText({ buffer })
         text = result.value
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const XLSX = require('xlsx')
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const workbook = XLSX.read(buffer, { type: 'buffer' })
+        const sheets: string[] = []
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName]
+          const csv = XLSX.utils.sheet_to_csv(sheet)
+          if (csv.trim()) {
+            sheets.push(`--- ${sheetName} ---\n${csv}`)
+          }
+        }
+        text = sheets.join('\n\n')
       } else {
         text = await file.text()
       }
