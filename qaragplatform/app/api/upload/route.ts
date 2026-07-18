@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       uploadedAt: new Date(),
     }
 
-    documentStore.add(doc)
+    await documentStore.add(doc)
 
     return NextResponse.json({
       success: true,
