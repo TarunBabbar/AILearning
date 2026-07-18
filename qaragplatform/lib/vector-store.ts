@@ -212,15 +212,15 @@ async function createPineconeStore(): Promise<VectorStore> {
     },
 
     async deleteDocument(docId: string) {
-      // Fetch all vector IDs for this doc, then delete by ID
+      // Fetch all vector IDs for this doc using prefix filter, then delete by ID
       const prefix = `${docId}-`
       const ids: string[] = []
       let pagToken: string | undefined
       do {
-        const listResult = await index.listPaginated({ limit: 1000, paginationToken: pagToken })
+        const listResult = await index.listPaginated({ prefix, limit: 1000, paginationToken: pagToken })
         if (listResult.vectors) {
           for (const v of listResult.vectors) {
-            if (v.id?.startsWith(prefix)) ids.push(v.id!)
+            if (v.id) ids.push(v.id)
           }
         }
         pagToken = listResult.pagination?.next
