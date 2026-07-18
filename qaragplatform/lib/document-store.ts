@@ -54,7 +54,7 @@ export const documentStore = {
       if (docs.length > 0) {
         const localDocs = globalStore.documents
         let totalSize = 0
-        for (const d of localDocs.values()) totalSize += d.size
+        Array.from(localDocs.values()).forEach(d => { totalSize += d.size })
         return {
           totalDocs: docs.length,
           totalChunks: docs.reduce((s, d) => s + d.chunks, 0),
