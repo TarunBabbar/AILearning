@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume–Job Matcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    .rg-header, .rg-row { grid-template-columns: 30px 70px 1fr 1.2fr 100px 1.3fr 120px 1.5fr 36px; }
+    .rg-row > * { min-width: 0; }
+    .sidebar.collapsed { width: 0 !important; min-width: 0 !important; overflow: hidden !important; opacity: 0 !important; border-right: none !important; }
+    .toggle-btn.pushed { left: 334px; }
+    .upload-card.dragover { border-color: #6366f1 !important; background: #f5f3ff !important; }
+    .upload-card.has-file { border-color: #10b981 !important; background: #f0fdf4 !important; border-style: solid !important; }
+    input[type="file"] { display: none; }
+    @media (max-width: 860px) { body { flex-direction: column; } .sidebar { width: 100% !important; min-width: unset !important; height: auto !important; position: static !important; } .sidebar.collapsed { display: none !important; } .main { height: auto !important; } .main-content { padding: 1.25rem 0.875rem !important; } .toggle-btn { display: none !important; } .rg-header, .rg-row { grid-template-columns: 28px 60px 1fr 1fr !important; } .rg-header .location, .rg-row .location, .rg-header .experience, .rg-row .experience, .rg-header .status-h, .rg-row .status-h, .rg-header .details, .rg-row .details, .rg-header .action, .rg-row .action { display: none; } }
+  </style>
+</head>
+<body class="font-sans bg-gray-50 text-gray-900 flex leading-normal h-screen">
+
+  <!-- ─── Toggle ─── -->
+  <button class="toggle-btn fixed top-3.5 left-3.5 z-50 w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center cursor-pointer text-base text-gray-500 shadow-sm hover:shadow transition-all" id="toggleBtn" title="Toggle sidebar">☰</button>
+
+  <!-- ═══════ SIDEBAR ═══════ -->
+  <aside class="sidebar w-80 shrink-0 bg-white border-r border-gray-100 flex flex-col h-screen sticky top-0 overflow-y-auto transition-all duration-300" id="sidebar">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <h1 class="text-sm font-semibold tracking-tight text-gray-900 whitespace-nowrap">Resume–Job Matcher</h1>
+    </div>
+
+    <div class="px-5 py-3.5 flex-1 flex flex-col">
+
+      <!-- Resume upload -->
+      <div class="upload-card border-2 border-dashed border-gray-200 rounded-xl p-3.5 cursor-pointer transition-all duration-200 hover:border-gray-300 mb-3" id="resumeCard">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-xs font-medium text-gray-700 flex items-center gap-1">📄 Resume</h3>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400 whitespace-nowrap" id="resumePill">Not uploaded</span>
+        </div>
+        <p class="text-[11px] text-gray-400">Click or drag a PDF / DOCX</p>
+        <div class="text-[11px] font-medium text-gray-800 mt-1 break-all hidden" id="resumeFileName"></div>
+        <div class="flex gap-1.5 mt-2">
+          <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gray-900 text-white transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-800" id="uploadResumeBtn" disabled>Upload</button>
+        </div>
+        <div class="text-[10px] px-2 py-1.5 rounded-md mt-1.5 leading-tight hidden" id="resumeMsg"></div>
+      </div>
+
+      <!-- Jobs upload -->
+      <div class="upload-card border-2 border-dashed border-gray-200 rounded-xl p-3.5 cursor-pointer transition-all duration-200 hover:border-gray-300 mb-3" id="jobsCard">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-xs font-medium text-gray-700 flex items-center gap-1">💼 Job listings</h3>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400 whitespace-nowrap" id="jobsPill">No files</span>
+        </div>
+        <p class="text-[11px] text-gray-400">Click or drag PDFs / DOCX (multiple)</p>
+        <div class="text-[11px] font-medium text-gray-800 mt-1 break-all hidden" id="jobsFileName"></div>
+        <div class="flex gap-1.5 mt-2">
+          <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gray-900 text-white transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-800" id="uploadJobsBtn" disabled>Upload &amp; parse</button>
+        </div>
+        <div class="text-[10px] px-2 py-1.5 rounded-md mt-1.5 leading-tight hidden" id="jobsMsg"></div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="h-0.5 bg-gray-100 rounded overflow-hidden my-2 hidden" id="progressWrap">
+        <div class="h-full w-0 bg-indigo-500 rounded transition-all duration-300" id="progressBar"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="mt-auto pt-2.5 border-t border-gray-100 space-y-1.5">
+        <button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-700 w-full justify-center" id="matchBtn" disabled>🔍 Find Matches</button>
+        <button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-transparent border border-gray-200 text-gray-700 transition-all active:scale-[0.97] hover:bg-gray-50 w-full justify-center" id="clearBtn">🗑️ Clear all</button>
+      </div>
+    </div>
+    <div class="px-5 py-2.5 border-t border-gray-100 text-[10px] text-gray-300 text-center">Express · OpenRouter · DeepSeek</div>
+  </aside>
+
+  <input type="file" id="resumeInput" accept=".pdf,.docx" />
+  <input type="file" id="jobsInput" accept=".pdf,.docx" multiple />
+
+  <!-- ═══════ MAIN ═══════ -->
+  <main class="main flex-1 min-w-0 flex flex-col h-screen overflow-y-auto">
+    <div class="main-content px-7 py-14 max-sm:px-3.5 max-sm:py-5">
+
+      <!-- Stats bar -->
+      <div class="flex gap-6 flex-wrap pb-3.5 mb-4 border-b border-gray-100">
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[10px] text-gray-400 uppercase tracking-wide">Resume</span>
+          <span class="text-sm font-semibold text-gray-900" id="statResume">—</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[10px] text-gray-400 uppercase tracking-wide">Jobs</span>
+          <span class="text-sm font-semibold text-gray-900" id="statJobs">0</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[10px] text-gray-400 uppercase tracking-wide">Matches</span>
+          <span class="text-sm text-gray-400 font-normal" id="statMatches">—</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-[10px] text-gray-400 uppercase tracking-wide">Top score</span>
+          <span class="text-sm text-gray-400 font-normal" id="statTopScore">—</span>
+        </div>
+      </div>
+
+      <!-- Status tabs -->
+      <div class="status-tabs flex gap-1 pb-3.5 mb-3.5 border-b border-gray-100 flex-wrap overflow-x-auto" id="statusTabs">
+        <button class="tab inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-500 cursor-pointer whitespace-nowrap transition-all hover:border-gray-300 hover:bg-gray-50 active:bg-gray-900 active:text-white active:border-gray-900" data-status="all">All <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400" id="countAll">0</span></button>
+        <button class="tab inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-500 cursor-pointer whitespace-nowrap transition-all hover:border-gray-300 hover:bg-gray-50" data-status="new">🆕 New <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400" id="countNew">0</span></button>
+        <button class="tab inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-500 cursor-pointer whitespace-nowrap transition-all hover:border-gray-300 hover:bg-gray-50" data-status="email_sent">📬 Sent <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400" id="countSent">0</span></button>
+        <button class="tab inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-500 cursor-pointer whitespace-nowrap transition-all hover:border-gray-300 hover:bg-gray-50" data-status="waiting_reply">⏳ Waiting <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400" id="countWaiting">0</span></button>
+        <button class="tab inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-500 cursor-pointer whitespace-nowrap transition-all hover:border-gray-300 hover:bg-gray-50" data-status="interviewing">🎯 Interviewing <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400" id="countInterview">0</span></button>
+        <button class="tab inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-500 cursor-pointer whitespace-nowrap transition-all hover:border-gray-300 hover:bg-gray-50" data-status="offer_received">✅ Offer <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400" id="countOffer">0</span></button>
+        <button class="tab inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-500 cursor-pointer whitespace-nowrap transition-all hover:border-gray-300 hover:bg-gray-50" data-status="ignored">🙈 Ignored <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400" id="countIgnored">0</span></button>
+        <span class="ml-auto flex gap-3 items-center text-[11px] text-gray-400 whitespace-nowrap"><span id="resultCount"></span></span>
+      </div>
+
+      <!-- Results header -->
+      <div class="flex items-center justify-between mb-3.5">
+        <h2 class="text-sm font-semibold text-gray-900">Results</h2>
+        <div class="flex gap-2 items-center">
+          <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-transparent border border-red-200 text-red-600 transition-all active:scale-[0.97] hover:bg-red-50 hidden" id="deleteAllJobsBtn">Delete All Jobs</button>
+          <a href="/agent" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-600 text-white transition-all active:scale-[0.97] hover:bg-emerald-700 no-underline hidden" id="agentBtn">📬 Email Agent</a>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="resultsEmpty" class="text-center py-20 text-gray-400">
+        <p class="text-sm">Upload your resume and job files, then click <strong class="text-gray-500">Find Matches</strong>.</p>
+      </div>
+
+      <!-- Results grid -->
+      <div class="results-grid hidden" id="resultsGrid">
+        <div class="rg-header grid gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          <div>#</div>
+          <div>Score</div>
+          <div>Company</div>
+          <div>Job Title</div>
+          <div class="status-h">Status</div>
+          <div>Email</div>
+          <div>Info</div>
+          <div>Description</div>
+          <div class="text-center w-9">✕</div>
+        </div>
+        <div id="resultsBody"></div>
+      </div>
+
+      <!-- Detail panel -->
+      <div class="detail-panel hidden mt-4 bg-white border border-gray-200 rounded-xl shadow-sm p-6" id="detailPanel">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="text-base font-semibold text-gray-900" id="dpCompany"></div>
+            <div class="text-sm text-indigo-500 mt-0.5" id="dpTitle"></div>
+          </div>
+          <button class="dp-close bg-none border-none text-base cursor-pointer text-gray-400 px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-700" id="dpClose">✕</button>
+        </div>
+        <div class="flex gap-5 mt-2.5 flex-wrap text-xs">
+          <span><span class="text-gray-400 mr-1">Email:</span> <span id="dpEmail"></span></span>
+          <span><span class="text-gray-400 mr-1">Location:</span> <span id="dpLocation"></span></span>
+          <span><span class="text-gray-400 mr-1">Experience:</span> <span id="dpExperience"></span></span>
+        </div>
+        <div class="flex gap-5 mt-1.5 flex-wrap text-[11px] text-gray-400" id="dpTimestamps"></div>
+        <div class="inline-flex items-center gap-2 mt-2.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-green-50 text-green-800" id="dpScore"></div>
+        <div class="flex items-center gap-2 mt-2.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wide text-gray-500" style="margin:0">Status</span>
+          <span class="status-badge inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-opacity hover:opacity-80 border-none leading-normal bg-indigo-100 text-indigo-800" id="dpStatusBadge">New</span>
+          <select id="dpStatusSelect" class="text-xs px-2 py-1 rounded-md border border-gray-300 cursor-pointer hidden">
+            <option value="new">🆕 New</option>
+            <option value="email_sent">📬 Email Sent</option>
+            <option value="waiting_reply">⏳ Waiting for Reply</option>
+            <option value="interviewing">🎯 Getting Interviewed</option>
+            <option value="offer_received">✅ Offer Received</option>
+            <option value="ignored">🙈 Ignore</option>
+          </select>
+        </div>
+        <div id="dpStrengthsSection" class="hidden mt-2.5">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Strengths</div>
+          <div class="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words text-emerald-600" id="dpStrengths"></div>
+        </div>
+        <div id="dpGapsSection" class="hidden mt-2.5">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Gaps</div>
+          <div class="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words text-red-600" id="dpGaps"></div>
+        </div>
+        <div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mt-3.5 mb-1.5">Job Description</div>
+        <div class="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words" id="dpDesc"></div>
+      </div>
+
+      <!-- Resume viewer modal -->
+      <div class="resume-viewer-modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title">View Resume</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="resume-content">
+              <!-- Resume content will be displayed here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- End Resume Viewer Modal -->
+
+    </div>
+      <div class="mt-4">
+        <button id="viewResumeBtn" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold bg-indigo-50 text-indigo-800 hover:bg-indigo-100">
+          View Resume
+        </button>
+      </div>
+
+  <script>
+    // ─── State ──
+    let selectedResume = null;
+    let selectedJobs = [];
+    let allResults = [];
+    let activeFilter = "all";
+
+    const STATUS_LABELS = {
+      new: "🆕 New",
+      email_sent: "📬 Sent",
+      waiting_reply: "⏳ Waiting",
+      interviewing: "🎯 Interviewing",
+      offer_received: "✅ Offer",
+      ignored: "🙈 Ignored"
+    };
+
+    const STATUS_COLORS = {
+      new: "bg-indigo-100 text-indigo-800",
+      email_sent: "bg-green-100 text-green-800",
+      waiting_reply: "bg-amber-100 text-amber-800",
+      interviewing: "bg-blue-100 text-blue-800",
+      offer_received: "bg-green-100 text-green-800 border-2 border-green-600",
+      ignored: "bg-gray-100 text-gray-400"
+    };
+
+    const SCORE_TEXT = { high: "text-green-600", mid: "text-amber-600", low: "text-red-600" };
+    const SCORE_BG = { high: "bg-green-500", mid: "bg-amber-500", low: "bg-red-500" };
+    const SCORE_DP = { "": "bg-green-50 text-green-800", mid: "bg-amber-50 text-amber-800", low: "bg-red-50 text-red-800" };
+
+    function isCompanyEmail(email, company) {
+      if (!email) return true;
+      const lower = email.toLowerCase();
+      const generic = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "rediffmail.com", "ymail.com", "live.com"];
+      const domain = lower.split("@")[1];
+      if (!domain || generic.includes(domain)) return false;
+      if (!company) return true;
+      const comp = company.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const dom = domain.split(".")[0];
+      return comp.includes(dom) || dom.includes(comp);
+    }
+
+    // ─── DOM ──
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("toggleBtn");
+
+    const resumeCard = document.getElementById("resumeCard");
+    const resumeInput = document.getElementById("resumeInput");
+    const resumeFileName = document.getElementById("resumeFileName");
+    const resumePill = document.getElementById("resumePill");
+    const uploadResumeBtn = document.getElementById("uploadResumeBtn");
+    const resumeMsg = document.getElementById("resumeMsg");
+
+    const jobsCard = document.getElementById("jobsCard");
+    const jobsInput = document.getElementById("jobsInput");
+    const jobsFileName = document.getElementById("jobsFileName");
+    const jobsPill = document.getElementById("jobsPill");
+    const uploadJobsBtn = document.getElementById("uploadJobsBtn");
+    const jobsMsg = document.getElementById("jobsMsg");
+
+    const matchBtn = document.getElementById("matchBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const progressWrap = document.getElementById("progressWrap");
+    const progressBar = document.getElementById("progressBar");
+
+    const statResume = document.getElementById("statResume");
+    const statJobs = document.getElementById("statJobs");
+    const statMatches = document.getElementById("statMatches");
+    const statTopScore = document.getElementById("statTopScore");
+
+    const resultsEmpty = document.getElementById("resultsEmpty");
+    const resultsGrid = document.getElementById("resultsGrid");
+    const resultsBody = document.getElementById("resultsBody");
+    const resultCount = document.getElementById("resultCount");
+
+    const detailPanel = document.getElementById("detailPanel");
+    const dpCompany = document.getElementById("dpCompany");
+    const dpTitle = document.getElementById("dpTitle");
+    const dpEmail = document.getElementById("dpEmail");
+    const dpLocation = document.getElementById("dpLocation");
+    const dpScore = document.getElementById("dpScore");
+    const dpDesc = document.getElementById("dpDesc");
+    const dpClose = document.getElementById("dpClose");
+
+    // ─── Toggle sidebar ──
+    toggleBtn.addEventListener("click", () => {
+      const collapsed = sidebar.classList.toggle("collapsed");
+      toggleBtn.classList.toggle("pushed", !collapsed);
+      toggleBtn.textContent = collapsed ? "☰" : "✕";
+    });
+
+    // ─── Resume ──
+    resumeCard.addEventListener("click", e => { if (e.target.tagName !== "BUTTON") resumeInput.click(); });
+    resumeCard.addEventListener("dragover", e => { e.preventDefault(); resumeCard.classList.add("dragover"); });
+    resumeCard.addEventListener("dragleave", () => resumeCard.classList.remove("dragover"));
+    resumeCard.addEventListener("drop", e => {
+      e.preventDefault(); resumeCard.classList.remove("dragover");
+      const f = e.dataTransfer.files[0];
+      if (f && (f.type === "application/pdf" || f.name.endsWith(".docx"))) { selectedResume = f; updateResumeUI(); }
+    });
+    resumeInput.addEventListener("change", () => {
+      if (resumeInput.files.length) { selectedResume = resumeInput.files[0]; updateResumeUI(); }
+    });
+    function updateResumeUI() {
+      if (!selectedResume) return;
+      resumeFileName.textContent = selectedResume.name;
+      resumeFileName.classList.remove("hidden");
+      resumeCard.classList.add("has-file");
+      resumeCard.classList.add("border-green-500", "bg-green-50");
+      resumeCard.classList.remove("border-gray-200", "border-dashed");
+      resumePill.textContent = "Ready"; resumePill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 whitespace-nowrap";
+      uploadResumeBtn.disabled = false;
+    }
+
+    // ─── Jobs ──
+    jobsCard.addEventListener("click", e => { if (e.target.tagName !== "BUTTON") jobsInput.click(); });
+    jobsCard.addEventListener("dragover", e => { e.preventDefault(); jobsCard.classList.add("dragover"); });
+    jobsCard.addEventListener("dragleave", () => jobsCard.classList.remove("dragover"));
+    jobsCard.addEventListener("drop", e => {
+      e.preventDefault(); jobsCard.classList.remove("dragover");
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type === "application/pdf" || f.name.endsWith(".docx"));
+      if (files.length) { selectedJobs = files; updateJobsUI(); }
+    });
+    jobsInput.addEventListener("change", () => {
+      if (jobsInput.files.length) { selectedJobs = Array.from(jobsInput.files); updateJobsUI(); }
+    });
+    function updateJobsUI() {
+      if (!selectedJobs.length) return;
+      jobsFileName.textContent = `${selectedJobs.length} file(s) selected`;
+      jobsFileName.classList.remove("hidden");
+      jobsCard.classList.add("has-file");
+      jobsCard.classList.add("border-green-500", "bg-green-50");
+      jobsCard.classList.remove("border-gray-200", "border-dashed");
+      jobsPill.textContent = "Ready"; jobsPill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 whitespace-nowrap";
+      uploadJobsBtn.disabled = false;
+    }
+
+    function showP(pct) { progressWrap.classList.remove("hidden"); progressWrap.classList.add("block"); progressBar.style.width = pct + "%"; }
+    function hideP() { progressWrap.classList.add("hidden"); progressBar.style.width = "0%"; }
+
+    function setMsg(el, type, text) {
+      el.textContent = text;
+      el.className = "text-[10px] px-2 py-1.5 rounded-md mt-1.5 leading-tight block";
+      if (type === "error") el.classList.add("bg-red-50", "text-red-700");
+      else if (type === "success") el.classList.add("bg-green-50", "text-green-700");
+      else el.classList.add("bg-blue-50", "text-blue-700");
+    }
+
+    async function uploadResume(file) {
+      const fd = new FormData(); fd.append("file", file);
+      showP(30); const r = await fetch("/api/upload-resume", { method: "POST", body: fd });
+      const d = await r.json(); showP(100);
+      if (!r.ok) throw new Error(d.error || "Upload failed"); return d;
+    }
+    async function uploadJobs(files) {
+      const fd = new FormData();
+      files.forEach(f => fd.append("files[]", f));
+      showP(30); const r = await fetch("/api/upload-jobs", { method: "POST", body: fd });
+      const d = await r.json(); showP(100);
+      if (!r.ok) throw new Error(d.error || "Upload failed"); return d;
+    }
+    async function runMatch() {
+      showP(10); const r = await fetch("/api/match", { method: "POST" });
+      const d = await r.json(); showP(100);
+      if (!r.ok) throw new Error(d.error || "Match failed"); return d;
+    }
+    async function getStatus() { const r = await fetch("/api/status"); return r.json(); }
+    async function clearAll() { await fetch("/api/clear", { method: "POST" }); }
+    async function deleteJob(idx) { await fetch("/api/jobs/" + idx, { method: "DELETE" }); }
+    async function deleteAllJobs() { await fetch("/api/jobs", { method: "DELETE" }); }
+    async function updateJobStatus(idx, status) {
+      const r = await fetch("/api/jobs/" + idx + "/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Status update failed"); }
+      return r.json();
+    }
+
+    function statusLabel(s) { return STATUS_LABELS[s] || s || "New"; }
+    function statusColors(s) { return STATUS_COLORS[s] || STATUS_COLORS.new; }
+
+    function computeStatusCounts(jobs) {
+      const counts = { all: 0, new: 0, email_sent: 0, waiting_reply: 0, interviewing: 0, offer_received: 0, ignored: 0 };
+      for (const j of jobs) {
+        if (!isCompanyEmail(j.email, j.company)) continue;
+        const st = j.status || "new";
+        if (counts[st] !== undefined) counts[st]++;
+        if (st !== "ignored") counts.all++;
+      }
+      return counts;
+    }
+
+    function updateStatusCounts(counts) {
+      document.getElementById("countAll").textContent = counts.all;
+      document.getElementById("countNew").textContent = counts.new;
+      document.getElementById("countSent").textContent = counts.email_sent;
+      document.getElementById("countWaiting").textContent = counts.waiting_reply;
+      document.getElementById("countInterview").textContent = counts.interviewing;
+      document.getElementById("countOffer").textContent = counts.offer_received;
+      document.getElementById("countIgnored").textContent = counts.ignored;
+      document.getElementById("resultCount").textContent = `${counts.all} job(s)`;
+    }
+
+    uploadResumeBtn.addEventListener("click", async () => {
+      uploadResumeBtn.disabled = true;
+      setMsg(resumeMsg, "info", "Parsing…");
+      try {
+        const d = await uploadResume(selectedResume);
+        setMsg(resumeMsg, "success", d.message);
+        resumePill.textContent = "Uploaded ✓"; resumePill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 whitespace-nowrap";
+        statResume.textContent = selectedResume.name;
+        await refresh();
+      } catch (e) { setMsg(resumeMsg, "error", e.message); }
+      finally { uploadResumeBtn.disabled = false; hideP(); }
+    });
+
+    uploadJobsBtn.addEventListener("click", async () => {
+      uploadJobsBtn.disabled = true;
+      setMsg(jobsMsg, "info", "Parsing…");
+      try {
+        const d = await uploadJobs(selectedJobs);
+        let msg = d.message;
+        if (d.warnings && d.warnings.length) msg += " Warnings: " + d.warnings.join(" | ");
+        setMsg(jobsMsg, d.warnings && d.warnings.length ? "error" : "success", msg);
+        jobsPill.textContent = `${d.job_count} job(s) parsed`; jobsPill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 whitespace-nowrap";
+        statJobs.textContent = d.job_count;
+        await refresh();
+        const r = await fetch("/api/jobs?exclude_ignored=false");
+        const jd = await r.json();
+        if (jd.jobs && jd.jobs.length) {
+          allResults = jd.jobs;
+          const counts = computeStatusCounts(allResults);
+          updateStatusCounts(counts);
+        }
+      } catch (e) { setMsg(jobsMsg, "error", e.message); }
+      finally { uploadJobsBtn.disabled = false; hideP(); }
+    });
+
+    document.getElementById("deleteAllJobsBtn").addEventListener("click", async () => {
+      if (!confirm("Delete all jobs? Resume will be kept.")) return;
+      await deleteAllJobs();
+      allResults = [];
+      resultsGrid.classList.add("hidden");
+      resultsGrid.classList.remove("block");
+      resultsEmpty.classList.remove("hidden");
+      jobsPill.textContent = "No files"; jobsPill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400 whitespace-nowrap";
+      statJobs.textContent = "0";
+      document.getElementById("deleteAllJobsBtn").classList.add("hidden");
+      updateStats();
+      updateStatusCounts({ all: 0, new: 0, email_sent: 0, waiting_reply: 0, interviewing: 0, offer_received: 0, ignored: 0 });
+    });
+
+    matchBtn.addEventListener("click", async () => {
+      matchBtn.disabled = true; matchBtn.textContent = "Matching…";
+      try {
+        const d = await runMatch();
+        allResults = d.results || [];
+        renderResults(allResults);
+        statMatches.textContent = allResults.length;
+        statTopScore.textContent = allResults.length ? allResults[0].score + "%" : "—";
+        if (window.innerWidth < 1100) {
+          sidebar.classList.add("collapsed");
+          toggleBtn.classList.remove("pushed");
+          toggleBtn.textContent = "☰";
+        }
+      } catch (e) { alert(e.message); }
+      finally { matchBtn.disabled = false; matchBtn.textContent = "🔍 Find Matches"; hideP(); }
+    });
+
+    // ─── Status Tab Handlers ──
+    document.querySelectorAll("#statusTabs .tab").forEach(tab => {
+      tab.addEventListener("click", function() {
+        document.querySelectorAll("#statusTabs .tab").forEach(t => {
+          t.classList.remove("bg-gray-900", "text-white", "border-gray-900");
+        });
+        this.classList.add("bg-gray-900", "text-white", "border-gray-900");
+        activeFilter = this.dataset.status;
+        if (allResults.length) renderResults(allResults);
+      });
+    });
+
+    clearBtn.addEventListener("click", async () => {
+      await clearAll();
+      selectedResume = null; selectedJobs = [];
+      resumeInput.value = ""; jobsInput.value = "";
+      resumeFileName.textContent = ""; resumeFileName.classList.add("hidden");
+      resumeCard.classList.remove("has-file", "border-green-500", "bg-green-50");
+      resumeCard.classList.add("border-gray-200", "border-dashed");
+      resumePill.textContent = "Not uploaded"; resumePill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400 whitespace-nowrap";
+      uploadResumeBtn.disabled = true; resumeMsg.className = "hidden";
+      jobsFileName.textContent = ""; jobsFileName.classList.add("hidden");
+      jobsCard.classList.remove("has-file", "border-green-500", "bg-green-50");
+      jobsCard.classList.add("border-gray-200", "border-dashed");
+      jobsPill.textContent = "No files"; jobsPill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400 whitespace-nowrap";
+      uploadJobsBtn.disabled = true; jobsMsg.className = "hidden";
+      matchBtn.disabled = true;
+      resultsGrid.classList.add("hidden"); resultsGrid.classList.remove("block"); resultsEmpty.classList.remove("hidden");
+      detailPanel.classList.add("hidden"); detailPanel.classList.remove("block");
+      document.getElementById("deleteAllJobsBtn").classList.add("hidden");
+      document.getElementById("agentBtn").classList.add("hidden");
+      statResume.textContent = "—"; statJobs.textContent = "0";
+      statMatches.textContent = "—"; statTopScore.textContent = "—";
+      allResults = [];
+      updateStatusCounts({ all: 0, new: 0, email_sent: 0, waiting_reply: 0, interviewing: 0, offer_received: 0, ignored: 0 });
+      hideP();
+    });
+
+    async function refresh() {
+      const s = await getStatus();
+      matchBtn.disabled = !(s.resume_loaded && s.job_count > 0);
+    }
+
+    // ─── Render ──
+    function updateStats() {
+      statMatches.textContent = allResults.length || "—";
+      statTopScore.textContent = allResults.length ? allResults[0].score + "%" : "—";
+    }
+
+    function renderResults(results) {
+      const filteredEntries = results
+        .map((job, idx) => ({ job, idx }))
+        .filter(({ job }) => {
+          if (!isCompanyEmail(job.email, job.company)) return false;
+          if (activeFilter === "all") return job.status !== "ignored";
+          return job.status === activeFilter;
+        });
+
+      const counts = computeStatusCounts(results);
+      updateStatusCounts(counts);
+
+      if (!filteredEntries.length) {
+        resultsGrid.classList.add("hidden"); resultsGrid.classList.remove("block");
+        resultsEmpty.classList.remove("hidden");
+        resultsEmpty.innerHTML = results.length > 0
+          ? `<p class="text-sm text-gray-400">No jobs in "${activeFilter === "all" ? "active" : activeFilter}" status. Change tab or update job status.</p>`
+          : `<p class="text-sm text-gray-400">No matching results found.</p>`;
+        return;
+      }
+      resultsEmpty.classList.add("hidden");
+      resultsGrid.classList.remove("hidden"); resultsGrid.classList.add("block");
+      document.getElementById("deleteAllJobsBtn").classList.remove("hidden");
+      document.getElementById("agentBtn").classList.remove("hidden");
+
+      let html = "";
+      filteredEntries.forEach(({ job, idx }) => {
+        const sc = job.score || 0;
+        const tier = sc >= 60 ? "top" : sc >= 30 ? "mid" : "low";
+        const cls = sc >= 60 ? "high" : sc >= 30 ? "mid" : "low";
+        const email = job.email || "";
+        const st = job.status || "new";
+        const info = [job.location, job.experience].filter(Boolean).join(" | ") || "—";
+        const rankColor = tier === "top" ? "text-green-600" : tier === "mid" ? "text-amber-600" : "text-red-600";
+        html += `
+          <div class="rg-row grid gap-2 px-3 py-2.5 border-b border-gray-100 items-center cursor-pointer transition-colors hover:bg-indigo-50/40" data-idx="${idx}">
+            <div class="text-[11px] font-semibold text-center ${rankColor}">${idx + 1}</div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-bold text-xs min-w-[32px] text-right ${SCORE_TEXT[cls]}">${sc}%</span>
+              <div class="w-[40px] h-1 bg-gray-100 rounded overflow-hidden shrink-0"><div class="h-full rounded transition-all duration-500 ${SCORE_BG[cls]}" style="width:${Math.min(sc, 100)}%"></div></div>
+            </div>
+            <div class="font-semibold text-xs text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">${esc(job.company || "—")}</div>
+            <div class="text-xs text-indigo-500 overflow-hidden text-ellipsis whitespace-nowrap">${esc(job.title || "—")}</div>
+            <div class="status-h status-cell relative flex items-center w-full overflow-hidden">
+              <span class="status-badge inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap cursor-pointer transition-opacity hover:opacity-80 border-none leading-normal ${statusColors(st)}" data-idx="${idx}">${statusLabel(st)} <span class="text-[9px] opacity-60">▾</span></span>
+              <select class="status-select text-[10px] px-1 py-0.5 rounded-md border border-gray-300 w-[130px] cursor-pointer hidden" data-idx="${idx}">
+                <option value="new" ${st === "new" ? "selected" : ""}>🆕 New</option>
+                <option value="email_sent" ${st === "email_sent" ? "selected" : ""}>📬 Email Sent</option>
+                <option value="waiting_reply" ${st === "waiting_reply" ? "selected" : ""}>⏳ Waiting for Reply</option>
+                <option value="interviewing" ${st === "interviewing" ? "selected" : ""}>🎯 Getting Interviewed</option>
+                <option value="offer_received" ${st === "offer_received" ? "selected" : ""}>✅ Offer Received</option>
+                <option value="ignored" ${st === "ignored" ? "selected" : ""}>🙈 Ignore</option>
+              </select>
+            </div>
+            <div class="overflow-hidden text-ellipsis whitespace-nowrap">${email ? `<a href="mailto:${email}" class="text-[11px] text-indigo-500 no-underline hover:underline overflow-hidden text-ellipsis whitespace-nowrap block">${email}</a>` : "<span class='text-[11px] text-gray-400'>—</span>"}</div>
+            <div class="text-[11px] text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">${esc(info)}</div>
+            <div class="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap break-words max-h-[4.3em] overflow-y-auto">${esc(job.description || '—')}</div>
+            <div class="text-center"><button class="del-btn inline-flex items-center justify-center w-5.5 h-5.5 border-none rounded bg-red-100 text-red-600 text-[11px] cursor-pointer transition-colors hover:bg-red-200" data-idx="${idx}" title="Delete">✕</button></div>
+          </div>`;
+      });
+      resultsBody.innerHTML = html;
+
+      // Row click → show detail
+      document.querySelectorAll(".rg-row").forEach(row => {
+        row.addEventListener("click", (e) => {
+          if (e.target.classList.contains("del-btn") || e.target.closest(".status-select") || e.target.closest(".status-badge")) return;
+          const idx = parseInt(row.dataset.idx);
+          showDetail(idx);
+          document.querySelectorAll(".rg-row").forEach(r => r.classList.remove("bg-indigo-50", "rounded-md"));
+          row.classList.add("bg-indigo-50", "rounded-md");
+        });
+      });
+
+      // Status badge click → show dropdown
+      document.querySelectorAll(".status-badge").forEach(badge => {
+        badge.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const cell = badge.closest(".status-cell");
+          const select = cell.querySelector(".status-select");
+          badge.style.display = "none";
+          select.style.display = "block";
+          select.focus();
+        });
+      });
+
+      // Status select change → PATCH + re-render
+      document.querySelectorAll(".status-select").forEach(select => {
+        select.addEventListener("change", async (e) => {
+          const idx = parseInt(select.dataset.idx);
+          const newStatus = select.value;
+          try {
+            await updateJobStatus(idx, newStatus);
+            allResults[idx].status = newStatus;
+            renderResults(allResults);
+            if (detailPanel.classList.contains("block")) {
+              const dpIdx = detailPanel.dataset.showingIdx;
+              if (dpIdx && parseInt(dpIdx) === idx) {
+                updateDetailStatus(allResults[idx]);
+              }
+            }
+          } catch (err) {
+            alert("Failed to update status: " + err.message);
+            renderResults(allResults);
+          }
+        });
+        select.addEventListener("blur", (e) => {
+          setTimeout(() => {
+            const cell = select.closest(".status-cell");
+            const badge = cell.querySelector(".status-badge");
+            select.style.display = "none";
+            badge.style.display = "";
+          }, 200);
+        });
+      });
+
+      // Delete single job
+      document.querySelectorAll(".del-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.dataset.idx);
+          if (!confirm("Delete this job?")) return;
+          await deleteJob(idx);
+          allResults.splice(idx, 1);
+          renderResults(allResults);
+          updateStats();
+        });
+      });
+    }
+
+    function updateDetailStatus(job) {
+      const st = job.status || "new";
+      const badge = document.getElementById("dpStatusBadge");
+      const select = document.getElementById("dpStatusSelect");
+      badge.className = `status-badge inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-opacity hover:opacity-80 border-none leading-normal ${statusColors(st)}`;
+      badge.textContent = statusLabel(st);
+      select.value = st;
+    }
+
+    function showDetail(idx) {
+      const job = allResults[idx];
+      if (!job) return;
+      detailPanel.dataset.showingIdx = idx;
+      detailPanel.classList.remove("hidden"); detailPanel.classList.add("block");
+      dpCompany.textContent = job.company || "—";
+      dpTitle.textContent = job.title || "—";
+      dpEmail.innerHTML = job.email ? `<a href="mailto:${job.email}" class="text-indigo-500 no-underline hover:underline">${job.email}</a>` : "—";
+      dpLocation.textContent = job.location || "—";
+      document.getElementById("dpExperience").textContent = job.experience || "—";
+      const sc = job.score || 0;
+      const tier = sc >= 60 ? "" : sc >= 30 ? "mid" : "low";
+      dpScore.className = `inline-flex items-center gap-2 mt-2.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold ${SCORE_DP[tier]}`;
+      dpScore.textContent = `Match Score: ${sc}%  (${job.scoring_method || 'tf-idf'})`;
+      dpDesc.textContent = job.description || "No description available.";
+
+      updateDetailStatus(job);
+
+      const tsEl = document.getElementById("dpTimestamps");
+      let tsParts = [];
+      if (job.created_at) tsParts.push(`Added: ${new Date(job.created_at).toLocaleString()}`);
+      if (job.email_sent_at) tsParts.push(`Emailed: ${new Date(job.email_sent_at).toLocaleString()}`);
+      if (job.status_updated_at) tsParts.push(`Status: ${new Date(job.status_updated_at).toLocaleString()}`);
+      tsEl.textContent = tsParts.join("  •  ");
+      tsEl.style.display = tsParts.length ? "" : "none";
+
+      const strEl = document.getElementById('dpStrengths');
+      const gapEl = document.getElementById('dpGaps');
+      const strSec = document.getElementById('dpStrengthsSection');
+      const gapSec = document.getElementById('dpGapsSection');
+      if (job.strengths) {
+        strEl.textContent = job.strengths;
+        strSec.classList.remove("hidden");
+      } else { strSec.classList.add("hidden"); }
+      if (job.gaps) {
+        gapEl.textContent = job.gaps;
+        gapSec.classList.remove("hidden");
+      } else { gapSec.classList.add("hidden"); }
+    }
+
+    // Detail panel status change handlers
+    document.getElementById("dpStatusBadge").addEventListener("click", function() {
+      document.getElementById("dpStatusBadge").style.display = "none";
+      document.getElementById("dpStatusSelect").style.display = "block";
+      document.getElementById("dpStatusSelect").focus();
+    });
+
+    document.getElementById("dpStatusSelect").addEventListener("change", async function() {
+      const idx = parseInt(detailPanel.dataset.showingIdx);
+      const newStatus = this.value;
+      if (isNaN(idx)) return;
+      try {
+        await updateJobStatus(idx, newStatus);
+        allResults[idx].status = newStatus;
+        updateDetailStatus(allResults[idx]);
+        renderResults(allResults);
+      } catch (err) {
+        alert("Failed to update status: " + err.message);
+        updateDetailStatus(allResults[idx]);
+      }
+      this.style.display = "none";
+      document.getElementById("dpStatusBadge").style.display = "";
+    });
+
+    document.getElementById("dpStatusSelect").addEventListener("blur", function() {
+      setTimeout(() => {
+        this.style.display = "none";
+        document.getElementById("dpStatusBadge").style.display = "";
+      }, 200);
+    });
+
+    dpClose.addEventListener("click", () => {
+      detailPanel.classList.add("hidden"); detailPanel.classList.remove("block");
+      document.querySelectorAll(".rg-row").forEach(r => r.classList.remove("bg-indigo-50", "rounded-md"));
+    });
+
+    function esc(s) { if (!s) return ""; const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+    // ─── Init ──
+    (async function init() {
+      try {
+        const s = await getStatus();
+        if (s.resume_loaded) {
+          statResume.textContent = s.resume_filename || "Uploaded";
+          resumePill.textContent = "Uploaded ✓"; resumePill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 whitespace-nowrap";
+        }
+        if (s.job_count > 0) {
+          statJobs.textContent = s.job_count;
+          jobsPill.textContent = `${s.job_count} job(s) parsed`; jobsPill.className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800 whitespace-nowrap";
+        }
+        matchBtn.disabled = !(s.resume_loaded && s.job_count > 0);
+
+        if (s.job_count > 0) {
+          const r = await fetch("/api/jobs?exclude_ignored=false");
+          const d = await r.json();
+          if (d.jobs && d.jobs.length) {
+            allResults = d.jobs;
+            const counts = computeStatusCounts(allResults);
+            updateStatusCounts(counts);
+            if (allResults.some(j => j.score !== undefined)) {
+              renderResults(allResults);
+              statMatches.textContent = allResults.length;
+              statTopScore.textContent = allResults.length ? allResults[0].score + "%" : "—";
+            }
+          }
+        }
+      } catch (_) {}
+    })();
+  </script>
+</body>
+</html>

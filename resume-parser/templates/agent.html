@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Agent — Resume–Job Matcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", -apple-system, sans-serif;
+      background: #f8f9fb; color: #1a1a2e;
+      display: flex; height: 100vh; line-height: 1.5;
+    }
+    .sidebar {
+      width: 340px; min-width: 340px; background: #fff; border-right: 1px solid #eef0f2;
+      display: flex; flex-direction: column; height: 100vh; overflow-y: auto;
+    }
+    .sidebar h2 { padding: 18px 18px 10px; font-size: 1rem; font-weight: 600; }
+    .email-list { flex: 1; padding: 0 14px 10px; overflow-y: auto; }
+    .email-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border: 1px solid #f3f4f6; border-radius: 6px;
+      margin-bottom: 4px; font-size: 0.8rem;
+    }
+    .email-item.sent { background: #f0fdf4; border-color: #bbf7d0; }
+    .email-item.failed { background: #fef2f2; border-color: #fecaca; }
+    .email-item.sending { background: #eff6ff; border-color: #bfdbfe; }
+    .email-item .info { flex: 1; min-width: 0; }
+    .email-item .info .company { font-weight: 600; font-size: 0.8rem; }
+    .email-item .info .addr { color: #6366f1; font-size: 0.72rem; word-break: break-all; }
+    .badge {
+      font-size: 0.6rem; padding: 1px 6px; border-radius: 999px; white-space: nowrap;
+    }
+    .badge.pending { background: #fef3c7; color: #92400e; }
+    .badge.sent { background: #d1fae5; color: #065f46; }
+    .badge.sending { background: #dbeafe; color: #1e40af; }
+    .badge.failed { background: #fee2e2; color: #991b1b; }
+
+    .main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .main-content { padding: 20px 28px; flex: 1; overflow-y: auto; max-width: 900px; }
+
+    .section { margin-bottom: 18px; }
+    .section h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #374151; }
+    .row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+    .row label { font-size: 0.78rem; color: #6b7280; display: block; margin-bottom: 3px; }
+    .row input, .row textarea {
+      padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 0.85rem; font-family: inherit; outline: none; width: 100%;
+    }
+    .row input:focus, .row textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,.12); }
+    .field { flex: 1; min-width: 200px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 8px 16px; border: none; border-radius: 6px;
+      font-size: 0.82rem; font-weight: 500; cursor: pointer;
+      transition: opacity .12s; line-height: 1.4; white-space: nowrap;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: #1f2937; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #111827; }
+    .btn-success { background: #10b981; color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #059669; }
+    .btn-outline { background: transparent; border: 1px solid #d1d5db; color: #374151; }
+    .btn-outline:hover:not(:disabled) { background: #f9fafb; }
+    .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover:not(:disabled) { background: #dc2626; }
+
+    .log-box {
+      background: #1f2937; color: #e5e7eb; border-radius: 8px; padding: 12px 14px;
+      font-size: 0.78rem; font-family: 'Consolas', monospace; min-height: 120px;
+      max-height: 260px; overflow-y: auto; line-height: 1.6; white-space: pre-wrap;
+    }
+    .log-box .ok { color: #34d399; }
+    .log-box .err { color: #f87171; }
+    .log-box .info { color: #60a5fa; }
+    .log-box .dim { color: #9ca3af; }
+
+    .status-bar {
+      display: flex; gap: 16px; padding: 10px 0; font-size: 0.78rem; color: #6b7280;
+    }
+    .status-bar span { display: flex; align-items: center; gap: 4px; }
+    .status-bar .num { font-weight: 600; color: #111827; }
+
+    .verify-ok { color: #059669; font-size: 0.78rem; font-weight: 500; }
+    .verify-fail { color: #dc2626; font-size: 0.78rem; font-weight: 500; }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; min-width: unset; height: auto; max-height: 35vh; }
+      .main { height: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <h2>📬 Email Queue</h2>
+    <div class="status-bar" style="padding:0 14px 8px">
+      <span>Total: <span class="num" id="totalCount">0</span></span>
+      <span>Sent: <span class="num" id="sentCount">0</span></span>
+      <span>Pending: <span class="num" id="pendingCount">0</span></span>
+    </div>
+    <div class="email-list" id="emailList">
+      <p style="color:#9ca3af;font-size:0.8rem;padding:20px;text-align:center">Loading...</p>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="main-content">
+
+      <!-- Resume Attachment -->
+      <div class="section">
+        <h3>📎 Resume Attachment</h3>
+        <div class="row">
+          <div class="field">
+            <label>Upload the resume file to attach with emails</label>
+            <input type="file" id="resumeFileInput" accept=".pdf,.docx" style="font-size:0.82rem" />
+          </div>
+          <div style="align-self:flex-end;display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" id="uploadResumeBtn">Upload</button>
+          </div>
+        </div>
+        <div id="resumeStatus" style="margin-top:4px;font-size:0.78rem;color:#6b7280"></div>
+      </div>
+
+      <!-- Gmail Auth -->
+      <div class="section">
+        <h3>🔐 Gmail Authentication</h3>
+        <div class="row">
+          <div class="field">
+            <label>Gmail Address</label>
+            <input type="email" id="gmailUser" placeholder="you@gmail.com" />
+          </div>
+          <div class="field">
+            <label>App Password <a href="https://support.google.com/accounts/answer/185833" target="_blank" style="font-size:0.7rem;color:#6366f1">(how to get one)</a></label>
+            <input type="password" id="gmailPass" placeholder="16-char app password" />
+          </div>
+          <div style="align-self:flex-end;display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" id="verifyBtn">Verify</button>
+          </div>
+        </div>
+        <div id="authStatus" style="margin-top:4px"></div>
+      </div>
+
+      <!-- Email Template -->
+      <div class="section">
+        <h3>📝 Email Template</h3>
+        <div class="row" style="margin-bottom:8px">
+          <div class="field">
+            <label>Subject Line (use <code>{{company}}</code> <code>{{title}}</code> as placeholders)</label>
+            <input type="text" id="subjectLine" value="Application for {{title}} at {{company}}" />
+          </div>
+        </div>
+        <textarea id="templateText" rows="8" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;font-family:inherit;outline:none;resize:vertical">Dear Team,
+
+I am writing to express my interest in the {{title}} position at {{company}}. With over 18 years of experience in quality engineering and test automation leadership, I believe my background aligns closely with what you are looking for.
+
+A few highlights relevant to this role:
+
+Generative AI in Testing: I have hands-on experience designing RAG-based test intelligence pipelines and MCP (Model Context Protocol) integrations that connect LLMs with automation frameworks for context-aware test generation, self-healing locators, and AI-assisted defect analysis — directly aligned with your focus on GenAI-driven test strategy and POCs.
+
+Automation Frameworks: 18+ years building and scaling automation solutions using Selenium WebDriver and Playwright, with strong programming skills in C#.NET, Python, JavaScript/TypeScript, and Java.
+
+Leadership & Mentoring: Led and mentored QA teams of 6+ engineers, driving 100% automation adoption and reducing production defects by ~40%, while partnering closely with product and engineering leadership.
+
+CI/CD & Enterprise Automation: Extensive experience integrating automation into Azure DevOps and GitHub Actions pipelines, and architecting automation strategies across multiple enterprise product lines.
+
+Innovation & POCs: Regularly evaluate and present new AI-enabled testing tools and approaches to leadership, including multi-agent QA workflows (n8n, Langflow, GPT, Claude, OpenRouter, Command-Code) for intelligent defect triage and root cause analysis.
+
+I am based in Pune and available to discuss how my experience in AI-augmented quality engineering can contribute to your team's automation and innovation goals. My resume is attached for your review.
+
+Thank you for your time and consideration. I look forward to the opportunity to speak further.
+
+Best regards,
+Tarun Kumar Babbar
++91-9623252365
+babbartarunkumar@gmail.com
+linkedin.com/in/tarunbabbar
+Pune, India</textarea>
+        <div style="font-size:0.72rem;color:#6b7280;margin-top:4px">Use placeholders: <code>{{company}}</code> <code>{{title}}</code> <code>{{location}}</code></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="section">
+        <div class="row">
+          <button class="btn btn-outline" id="testBtn" disabled>📧 Send Test (first unsent)</button>
+          <button class="btn btn-success" id="sendAllBtn" disabled>▶ Send All Unsent</button>
+          <button class="btn btn-outline" id="backBtn" style="margin-left:auto">← Back</button>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="section">
+        <h3>📋 Activity Log</h3>
+        <div class="log-box" id="logBox">Ready. Authenticate Gmail first.</div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // ─── State ──────────────────────────────────────────
+    let jobs = [];
+    let gmailUser = localStorage.getItem("agent_gmail_user") || "";
+    let gmailPass = localStorage.getItem("agent_gmail_pass") || "";
+    let verified = false;
+    let sending = false;
+
+    const $ = id => document.getElementById(id);
+    const logBox = $("logBox");
+    const emailListEl = $("emailList");
+    const totalCount = $("totalCount");
+    const sentCount = $("sentCount");
+    const pendingCount = $("pendingCount");
+
+    // ─── Logging ─────────────────────────────────────────
+    function log(text, cls = "dim") {
+      const d = document.createElement("div");
+      d.innerHTML = `<span class="${cls}">${text}</span>`;
+      logBox.appendChild(d);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    function logClear() { logBox.innerHTML = ""; }
+
+    // ─── Helpers ─────────────────────────────────────────
+    function esc(s) { if (!s) return ""; const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+    function renderList() {
+      if (!jobs.length) {
+        emailListEl.innerHTML = `<p style="color:#9ca3af;font-size:0.8rem;padding:20px;text-align:center">No jobs loaded.</p>`;
+        totalCount.textContent = "0"; sentCount.textContent = "0"; pendingCount.textContent = "0";
+        return;
+      }
+      let total = 0, sent = 0, filtered = 0;
+      let html = "";
+      jobs.forEach((j, i) => {
+        if (!isCompanyEmail(j.email, j.company)) { filtered++; return; }
+        total++;
+        const st = j.email_sent ? "sent" : "pending";
+        if (j.email_sent) sent++;
+        html += `<div class="email-item ${st}" data-idx="${i}">
+          <div class="info">
+            <div class="company">${esc(j.company || "Unknown")}</div>
+            <div class="addr">${esc(j.email || "—")}</div>
+          </div>
+          <span class="badge ${st}">${j.email_sent ? "✔ Sent" : "Pending"}</span>
+        </div>`;
+      });
+      if (filtered > 0) {
+        html += `<p style="color:#9ca3af;font-size:0.72rem;padding:8px;text-align:center">${filtered} non-matching email(s) hidden</p>`;
+      }
+      emailListEl.innerHTML = html;
+      totalCount.textContent = total;
+      sentCount.textContent = sent;
+      pendingCount.textContent = total - sent;
+    }
+
+    function isCompanyEmail(email, company) {
+      if (!email) return false;
+      const lower = email.toLowerCase();
+      const generic = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "rediffmail.com", "ymail.com", "live.com"];
+      const domain = lower.split("@")[1];
+      if (!domain || generic.includes(domain)) return false;
+      if (!company) return true;
+      const comp = company.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const dom = domain.split(".")[0];
+      return comp.includes(dom) || dom.includes(comp);
+    }
+
+    function updateBadge(idx, st, label) {
+      const item = emailListEl.querySelector(`.email-item[data-idx="${idx}"]`);
+      if (!item) return;
+      item.className = "email-item " + st;
+      const b = item.querySelector(".badge");
+      if (b) { b.className = "badge " + st; b.textContent = label; }
+      // update counts
+      const companyJobs = jobs.filter(j => isCompanyEmail(j.email, j.company));
+      const sent = companyJobs.filter(j => j.email_sent).length;
+      sentCount.textContent = sent;
+      pendingCount.textContent = companyJobs.length - sent;
+    }
+
+    function updateButtons() {
+      const hasAuth = verified && gmailUser && gmailPass;
+      const hasJobs = jobs.some(j => isCompanyEmail(j.email, j.company) && !j.email_sent);
+      $("testBtn").disabled = !hasAuth || !hasJobs || sending;
+      $("sendAllBtn").disabled = !hasAuth || !hasJobs || sending;
+    }
+
+    // ─── Resume upload ──────────────────────────────────
+    $("uploadResumeBtn").addEventListener("click", async () => {
+      const file = $("resumeFileInput").files[0];
+      if (!file) { $("resumeStatus").innerHTML = '<span class="verify-fail">Select a file first.</span>'; return; }
+      const fd = new FormData();
+      fd.append("file", file);
+      $("uploadResumeBtn").disabled = true; $("uploadResumeBtn").textContent = "Uploading...";
+      try {
+        const r = await fetch("/api/upload-resume", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+        $("resumeStatus").innerHTML = `<span class="verify-ok">✅ ${esc(d.message)}</span>`;
+        log(`📎 Resume saved: ${file.name}`, "ok");
+      } catch (e) {
+        $("resumeStatus").innerHTML = `<span class="verify-fail">❌ ${esc(e.message)}</span>`;
+      }
+      $("uploadResumeBtn").disabled = false; $("uploadResumeBtn").textContent = "Upload";
+    });
+
+    // ─── Load jobs ──────────────────────────────────────
+    async function loadJobs() {
+      try {
+        const r = await fetch("/api/jobs");
+        const d = await r.json();
+        jobs = d.jobs || [];
+        renderList();
+        updateButtons();
+      } catch (e) {
+        emailListEl.innerHTML = `<p style="color:#dc2626;font-size:0.8rem;padding:20px;text-align:center">Failed to load jobs: ${e.message}</p>`;
+      }
+    }
+
+    // ─── Gmail Auth ─────────────────────────────────────
+    if (gmailUser) $("gmailUser").value = gmailUser;
+    if (gmailPass) $("gmailPass").value = gmailPass;
+
+    $("verifyBtn").addEventListener("click", async () => {
+      const u = $("gmailUser").value.trim();
+      const p = $("gmailPass").value.trim();
+      if (!u || !p) { $("authStatus").innerHTML = '<span class="verify-fail">Fill in both fields.</span>'; return; }
+      $("verifyBtn").disabled = true; $("verifyBtn").textContent = "Verifying...";
+      $("authStatus").innerHTML = "";
+      try {
+        const r = await fetch("/api/verify-gmail", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gmailUser: u, gmailPass: p }),
+        });
+        const d = await r.json();
+        if (!d.verified) throw new Error(d.error || "Auth failed");
+        gmailUser = u; gmailPass = p; verified = true;
+        localStorage.setItem("agent_gmail_user", u);
+        localStorage.setItem("agent_gmail_pass", p);
+        $("authStatus").innerHTML = '<span class="verify-ok">✅ Authenticated successfully!</span>';
+        log("✅ Gmail authentication successful", "ok");
+        updateButtons();
+      } catch (e) {
+        verified = false;
+        $("authStatus").innerHTML = `<span class="verify-fail">❌ ${esc(e.message)}</span>`;
+        log("❌ Auth failed: " + e.message, "err");
+      }
+      $("verifyBtn").disabled = false; $("verifyBtn").textContent = "Verify";
+    });
+
+    // ─── Send email ─────────────────────────────────────
+    async function sendOne(idx) {
+      const job = jobs[idx];
+      if (!job || !job.email) return;
+      const template = $("templateText").value;
+      const subjectTmpl = $("subjectLine").value || "Application for {{title}} at {{company}}";
+      const company = job.company || "Company";
+      const title = job.title || "Position";
+      const location = job.location || "";
+
+      const body = template
+        .replace(/\{\{company\}\}/g, company)
+        .replace(/\{\{title\}\}/g, title)
+        .replace(/\{\{location\}\}/g, location);
+      const subject = subjectTmpl
+        .replace(/\{\{company\}\}/g, company)
+        .replace(/\{\{title\}\}/g, title)
+        .replace(/\{\{location\}\}/g, location);
+
+      updateBadge(idx, "sending", "Sending...");
+      log(`📧 Sending to ${company} (${job.email})...`, "info");
+
+      const r = await fetch("/api/send-email", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobIdx: idx, gmailUser, gmailPass, body, subject }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Send failed");
+      jobs[idx].email_sent = true;
+      updateBadge(idx, "sent", "✔ Sent");
+      log(`✅ Sent to ${company} (${job.email})`, "ok");
+    }
+
+    // ─── Test send (first unsent) ──────────────────────
+    $("testBtn").addEventListener("click", async () => {
+      if (sending) return;
+      sending = true; updateButtons();
+      const idx = jobs.findIndex(j => isCompanyEmail(j.email, j.company) && !j.email_sent);
+      if (idx === -1) { log("No unsent company emails.", "dim"); sending = false; updateButtons(); return; }
+      try { await sendOne(idx); }
+      catch (e) {
+        updateBadge(idx, "failed", "✕ Failed");
+        log("❌ " + e.message, "err");
+      }
+      sending = false; updateButtons();
+    });
+
+    // ─── Send all ──────────────────────────────────────
+    $("sendAllBtn").addEventListener("click", async () => {
+      if (sending) return;
+      sending = true; updateButtons();
+      logClear();
+      const hidden = jobs.filter(j => j.email && !isCompanyEmail(j.email, j.company)).length;
+      log(`▶ Starting batch send... (${hidden} non-matching email(s) skipped)`, "info");
+      let success = 0, failed = 0;
+      for (let i = 0; i < jobs.length; i++) {
+        if (!isCompanyEmail(jobs[i].email, jobs[i].company) || jobs[i].email_sent) continue;
+        try {
+          await sendOne(i);
+          success++;
+        } catch (e) {
+          updateBadge(i, "failed", "✕ Failed");
+          log("❌ " + e.message, "err");
+          failed++;
+        }
+        // Small delay between sends to avoid Gmail rate limits
+        if (i < jobs.length - 1) await new Promise(r => setTimeout(r, 2000));
+      }
+      log(`\n✅ Done — ${success} sent, ${failed} failed.`, success > 0 ? "ok" : "err");
+      sending = false; updateButtons();
+    });
+
+    // ─── Back ──────────────────────────────────────────
+    $("backBtn").addEventListener("click", () => { window.location.href = "/"; });
+
+    // ─── Init ──────────────────────────────────────────
+    loadJobs();
+    // Auto-verify if saved creds exist
+    if (gmailUser && gmailPass) {
+      $("verifyBtn").click();
+    }
+  </script>
+</body>
+</html>
