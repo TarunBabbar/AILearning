@@ -1,6 +1,6 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, Mail, ChevronLeft, ChevronRight, BriefcaseBusiness } from "lucide-react";
+import { LayoutDashboard, Mail, ChevronLeft, ChevronRight, BriefcaseBusiness, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Layout() {
@@ -49,6 +49,16 @@ export default function Layout() {
           >
             <Mail size={17} />
             {!collapsed && "Email Agent"}
+          </NavLink>
+          <NavLink
+            to="/ignored-agent"
+            className={({ isActive }) => cn(
+              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
+              isActive ? "bg-amber-50 text-amber-800" : "text-[#7c6e60] hover:bg-[#f5f0eb] hover:text-[#1c1917]"
+            )}
+          >
+            <Ban size={17} />
+            {!collapsed && "Ignored Agent"}
           </NavLink>
         </nav>
 

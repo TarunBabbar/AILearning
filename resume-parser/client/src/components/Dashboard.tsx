@@ -2,16 +2,16 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { Job } from "@/lib/types";
 import { cn, getScoreColor, getScoreBg, isCompanyEmail, isValidJobTitle, formatDate } from "@/lib/utils";
-import { Search, Trash2, X, FileText, Upload, MapPin, Clock, Mail, Award, Building2, Plus } from "lucide-react";
+import { Search, Trash2, X, FileText, Upload, MapPin, Clock, Mail, Award, Building2, Plus, RefreshCw, ChevronDown } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
   new: "New", email_sent: "Email Sent", waiting_reply: "Waiting",
-  interviewing: "Interviewing", offer_received: "Offered", ignored: "Ignored"
+  interviewing: "Interviewing", offer_received: "Offered", ignored: "Ignored", duplicate: "Duplicate"
 };
 
 const STATUS_DOT: Record<string, string> = {
   new: "bg-blue-500", email_sent: "bg-emerald-500", waiting_reply: "bg-amber-500",
-  interviewing: "bg-violet-500", offer_received: "bg-emerald-600", ignored: "bg-stone-300"
+  interviewing: "bg-violet-500", offer_received: "bg-emerald-600", ignored: "bg-stone-300", duplicate: "bg-zinc-400"
 };
 
 export default function Dashboard() {
@@ -23,39 +23,45 @@ export default function Dashboard() {
   const [filteredResults, setFilteredResults] = useState<Job[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
-  const [detailJob, setDetailJob] = useState<{ job: Job; idx: number } | null>(null);
+  const [detailJob, setDetailJob] = useState<{ job: Job } | null>(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [topScore, setTopScore] = useState("");
   const [matches, setMatches] = useState("");
+  const [showScorePopup, setShowScorePopup] = useState(false);
+  const [scoreScope, setScoreScope] = useState("unscored");
+
+  const isBadData = useCallback((j: Job) => {
+    if (!j.email) return true;
+    if (j.company === "Unknown Company" || !j.company) return true;
+    if (!isCompanyEmail(j.email, j.company)) return true;
+    if (!isValidJobTitle(j.title)) return true;
+    return false;
+  }, []);
 
   const computeStatusCounts = useCallback((jobs: Job[]) => {
-    const counts: Record<string, number> = { all: 0, new: 0, email_sent: 0, waiting_reply: 0, interviewing: 0, offer_received: 0, ignored: 0 };
+    const counts: Record<string, number> = { all: 0, new: 0, email_sent: 0, waiting_reply: 0, interviewing: 0, offer_received: 0, ignored: 0, duplicate: 0 };
     for (const j of jobs) {
       const st = j.status || "new";
-      // Count ignored jobs always
+      if (st === "duplicate") { counts.duplicate++; continue; }
       if (st === "ignored") { counts.ignored++; continue; }
-      // Filter bad data from active counts
-      if (!isCompanyEmail(j.email, j.company)) { counts.ignored++; continue; }
-      if (!isValidJobTitle(j.title)) { counts.ignored++; continue; }
+      if (isBadData(j)) { counts.ignored++; continue; }
       if (counts[st] !== undefined) counts[st]++;
       counts.all++;
     }
     return counts;
-  }, []);
+  }, [isBadData]);
 
   const applyFilter = useCallback((results: Job[], filter: string) => {
     return results.filter(j => {
       const st = j.status || "new";
-      const isBadData = !isCompanyEmail(j.email, j.company) || !isValidJobTitle(j.title);
-      // Ignored tab: show explicitly ignored + bad-data jobs
-      if (filter === "ignored") return st === "ignored" || (st !== "ignored" && isBadData);
-      // Other tabs: hide bad-data and ignored
-      if (isBadData || st === "ignored") return false;
+      if (filter === "duplicate") return st === "duplicate";
+      if (filter === "ignored") return st === "ignored" || isBadData(j);
+      if (st === "duplicate" || st === "ignored" || isBadData(j)) return false;
       if (filter !== "all") return st === filter;
       return true;
     });
-  }, []);
+  }, [isBadData]);
 
   useEffect(() => {
     api.getStatus().then(s => {
@@ -109,14 +115,25 @@ export default function Dashboard() {
       setStatusCounts(counts);
       setFilteredResults(applyFilter(jd.jobs, activeFilter));
       setMatches(String(jd.jobs.length));
+      if (resumeName) {
+        setMessage({ type: "info", text: "Auto-scoring new jobs..." });
+        setLoading("match");
+        const md = await api.runMatch("unscored");
+        setAllResults(md.results);
+        const mc = computeStatusCounts(md.results);
+        setStatusCounts(mc);
+        setFilteredResults(applyFilter(md.results, activeFilter));
+        setTopScore(md.results.length ? md.results[0]?.score + "%" : "—");
+        setMessage(null);
+      }
     } catch (e: any) { setMessage({ type: "error", text: e.message }); }
     setLoading(null);
   };
 
-  const handleMatch = async () => {
-    setLoading("match");
+  const handleMatch = async (scope?: string) => {
+    setLoading("match"); setShowScorePopup(false);
     try {
-      const d = await api.runMatch();
+      const d = await api.runMatch(scope || scoreScope);
       setAllResults(d.results);
       const counts = computeStatusCounts(d.results);
       setStatusCounts(counts);
@@ -133,24 +150,28 @@ export default function Dashboard() {
     setStatsJobs(0); setStatusCounts({}); setMatches(""); setTopScore(""); setMessage(null); setDetailJob(null);
   };
 
-  const handleStatus = async (idx: number, status: string) => {
-    await api.updateStatus(idx, status);
-    const updated = [...allResults];
-    updated[idx] = { ...updated[idx], status, status_updated_at: new Date().toISOString() };
+  const handleStatus = async (id: string, status: string) => {
+    await api.updateStatus(id, status);
+    const updated = allResults.map(j => j.id === id ? { ...j, status, status_updated_at: new Date().toISOString() } : j);
     setAllResults(updated);
     setFilteredResults(applyFilter(updated, activeFilter));
     setStatusCounts(computeStatusCounts(updated));
-    if (detailJob && detailJob.idx === idx) setDetailJob({ job: updated[idx], idx });
+    if (detailJob && detailJob.idx !== undefined) {
+      const found = updated[allResults.findIndex(j => j.id === id)];
+      if (found) setDetailJob({ job: found, idx: allResults.indexOf(found) });
+    }
   };
 
-  const handleDelete = async (idx: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Delete this job?")) return;
+    const idx = allResults.findIndex(j => j.id === id);
+    if (idx === -1) return;
     await api.deleteJob(idx);
-    const updated = allResults.filter((_, i) => i !== idx);
+    const updated = allResults.filter(j => j.id !== id);
     setAllResults(updated);
     setFilteredResults(applyFilter(updated, activeFilter));
     setStatusCounts(computeStatusCounts(updated));
-    if (detailJob?.idx === idx) setDetailJob(null);
+    if (detailJob && detailJob.job.id === id) setDetailJob(null);
   };
 
   const handleDeleteAll = async () => {
@@ -218,16 +239,41 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Match button */}
-        <button disabled={!resumeName || !statsJobs || loading === "match"} onClick={handleMatch}
-          className="shrink-0 px-4 py-2 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-30 transition-colors flex items-center gap-1.5">
-          <Search size={14} /> {loading === "match" ? "Matching..." : "Find Matches"}
-        </button>
+        {/* Score Again button */}
+        {statsJobs > 0 && resumeName && (
+          <div className="relative">
+            <button disabled={loading === "match"} onClick={() => setShowScorePopup(!showScorePopup)}
+              className="shrink-0 px-4 py-2 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-30 transition-colors flex items-center gap-1.5">
+              <RefreshCw size={14} className={loading === "match" ? "animate-spin" : ""} /> {loading === "match" ? "Scoring..." : "Score Again"}
+            </button>
+            {showScorePopup && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-[#ede3da] rounded-lg shadow-lg z-30 p-3 w-72">
+                <p className="text-[11px] font-semibold text-[#7c6e60] mb-2">Choose which jobs to re-score:</p>
+                <div className="space-y-1.5">
+                  {[
+                    { key: "unscored", label: "New (unscored)", count: allResults.filter(j => j.score === undefined && j.status !== "duplicate" && j.status !== "ignored").length },
+                    { key: "new", label: "New status jobs", count: statusCounts.new },
+                    { key: "ignored", label: "Ignored jobs", count: statusCounts.ignored },
+                    { key: "all", label: "All jobs (reset)", count: allResults.filter(j => j.status !== "duplicate").length },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => { setScoreScope(opt.key); handleMatch(opt.key); }}
+                      disabled={opt.count === 0 || loading === "match"}
+                      className="w-full text-left px-2.5 py-1.5 rounded-md text-xs hover:bg-amber-50 disabled:opacity-30 flex items-center justify-between">
+                      <span>{opt.label}</span>
+                      <span className="font-semibold text-[#7c6e60]">{opt.count}</span>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setShowScorePopup(false)} className="mt-2 text-[10px] text-stone-400 hover:text-stone-600">Cancel</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Message */}
       {message && (
-        <div className={cn("text-xs px-3 py-2 rounded-md", message.type === "error" ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200")}>
+        <div className={cn("text-xs px-3 py-2 rounded-md", message.type === "error" ? "bg-red-50 text-red-700 border border-red-200" : message.type === "info" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200")}>
           {message.text}
         </div>
       )}
@@ -235,7 +281,7 @@ export default function Dashboard() {
       {/* Status tabs */}
       {allResults.length > 0 && (
         <div className="flex gap-1 flex-wrap items-center">
-          {Object.entries({ all: "All", new: "New", email_sent: "Emailed", waiting_reply: "Waiting", interviewing: "Interview", offer_received: "Offered", ignored: "Ignored" })
+          {Object.entries({ all: "All", new: "New", email_sent: "Emailed", waiting_reply: "Waiting", interviewing: "Interview", offer_received: "Offered", duplicate: "Duplicate", ignored: "Ignored" })
             .map(([k, label]) => (
               <button key={k} onClick={() => handleFilter(k)}
                 className={cn(
@@ -264,12 +310,11 @@ export default function Dashboard() {
             <div className="text-center">#</div><div>Score</div><div>Company</div><div>Title</div><div>Status</div><div>Email</div><div>Info</div><div></div>
           </div>
           {filteredResults.map((job, idx) => {
-            const realIdx = allResults.indexOf(job);
             const sc = job.score || 0;
             const st = job.status || "new";
             return (
-              <div key={realIdx} onClick={() => setDetailJob({ job, idx: realIdx })}
-                className={cn("grid grid-cols-[28px_60px_1fr_1fr_100px_1.2fr_100px_32px] gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 items-center cursor-pointer hover:bg-amber-50/60 text-[13px] transition-colors", detailJob?.idx === realIdx && "bg-amber-50")}>
+              <div key={job.id} onClick={() => setDetailJob({ job })}
+                className={cn("grid grid-cols-[28px_60px_1fr_1fr_100px_1.2fr_100px_32px] gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 items-center cursor-pointer hover:bg-amber-50/60 text-[13px] transition-colors", detailJob?.job.id === job.id && "bg-amber-50")}>
                 <div className="text-center text-[#b8ae9e] text-xs font-medium">{idx + 1}</div>
                 <div className="flex items-center gap-1.5">
                   <span className={cn("font-bold text-xs w-7 text-right tabular-nums", getScoreColor(sc))}>{sc}%</span>
@@ -287,7 +332,7 @@ export default function Dashboard() {
                   {/* Status dropdown on hover */}
                   <div className="hidden group-hover:block absolute top-full left-0 mt-1 bg-white border border-[#ede3da] rounded-lg shadow-lg z-20 py-1 min-w-[130px]">
                     {["new","email_sent","waiting_reply","interviewing","offer_received","ignored"].map(s => (
-                      <button key={s} onClick={e => { e.stopPropagation(); handleStatus(realIdx, s); }}
+                      <button key={s} onClick={e => { e.stopPropagation(); handleStatus(job.id, s); }}
                         className={cn("w-full text-left px-3 py-1.5 text-xs hover:bg-[#f5f0eb]", st === s && "font-semibold text-amber-700")}>
                         <span className={cn("w-1.5 h-1.5 rounded-full inline-block mr-1.5 align-middle", STATUS_DOT[s])} /> {STATUS_LABELS[s]}
                       </button>
@@ -298,7 +343,7 @@ export default function Dashboard() {
                   {job.email ? <a href={`mailto:${job.email}`} onClick={e => e.stopPropagation()} className="text-amber-700 hover:underline text-xs">{job.email}</a> : <span className="text-xs text-stone-300">—</span>}
                 </div>
                 <div className="text-xs text-[#b8ae9e] truncate">{[job.location, job.experience].filter(Boolean).join(" · ") || "—"}</div>
-                <button onClick={e => { e.stopPropagation(); handleDelete(realIdx); }} className="flex items-center justify-center w-5 h-5 rounded text-stone-300 hover:text-red-500 hover:bg-red-50 text-xs">✕</button>
+                <button onClick={e => { e.stopPropagation(); handleDelete(job.id); }} className="flex items-center justify-center w-5 h-5 rounded text-stone-300 hover:text-red-500 hover:bg-red-50 text-xs">✕</button>
               </div>
             );
           })}

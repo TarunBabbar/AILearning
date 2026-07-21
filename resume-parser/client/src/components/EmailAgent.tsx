@@ -33,7 +33,7 @@ export default function EmailAgent() {
   const [gmailPass, setGmailPass] = useState(localStorage.getItem("agent_gmail_pass") || "");
   const [verified, setVerified] = useState(false);
   const [sending, setSending] = useState(false);
-  const [sendingIdx, setSendingIdx] = useState<number | null>(null);
+  const [sendingIdx, setSendingIdx] = useState<string | null>(null);
   const [subject, setSubject] = useState("Application for {{title}} at {{company}}");
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   const [logs, setLogs] = useState<{ text: string; type: string }[]>([]);
@@ -72,22 +72,18 @@ export default function EmailAgent() {
     } catch (e: any) { setResumeStatus("❌ " + e.message); }
   };
 
-  const sendOne = async (idx: number) => {
-    const job = jobs[idx];
-    if (!job?.email) return;
-    setSendingIdx(idx);
-    const company = job.company || "Company";
-    const title = job.title || "Position";
-    const body = template.replace(/\{\{company\}\}/g, company).replace(/\{\{title\}\}/g, title).replace(/\{\{location\}\}/g, job.location || "");
-    const subj = subject.replace(/\{\{company\}\}/g, company).replace(/\{\{title\}\}/g, title).replace(/\{\{location\}\}/g, job.location || "");
+  const sendOne = async (job: Job) => {
+    if (!job?.email || job.email_sent) return;
+    setSendingIdx(job.id);
     try {
-      await api.sendEmail(idx, gmailUser, gmailPass, subj, body);
-      const updated = [...jobs];
-      updated[idx] = { ...updated[idx], email_sent: true };
-      setJobs(updated);
-      log(`✅ ${company} — sent`, "ok");
+      await api.sendEmail(job.id, gmailUser, gmailPass, 
+        subject.replace(/\{\{company\}\}/g, job.company || "Company").replace(/\{\{title\}\}/g, job.title || "Position").replace(/\{\{location\}\}/g, job.location || ""),
+        template.replace(/\{\{company\}\}/g, job.company || "Company").replace(/\{\{title\}\}/g, job.title || "Position").replace(/\{\{location\}\}/g, job.location || "")
+      );
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, email_sent: true } : j));
+      log(`✅ ${job.company || "Unknown"}`, "ok");
     } catch (e: any) {
-      log(`❌ ${company}: ${e.message}`, "err");
+      log(`❌ ${job.company || "Unknown"}: ${e.message}`, "err");
     }
     setSendingIdx(null);
   };
@@ -97,8 +93,7 @@ export default function EmailAgent() {
     log(`▶ Starting batch — ${pendingJobs.length} emails`, "info");
     let success = 0, failed = 0;
     for (const job of pendingJobs) {
-      const realIdx = jobs.indexOf(job);
-      try { await sendOne(realIdx); success++; } catch { failed++; }
+      try { await sendOne(job); success++; } catch { failed++; }
     }
     log(`${success} sent, ${failed} failed`, success > 0 ? "ok" : "err");
     setSending(false);
@@ -168,10 +163,9 @@ export default function EmailAgent() {
               </div>
               <div className="overflow-y-auto flex-1">
                 {pendingJobs.map((j) => {
-                  const realIdx = jobs.indexOf(j);
-                  const isSending = sendingIdx === realIdx;
+                  const isSending = sendingIdx === j.id;
                   return (
-                    <div key={realIdx} className="flex items-center gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 hover:bg-amber-50/40 transition-colors group">
+                    <div key={j.id} className="flex items-center gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 hover:bg-amber-50/40 transition-colors group">
                       <div className="flex-1 min-w-0 flex items-center gap-3">
                         <span className="text-[13px] font-semibold text-[#1c1917] truncate w-[140px] shrink-0">{j.company}</span>
                         <span className="text-xs text-amber-700 truncate w-[180px] shrink-0">{j.title}</span>
@@ -179,7 +173,7 @@ export default function EmailAgent() {
                       </div>
                       <button
                         disabled={!verified || isSending || sending}
-                        onClick={() => sendOne(realIdx)}
+                        onClick={() => sendOne(j)}
                         className="shrink-0 px-2.5 py-1 text-[10px] font-medium rounded border border-amber-200 text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-50 disabled:opacity-0"
                       >
                         {isSending ? <Loader2 size={10} className="animate-spin" /> : "Send"}

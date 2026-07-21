@@ -47,3 +47,10 @@ export function isValidJobTitle(title: string | undefined) {
   if (BAD_TITLES.test(t)) return false;
   return QA_KEYWORDS.test(t);
 }
+
+export function isGenericEmail(email: string) {
+  if (!email) return true;
+  const domain = email.toLowerCase().split("@")[1];
+  if (!domain) return true;
+  return GENERIC_DOMAINS.includes(domain) || domain === "google.com";
+}
