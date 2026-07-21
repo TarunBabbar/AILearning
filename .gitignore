@@ -1,0 +1,11 @@
+node_modules/
+uploads/
+.env
+data.json
+.commandcode/
+__pycache__/
+*.pdf
+*.docx
+*.xlsx
+~$*
+client/dist/
