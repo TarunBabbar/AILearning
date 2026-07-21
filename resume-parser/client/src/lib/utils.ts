@@ -54,3 +54,16 @@ export function isGenericEmail(email: string) {
   if (!domain) return true;
   return GENERIC_DOMAINS.includes(domain) || domain === "google.com";
 }
+
+const QA_ONLY_PATTERN = /test|testing|qa\b|qe\b|automation|sdet/i;
+const FALLBACK_TITLE = "Test / AI-Agentic Test Lead";
+
+export function normalizeJobTitle(title: string | undefined) {
+  if (!title) return FALLBACK_TITLE;
+  const t = title.trim();
+  if (t.length > 80) return FALLBACK_TITLE;
+  if (/software testing studio|disclaimer|interview prep|subscribe/i.test(t)) return FALLBACK_TITLE;
+  if (/unknown position|job application|undefined|null|na|n\/a|tbd|none/i.test(t)) return FALLBACK_TITLE;
+  if (QA_ONLY_PATTERN.test(t)) return t;
+  return FALLBACK_TITLE;
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { Job } from "@/lib/types";
-import { cn, getScoreColor, getScoreBg, isCompanyEmail, isValidJobTitle, formatDate } from "@/lib/utils";
+import { cn, getScoreColor, getScoreBg, isCompanyEmail, isValidJobTitle, normalizeJobTitle, formatDate } from "@/lib/utils";
 import { Search, Trash2, X, FileText, Upload, MapPin, Clock, Mail, Award, Building2, Plus, RefreshCw, ChevronDown } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {

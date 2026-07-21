@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Job } from "@/lib/types";
-import { isCompanyEmail, isValidJobTitle, cn } from "@/lib/utils";
+import { isCompanyEmail, isValidJobTitle, normalizeJobTitle, cn } from "@/lib/utils";
 import { Send, ShieldCheck, Mail, FileText, CheckCircle, Loader2, ChevronDown, ChevronRight, Activity } from "lucide-react";
 
 const DEFAULT_TEMPLATE = `Dear Team,
@@ -10,21 +10,25 @@ I am writing to express my interest in the {{title}} position at {{company}}. Wi
 
 A few highlights relevant to this role:
 
-Generative AI in Testing: I have hands-on experience designing RAG-based test intelligence pipelines and MCP (Model Context Protocol) integrations that connect LLMs with automation frameworks.
+<b>Generative AI in Testing:</b> I have hands-on experience designing RAG-based test intelligence pipelines and MCP (Model Context Protocol) integrations that connect LLMs with automation frameworks for context-aware test generation, self-healing locators, and AI-assisted defect analysis — directly aligned with your focus on GenAI-driven test strategy and POCs.
 
-Automation Frameworks: 18+ years building and scaling automation solutions using Selenium WebDriver and Playwright.
+<b>Automation Frameworks:</b> 18+ years building and scaling automation solutions using Selenium WebDriver and Playwright, with strong programming skills in C#.NET, Python, JavaScript/TypeScript, and Java.
 
-Leadership & Mentoring: Led and mentored QA teams of 6+ engineers, driving 100% automation adoption and reducing production defects by ~40%.
+<b>Leadership & Mentoring:</b> Led and mentored QA teams of 6+ engineers, driving 100% automation adoption and reducing production defects by ~40%, while partnering closely with product and engineering leadership.
 
-Innovation & POCs: Agentic QA workflows (n8n, GPT, Claude, OpenRouter) for intelligent defect triage and root cause analysis.
+<b>CI/CD & Enterprise Automation:</b> Extensive experience integrating automation into Azure DevOps and GitHub Actions pipelines, and architecting automation strategies across multiple enterprise product lines.
 
-I am based in Pune and available to discuss how my experience can contribute to your team.
+<b>Innovation & POCs:</b> Regularly evaluate and present new AI-enabled testing tools and approaches to leadership, including multi-agent QA workflows (n8n, Langflow, GPT, Claude, OpenRouter, Command-Code) for intelligent defect triage and root cause analysis.
 
-Thank you for your time and consideration.
+I am based in Pune and available to discuss how my experience in AI-augmented quality engineering can contribute to your team's automation and innovation goals. My resume is attached for your review.
+
+Thank you for your time and consideration. I look forward to the opportunity to speak further.
 
 Best regards,
 Tarun Kumar Babbar
-+91-9623252365 · babbartarunkumar@gmail.com · linkedin.com/in/tarunbabbar
++91-9623252365
+babbartarunkumar@gmail.com
+linkedin.com/in/tarunbabbar
 Pune, India`;
 
 export default function EmailAgent() {
@@ -75,11 +79,12 @@ export default function EmailAgent() {
   const sendOne = async (job: Job) => {
     if (!job?.email || job.email_sent) return;
     setSendingIdx(job.id);
+    const displayTitle = normalizeJobTitle(job.title);
+    const company = job.company || "Company";
     try {
-      await api.sendEmail(job.id, gmailUser, gmailPass, 
-        subject.replace(/\{\{company\}\}/g, job.company || "Company").replace(/\{\{title\}\}/g, job.title || "Position").replace(/\{\{location\}\}/g, job.location || ""),
-        template.replace(/\{\{company\}\}/g, job.company || "Company").replace(/\{\{title\}\}/g, job.title || "Position").replace(/\{\{location\}\}/g, job.location || "")
-      );
+      const subj = subject.replace(/\{\{company\}\}/g, company).replace(/\{\{title\}\}/g, displayTitle).replace(/\{\{location\}\}/g, job.location || "");
+      const body = template.replace(/\{\{company\}\}/g, company).replace(/\{\{title\}\}/g, displayTitle).replace(/\{\{location\}\}/g, job.location || "");
+      await api.sendEmail(job.id, gmailUser, gmailPass, subj, body);
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, email_sent: true } : j));
       log(`✅ ${job.company || "Unknown"}`, "ok");
     } catch (e: any) {

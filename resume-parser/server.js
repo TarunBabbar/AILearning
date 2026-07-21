@@ -327,7 +327,7 @@ ${gmailUser}`;
       from: gmailUser,
       to: job.email,
       subject,
-      text,
+      html: (req.body.body || "").replace(/\n/g, "<br>"),
     };
 
     // Attach resume file if available (fallback: scan uploads dir)

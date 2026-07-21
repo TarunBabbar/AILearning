@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Job } from "@/lib/types";
-import { isCompanyEmail, isValidJobTitle, isGenericEmail, cn } from "@/lib/utils";
+import { isCompanyEmail, isValidJobTitle, normalizeJobTitle, isGenericEmail, cn } from "@/lib/utils";
 import { Send, ShieldCheck, Mail, FileText, CheckCircle, Loader2, ChevronDown, ChevronRight, Ban } from "lucide-react";
 
 const IGNORED_TEMPLATE = `Dear Hiring Team,
@@ -10,10 +10,13 @@ I am writing to express my interest in QA/Test Automation opportunities at your 
 
 A few highlights:
 
-- Generative AI in Testing: Hands-on experience designing RAG-based test intelligence pipelines and MCP integrations connecting LLMs with automation frameworks for context-aware test generation and self-healing locators.
-- Automation Frameworks: 18+ years building and scaling automation solutions using Selenium WebDriver and Playwright, with strong programming skills in C#.NET, Python, JavaScript/TypeScript, and Java.
-- Leadership: Led and mentored QA teams of 6+ engineers, driving 100% automation adoption and reducing production defects by ~40%.
-- Innovation: Architected multi-agent QA workflows (n8n, GPT, Claude, OpenRouter) for intelligent defect triage and root cause analysis.
+<b>Generative AI in Testing:</b> Hands-on experience designing RAG-based test intelligence pipelines and MCP integrations connecting LLMs with automation frameworks for context-aware test generation and self-healing locators.
+
+<b>Automation Frameworks:</b> 18+ years building and scaling automation solutions using Selenium WebDriver and Playwright, with strong programming skills in C#.NET, Python, JavaScript/TypeScript, and Java.
+
+<b>Leadership:</b> Led and mentored QA teams of 6+ engineers, driving 100% automation adoption and reducing production defects by ~40%.
+
+<b>Innovation:</b> Architected multi-agent QA workflows (n8n, GPT, Claude, OpenRouter) for intelligent defect triage and root cause analysis.
 
 I am based in Pune and available to discuss how my experience in AI-augmented quality engineering can contribute to your team's automation and quality goals. My resume is attached for your review.
 
