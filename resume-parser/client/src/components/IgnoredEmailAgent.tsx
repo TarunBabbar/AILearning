@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Job } from "@/lib/types";
-import { isCompanyEmail, isValidJobTitle, normalizeJobTitle, isGenericEmail, cn } from "@/lib/utils";
+import { isCompanyEmail, isValidJobTitle, normalizeJobTitle, isGenericEmail, getScoreColor, cn } from "@/lib/utils";
 import { Send, ShieldCheck, Mail, FileText, CheckCircle, Loader2, ChevronDown, ChevronRight, Ban } from "lucide-react";
 
 const IGNORED_TEMPLATE = `Dear Hiring Team,
@@ -166,8 +166,9 @@ export default function IgnoredEmailAgent() {
                   const isSending = sendingIdx === j.id;
                   return (
                     <div key={j.id} className="flex items-center gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 hover:bg-stone-50/50 transition-colors group">
-                      <div className="flex-1 min-w-0 flex items-center gap-3">
-                        <span className="text-[13px] font-semibold text-[#1c1917] truncate w-[140px] shrink-0">{j.company || "Unknown"}</span>
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        {j.score !== undefined && <span className={cn("text-[10px] font-bold w-7 text-right shrink-0 tabular-nums", getScoreColor(j.score))}>{j.score}%</span>}
+                        <span className="text-[13px] font-semibold text-[#1c1917] truncate w-[130px] shrink-0">{j.company || "Unknown"}</span>
                         <span className="text-[11px] text-[#b8ae9e] truncate">{j.email}</span>
                       </div>
                       <button

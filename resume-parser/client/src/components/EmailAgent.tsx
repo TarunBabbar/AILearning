@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Job } from "@/lib/types";
-import { isCompanyEmail, isValidJobTitle, normalizeJobTitle, cn } from "@/lib/utils";
+import { isCompanyEmail, isValidJobTitle, normalizeJobTitle, getScoreColor, cn } from "@/lib/utils";
 import { Send, ShieldCheck, Mail, FileText, CheckCircle, Loader2, ChevronDown, ChevronRight, Activity } from "lucide-react";
 
 const DEFAULT_TEMPLATE = `Dear Team,
@@ -171,8 +171,9 @@ export default function EmailAgent() {
                   const isSending = sendingIdx === j.id;
                   return (
                     <div key={j.id} className="flex items-center gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 hover:bg-amber-50/40 transition-colors group">
-                      <div className="flex-1 min-w-0 flex items-center gap-3">
-                        <span className="text-[13px] font-semibold text-[#1c1917] truncate w-[140px] shrink-0">{j.company}</span>
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        {j.score !== undefined && <span className={cn("text-[10px] font-bold w-8 text-right shrink-0 tabular-nums", getScoreColor(j.score))}>{j.score}%</span>}
+                        <span className="text-[13px] font-semibold text-[#1c1917] truncate w-[130px] shrink-0">{j.company}</span>
                         <span className="text-xs text-amber-700 truncate w-[180px] shrink-0">{j.title}</span>
                         <span className="text-[11px] text-[#b8ae9e] truncate">{j.email}</span>
                       </div>
@@ -226,9 +227,12 @@ export default function EmailAgent() {
               <div className="overflow-y-auto flex-1">
                 {sentJobs.length > 0 ? (
                   sentJobs.map((j) => (
-                    <div key={jobs.indexOf(j)} className="flex items-center gap-2 px-3 py-1.5 border-b border-[#f5f0eb] last:border-0">
+                    <div key={j.id} className="flex items-center gap-2 px-3 py-1.5 border-b border-[#f5f0eb] last:border-0">
                       <div className="flex-1 min-w-0">
-                        <div className="text-[12px] font-semibold text-[#1c1917] truncate">{j.company}</div>
+                        <div className="text-[12px] font-semibold text-[#1c1917] truncate flex items-center gap-2">
+                          {j.company}
+                          {j.score !== undefined && <span className={cn("text-[10px] font-bold", getScoreColor(j.score))}>{j.score}%</span>}
+                        </div>
                         <div className="text-[10px] text-[#b8ae9e] truncate">{j.title} · {j.email}</div>
                       </div>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 font-medium">✓</span>
