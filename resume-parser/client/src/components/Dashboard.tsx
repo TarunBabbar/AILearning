@@ -6,12 +6,12 @@ import { Search, Trash2, X, FileText, Upload, MapPin, Clock, Mail, Award, Buildi
 
 const STATUS_LABELS: Record<string, string> = {
   new: "New", email_sent: "Email Sent", waiting_reply: "Waiting",
-  interviewing: "Interviewing", offer_received: "Offered", ignored: "Ignored", duplicate: "Duplicate"
+  interviewing: "Interviewing", offer_received: "Offered", ignored: "Ignored", duplicate: "Duplicate", deleted: "Deleted"
 };
 
 const STATUS_DOT: Record<string, string> = {
   new: "bg-blue-500", email_sent: "bg-emerald-500", waiting_reply: "bg-amber-500",
-  interviewing: "bg-violet-500", offer_received: "bg-emerald-600", ignored: "bg-stone-300", duplicate: "bg-zinc-400"
+  interviewing: "bg-violet-500", offer_received: "bg-emerald-600", ignored: "bg-stone-300", duplicate: "bg-zinc-400", deleted: "bg-red-500"
 };
 
 export default function Dashboard() {
@@ -40,10 +40,11 @@ export default function Dashboard() {
   }, []);
 
   const computeStatusCounts = useCallback((jobs: Job[]) => {
-    const counts: Record<string, number> = { all: 0, new: 0, email_sent: 0, waiting_reply: 0, interviewing: 0, offer_received: 0, ignored: 0, duplicate: 0 };
+    const counts: Record<string, number> = { all: 0, new: 0, email_sent: 0, waiting_reply: 0, interviewing: 0, offer_received: 0, ignored: 0, duplicate: 0, deleted: 0 };
     for (const j of jobs) {
       const st = j.status || "new";
       if (st === "duplicate") { counts.duplicate++; continue; }
+      if (st === "deleted") { counts.deleted++; continue; }
       if (st === "ignored") { counts.ignored++; continue; }
       if (isBadData(j)) { counts.ignored++; continue; }
       if (counts[st] !== undefined) counts[st]++;
@@ -56,8 +57,9 @@ export default function Dashboard() {
     return results.filter(j => {
       const st = j.status || "new";
       if (filter === "duplicate") return st === "duplicate";
+      if (filter === "deleted") return st === "deleted";
       if (filter === "ignored") return st === "ignored" || isBadData(j);
-      if (st === "duplicate" || st === "ignored" || isBadData(j)) return false;
+      if (st === "duplicate" || st === "deleted" || st === "ignored" || isBadData(j)) return false;
       if (filter !== "all") return st === filter;
       return true;
     });
@@ -281,7 +283,7 @@ export default function Dashboard() {
       {/* Status tabs */}
       {allResults.length > 0 && (
         <div className="flex gap-1 flex-wrap items-center">
-          {Object.entries({ all: "All", new: "New", email_sent: "Emailed", waiting_reply: "Waiting", interviewing: "Interview", offer_received: "Offered", duplicate: "Duplicate", ignored: "Ignored" })
+          {Object.entries({ all: "All", new: "New", email_sent: "Emailed", waiting_reply: "Waiting", interviewing: "Interview", offer_received: "Offered", duplicate: "Duplicate", ignored: "Ignored", deleted: "Deleted" })
             .map(([k, label]) => (
               <button key={k} onClick={() => handleFilter(k)}
                 className={cn(

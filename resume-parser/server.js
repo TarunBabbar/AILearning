@@ -248,21 +248,39 @@ app.patch("/api/jobs/:index/status", (req, res) => {
   res.json({ message: `Status updated to "${status}"`, job: jobs[idx] });
 });
 
-// ─── Delete single job ───────────────────────────────────
+// ─── Delete single job (soft delete) ────────────────────
 app.delete("/api/jobs/:index", (req, res) => {
   const idx = parseInt(req.params.index, 10);
   if (isNaN(idx) || idx < 0 || idx >= jobs.length)
     return res.status(400).json({ error: "Invalid job index" });
-  const removed = jobs.splice(idx, 1);
+  jobs[idx].status = "deleted";
+  jobs[idx].deleted_at = new Date().toISOString();
+  jobs[idx].previous_status = jobs[idx].previous_status || jobs[idx].status === "deleted" ? jobs[idx].previous_status : undefined;
   saveData();
-  res.json({ message: `Deleted "${removed[0]?.title || 'job'}"`, job_count: jobs.length });
+  res.json({ message: `Moved "${jobs[idx]?.title || 'job'}" to Deleted`, job_count: jobs.length, job: jobs[idx] });
+});
+
+// ─── Restore deleted job ─────────────────────────────────
+app.patch("/api/jobs/:index/restore", (req, res) => {
+  const idx = parseInt(req.params.index, 10);
+  if (isNaN(idx) || idx < 0 || idx >= jobs.length)
+    return res.status(400).json({ error: "Invalid job index" });
+  if (jobs[idx].status !== "deleted")
+    return res.status(400).json({ error: "Job is not deleted" });
+  jobs[idx].status = jobs[idx].previous_status || "new";
+  delete jobs[idx].deleted_at;
+  saveData();
+  res.json({ message: `Restored "${jobs[idx]?.title || 'job'}"`, job: jobs[idx] });
 });
 
 // ─── Delete all jobs (keep resume) ───────────────────────
 app.delete("/api/jobs", (req, res) => {
-  jobs = [];
+  for (const j of jobs) {
+    j.status = "deleted";
+    j.deleted_at = new Date().toISOString();
+  }
   saveData();
-  res.json({ message: "All jobs deleted.", job_count: 0 });
+  res.json({ message: "All jobs moved to Deleted.", job_count: jobs.length });
 });
 
 // ─── Status & Clear ─────────────────────────────────────
