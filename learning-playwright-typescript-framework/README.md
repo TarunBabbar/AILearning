@@ -22,6 +22,7 @@ Each phase is documented with:
 
 | Phase | Topic | Status |
 |---|---|---|
+| [Phase 0](./learning/phase-0-javascript-nodejs-npm-foundations.md) | Foundations — JavaScript history, Node.js, npm, the ecosystem | ✅ Done |
 | [Phase 1](./learning/phase-1-project-scaffold.md) | Project scaffold — `package.json`, `tsconfig.json`, `playwright.config.ts`, from-scratch setup | ✅ Done |
 | Phase 2 | Page Object Model + Fixtures + Test Data | 🚧 In Progress |
 | Phase 3 | API Automation (ReqRes, RESTful-API) | ⬜ Pending |
@@ -104,6 +105,7 @@ npm run report
 
 ## 📝 Progress Log
 
+- **Phase 0 Complete** — JavaScript history (1995→today), why Node.js exists, how npm works, the full tool chain
 - **Phase 1 Complete** — Project scaffold, config files, core understanding of `package.json`, `tsconfig.json`, `playwright.config.ts`
 - **Currently Learning** — Page Object Model design and custom Playwright fixtures
 
