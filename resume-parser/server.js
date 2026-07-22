@@ -56,6 +56,14 @@ function newJobId() { return "j-" + (nextJobId++); }
 function saveData() {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify({ resumeText, resumeFilename, resumeFilePath, jobs, nextJobId }, null, 2), "utf-8");
+    // Auto-backup once per day
+    const today = new Date().toISOString().slice(0, 10);
+    const backupDir = path.join(__dirname, "backups");
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    const backupFile = path.join(backupDir, `data-backup-${today}.json`);
+    if (!fs.existsSync(backupFile)) {
+      fs.copyFileSync(DATA_FILE, backupFile);
+    }
   } catch {}
 }
 

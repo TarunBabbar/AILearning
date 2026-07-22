@@ -9,3 +9,4 @@ __pycache__/
 *.xlsx
 ~$*
 client/dist/
+backups/ 
