@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+.next/
+frontend/.next/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.eggs/
+
+# Environment
+.env
+backend/.env
+*.env.local
+
+# Database
+*.db
+*.sqlite
+chroma_data/
+
+# IDE / tooling
+.commandcode/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Plans (keep architecture doc but exclude temp plans)
+.agent/

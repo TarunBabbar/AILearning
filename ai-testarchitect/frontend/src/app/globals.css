@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg-page: #faf8f5;
+  --color-bg-main: #faf8f5;
+  --color-bg-sidebar: #f0ece3;
+  --color-bg-surface: #f5f2eb;
+  --color-bg-hover: #ebe5d7;
+  --color-bg-input: #ffffff;
+  --color-bg-code: #2d2a26;
+  --color-bg-user: #e8e0d1;
+  --color-border: #e6dfd1;
+  --color-border-input: #d4cdbf;
+  --color-border-focus: #d97706;
+  --color-text-primary: #1a1410;
+  --color-text-secondary: #6b625a;
+  --color-text-muted: #978f85;
+  --color-amber-400: #f59e0b;
+  --color-amber-500: #d97706;
+  --color-amber-600: #b45309;
+  --color-amber-700: #92400e;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d4cdbf transparent;
+}
+
+body {
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.markdown-body pre {
+  background: var(--color-bg-code);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  position: relative;
+}
+
+.markdown-body pre code {
+  color: #e8e0d1;
+}
+
+.markdown-body code {
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+  font-size: 0.8125rem;
+}
+
+.markdown-body p code {
+  background: #ece6d7;
+  color: #b45309;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  border: 1px solid #e6dfd1;
+  font-size: 0.8125rem;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #e6dfd1;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: #f0ece3;
+  color: #1a1410;
+  font-weight: 600;
+}
+
+.markdown-body tr:nth-child(even) td {
+  background: #faf8f5;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.25rem;
+  margin: 0.25rem 0;
+}
