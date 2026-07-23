@@ -1,4 +1,12 @@
 node_modules/
-.next/
-temp-*/
-.env.local
+uploads/
+.env
+data.json
+.commandcode/
+__pycache__/
+*.pdf
+*.docx
+*.xlsx
+~$*
+client/dist/
+backups/ 
