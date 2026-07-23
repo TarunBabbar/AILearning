@@ -14,6 +14,26 @@ const PARSE_CHUNK_OVERLAP = parseInt(process.env.PARSE_CHUNK_OVERLAP || "400");
 const PARSE_TIMEOUT_MS = parseInt(process.env.PARSE_TIMEOUT_MS || "120000");
 const PARSE_MAX_TOKENS = parseInt(process.env.PARSE_MAX_TOKENS || "8192");
 
+const FALLBACK_TITLE = "Test / AI-Agentic Test Lead";
+const QA_TITLE_PATTERN = /test|testing|qa\b|qe\b|automation|sdet|tosca|playwright|selenium|cypress|appium|guidewire|mainframe|servicenow|devops|etl|performance|security/i;
+
+function normalizeTitle(title) {
+  if (!title || typeof title !== "string") return FALLBACK_TITLE;
+  const trimmed = title.trim();
+  // Skip obvious meta-text / non-title content
+  if (trimmed.length > 80 || /software testing studio|disclaimer|interview prep|subscribe|newsletter|whatsapp|download kit/i.test(trimmed)) {
+    return FALLBACK_TITLE;
+  }
+  if (/unknown position|job application|undefined|null|na|n\/a|tbd|none/i.test(trimmed)) {
+    return FALLBACK_TITLE;
+  }
+  // If title doesn't contain any QA/testing keyword, use fallback
+  if (!QA_TITLE_PATTERN.test(trimmed)) {
+    return FALLBACK_TITLE;
+  }
+  return trimmed;
+}
+
 export async function extractText(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".pdf") return extractPdfText(filePath);
@@ -109,7 +129,7 @@ ${chunk}`;
     succeededCount++;
     for (const j of parsed) {
       allJobs.push({
-        title: j.title || "Unknown Position",
+        title: normalizeTitle(j.title),
         company: j.company || "Unknown Company",
         email: j.email || "",
         location: j.location || "",

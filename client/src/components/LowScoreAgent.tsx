@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import type { Job } from "@/lib/types";
 import { isCompanyEmail, isValidJobTitle, normalizeJobTitle, getScoreColor, cn, formatDate } from "@/lib/utils";
-import { Send, ShieldCheck, Mail, FileText, CheckCircle, Loader2, ChevronDown, ChevronRight, Activity, X, Square, MapPin, Clock } from "lucide-react";
+import { Send, ShieldCheck, Mail, FileText, CheckCircle, Loader2, ChevronDown, ChevronRight, TrendingDown, X, Square, MapPin, Clock } from "lucide-react";
 
 const DEFAULT_TEMPLATE = `Dear Team,
 
@@ -16,9 +16,7 @@ A few highlights relevant to this role:
 
 <b>Leadership & Mentoring:</b> Led and mentored QA teams of 6+ engineers, driving 100% automation adoption and reducing production defects by ~40%.
 
-<b>CI/CD & Enterprise Automation:</b> Extensive experience integrating automation into Azure DevOps and GitHub Actions pipelines.
-
-<b>Innovation & POCs:</b> Multi-agent QA workflows for intelligent defect triage and root cause analysis.
+<b>Innovation & POCs:</b> Agentic QA workflows for intelligent defect triage and root cause analysis.
 
 I am based in Pune and available to discuss how my experience can contribute to your team.
 
@@ -31,7 +29,7 @@ babbartarunkumar@gmail.com
 linkedin.com/in/tarunbabbar
 Pune, India`;
 
-export default function EmailAgent() {
+export default function LowScoreAgent() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [gmailUser, setGmailUser] = useState(localStorage.getItem("agent_gmail_user") || "");
   const [gmailPass, setGmailPass] = useState(localStorage.getItem("agent_gmail_pass") || "");
@@ -47,7 +45,7 @@ export default function EmailAgent() {
   const [showTemplate, setShowTemplate] = useState(false);
   const [showSent, setShowSent] = useState(true);
 
-  const pendingJobs = jobs.filter(j => isCompanyEmail(j.email, j.company) && isValidJobTitle(j.title) && !j.email_sent && (j.score === undefined || j.score >= 60) && j.status !== "deleted");
+  const pendingJobs = jobs.filter(j => isCompanyEmail(j.email, j.company) && isValidJobTitle(j.title) && !j.email_sent && j.score !== undefined && j.score < 60 && j.status !== "deleted");
   const sentJobs = jobs.filter(j => isCompanyEmail(j.email, j.company) && j.email_sent && j.status !== "deleted");
   const hiddenCount = jobs.filter(j => !isCompanyEmail(j.email, j.company) || !isValidJobTitle(j.title)).length;
 
@@ -59,7 +57,7 @@ export default function EmailAgent() {
     catch (e: any) { setVerified(false); log("❌ Auth failed: " + e.message, "err"); }
   };
   const handleUploadResume = async () => {
-    const input = document.getElementById("resumeFileInput") as HTMLInputElement;
+    const input = document.getElementById("resumeFileInputLow") as HTMLInputElement;
     const file = input?.files?.[0];
     if (!file) return;
     try { const d = await api.uploadResume(file); setResumeStatus("✅ " + d.message); log("📎 Resume saved", "ok"); }
@@ -90,11 +88,7 @@ export default function EmailAgent() {
     log(`${success} sent, ${failed} failed`, success > 0 ? "ok" : "err");
     setSending(false);
   };
-  const stopSending = () => { 
-    stopRef.current = true;
-    // Abort any in-flight fetch by rejecting the current send
-    if (sendingIdx) log("⏹ Stopping...", "info");
-  };
+  const stopSending = () => { stopRef.current = true; };
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this job?")) return;
     const idx = jobs.findIndex(x => x.id === id);
@@ -106,9 +100,9 @@ export default function EmailAgent() {
   return (
     <div className="flex flex-col h-[calc(100vh-40px)]">
       <div className="flex items-center gap-4 pb-3 border-b border-[#ede3da]">
-        <h2 className="font-bold text-[#1c1917] flex items-center gap-2"><Mail size={18} className="text-amber-600" /> High Score Agent</h2>
+        <h2 className="font-bold text-[#1c1917] flex items-center gap-2"><TrendingDown size={18} className="text-orange-500" /> Low Score Agent</h2>
         <div className="flex gap-3 text-[13px] text-[#7c6e60] ml-2">
-          <span className="font-semibold text-amber-700">{pendingJobs.length} pending</span>
+          <span className="font-semibold text-orange-600">{pendingJobs.length} pending</span>
           <span className="text-stone-300">·</span>
           <span className="font-semibold text-emerald-700">{sentJobs.length} sent</span>
           {hiddenCount > 0 && <><span className="text-stone-300">·</span><span className="text-stone-400">{hiddenCount} hidden</span></>}
@@ -116,7 +110,7 @@ export default function EmailAgent() {
         <div className="ml-auto flex gap-2">
           {pendingJobs.length > 0 && (
             <button disabled={!verified || sending} onClick={handleSendAll}
-              className="px-4 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-30 transition-colors flex items-center gap-1.5">
+              className="px-4 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-30 transition-colors flex items-center gap-1.5">
               {sending ? <><Loader2 size={12} className="animate-spin" /> Sending...</> : <><Send size={12} /> Send All ({pendingJobs.length})</>}
             </button>
           )}
@@ -126,14 +120,20 @@ export default function EmailAgent() {
         </div>
       </div>
       <div className="flex items-center gap-3 py-2.5 border-b border-[#ede3da]">
-        <FileText size={14} className="text-stone-400 shrink-0" /><input type="file" id="resumeFileInput" accept=".pdf,.docx" className="text-[11px] w-28" />
+        <FileText size={14} className="text-stone-400 shrink-0" />
+        <input type="file" id="resumeFileInputLow" accept=".pdf,.docx" className="text-[11px] w-28" />
         <button onClick={handleUploadResume} className="px-2 py-1 text-[11px] bg-[#f5f0eb] rounded hover:bg-[#ede3da] shrink-0">Upload</button>
         {resumeStatus && <span className="text-[10px] text-emerald-600 truncate max-w-32">{resumeStatus}</span>}
-        <span className="text-stone-300">|</span><ShieldCheck size={14} className="text-stone-400 shrink-0" />
+        <span className="text-stone-300">|</span>
+        <ShieldCheck size={14} className="text-stone-400 shrink-0" />
         <input type="email" value={gmailUser} onChange={e => setGmailUser(e.target.value)} placeholder="you@gmail.com" className="w-36 px-2 py-1 text-[11px] border border-[#ede3da] rounded outline-none focus:border-amber-300" />
         <input type="password" value={gmailPass} onChange={e => setGmailPass(e.target.value)} placeholder="App password" className="w-32 px-2 py-1 text-[11px] border border-[#ede3da] rounded outline-none focus:border-amber-300" />
-        <button onClick={handleVerify} className={cn("px-2.5 py-1 text-[11px] font-medium rounded shrink-0", verified ? "bg-emerald-100 text-emerald-700" : "bg-amber-600 text-white hover:bg-amber-700")}>{verified ? <><CheckCircle size={12} className="inline mr-1" /> OK</> : "Verify"}</button>
-        <button onClick={() => setShowTemplate(!showTemplate)} className="ml-auto text-[11px] text-[#7c6e60] hover:text-amber-700 flex items-center gap-1">{showTemplate ? <ChevronDown size={13} /> : <ChevronRight size={13} />} Template</button>
+        <button onClick={handleVerify} className={cn("px-2.5 py-1 text-[11px] font-medium rounded shrink-0", verified ? "bg-emerald-100 text-emerald-700" : "bg-orange-500 text-white hover:bg-orange-600")}>
+          {verified ? <><CheckCircle size={12} className="inline mr-1" /> OK</> : "Verify"}
+        </button>
+        <button onClick={() => setShowTemplate(!showTemplate)} className="ml-auto text-[11px] text-[#7c6e60] hover:text-orange-500 flex items-center gap-1">
+          {showTemplate ? <ChevronDown size={13} /> : <ChevronRight size={13} />} Template
+        </button>
       </div>
       {showTemplate && (
         <div className="py-2.5 border-b border-[#ede3da] space-y-2">
@@ -145,30 +145,30 @@ export default function EmailAgent() {
       <div className="flex gap-4 flex-1 overflow-hidden pt-3">
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {pendingJobs.length > 0 ? (
-            <div className="border border-amber-200 rounded-xl overflow-hidden bg-white flex-1 min-h-0 flex flex-col">
-              <div className="px-3 py-2 bg-amber-50/60 border-b border-amber-100 text-[11px] font-semibold text-amber-800">Pending ({pendingJobs.length})</div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-amber-50/30 border-b border-amber-100 text-[10px] font-semibold uppercase text-amber-400">
+            <div className="border border-orange-200 rounded-xl overflow-hidden bg-white flex-1 min-h-0 flex flex-col">
+              <div className="px-3 py-2 bg-orange-50/60 border-b border-orange-100 text-[11px] font-semibold text-orange-700">Pending ({pendingJobs.length})</div>
+              <div className="flex items-center gap-2 px-3 py-1 bg-orange-50/30 border-b border-orange-100 text-[10px] font-semibold uppercase text-orange-400">
                 <span className="w-10 shrink-0">Score</span><span className="w-[130px] shrink-0">Company</span><span className="w-[180px] shrink-0">Title</span><span className="flex-1">Email</span>
               </div>
               <div className="overflow-y-auto flex-1">
                 {pendingJobs.map((j) => {
                   const isSending = sendingIdx === j.id;
                   return (
-                    <div key={j.id} onClick={() => setDetailJob(j)} className="flex items-center gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 hover:bg-amber-50/40 transition-colors group cursor-pointer">
+                    <div key={j.id} onClick={() => setDetailJob(j)} className="flex items-center gap-2 px-3 py-2 border-b border-[#f5f0eb] last:border-0 hover:bg-orange-50/40 transition-colors group cursor-pointer">
                       <div className="flex-1 min-w-0 flex items-center gap-2">
-                        {j.score !== undefined ? <span className={cn("text-[10px] font-bold w-8 text-right shrink-0 tabular-nums", getScoreColor(j.score))}>{j.score}%</span> : <span className="w-8 shrink-0" />}
+                        {j.score !== undefined && <span className={cn("text-[10px] font-bold w-8 text-right shrink-0 tabular-nums", getScoreColor(j.score))}>{j.score}%</span>}
                         <span className="text-[13px] font-semibold text-[#1c1917] truncate w-[130px] shrink-0">{j.company}</span>
-                        <span className="text-xs text-amber-700 truncate w-[180px] shrink-0">{j.title}</span>
+                        <span className="text-xs text-orange-600 truncate w-[180px] shrink-0">{j.title}</span>
                         <span className="text-[11px] text-[#b8ae9e] truncate">{j.email}</span>
                       </div>
-                      <button disabled={!verified || isSending || sending} onClick={e => { e.stopPropagation(); sendOne(j); }} className="shrink-0 px-2.5 py-1 text-[10px] font-medium rounded border border-amber-200 text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-50 disabled:opacity-0">{isSending ? <Loader2 size={10} className="animate-spin" /> : "Send"}</button>
+                      <button disabled={!verified || isSending || sending} onClick={e => { e.stopPropagation(); sendOne(j); }} className="shrink-0 px-2.5 py-1 text-[10px] font-medium rounded border border-orange-200 text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-50 disabled:opacity-0">{isSending ? <Loader2 size={10} className="animate-spin" /> : "Send"}</button>
                       <button onClick={e => { e.stopPropagation(); handleDelete(j.id); }} className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-stone-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 text-[10px]"><X size={10} /></button>
                     </div>
                   );
                 })}
               </div>
             </div>
-          ) : (<div className="flex-1 flex items-center justify-center text-[13px] text-[#b8ae9e]">{sentJobs.length > 0 ? "🎉 All emails sent!" : "No pending emails."}</div>)}
+          ) : (<div className="flex-1 flex items-center justify-center text-[13px] text-[#b8ae9e]">{sentJobs.length > 0 ? "🎉 All emails sent!" : "No low-score pending emails."}</div>)}
         </div>
         <div className="w-[340px] shrink-0 flex flex-col gap-3 overflow-hidden">
           <div className="border border-[#ede3da] rounded-xl bg-white overflow-hidden flex flex-col" style={{ height: "calc(50% - 6px)" }}>
@@ -187,7 +187,7 @@ export default function EmailAgent() {
           <div className="flex-1 bg-black/20" onClick={() => setDetailJob(null)} />
           <div className="w-[440px] bg-[#fffdfa] shadow-2xl border-l border-[#ede3da] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#ede3da]">
-              <div><h2 className="text-base font-bold text-[#1c1917]">{detailJob.company || "Unknown"}</h2><p className="text-sm text-amber-700">{detailJob.title}</p></div>
+              <div><h2 className="text-base font-bold text-[#1c1917]">{detailJob.company || "Unknown"}</h2><p className="text-sm text-orange-600">{detailJob.title}</p></div>
               <button onClick={() => setDetailJob(null)} className="p-1.5 rounded-lg hover:bg-[#f5f0eb] text-stone-400 hover:text-stone-700"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">

@@ -48,11 +48,22 @@ let resumeText = null;
 let resumeFilename = null;
 let resumeFilePath = null;
 let jobs = [];
+let nextJobId = 1;
+
+function newJobId() { return "j-" + (nextJobId++); }
 
 // ─── Persistence ─────────────────────────────────────────
 function saveData() {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ resumeText, resumeFilename, resumeFilePath, jobs }, null, 2), "utf-8");
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ resumeText, resumeFilename, resumeFilePath, jobs, nextJobId }, null, 2), "utf-8");
+    // Auto-backup once per day
+    const today = new Date().toISOString().slice(0, 10);
+    const backupDir = path.join(__dirname, "backups");
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    const backupFile = path.join(backupDir, `data-backup-${today}.json`);
+    if (!fs.existsSync(backupFile)) {
+      fs.copyFileSync(DATA_FILE, backupFile);
+    }
   } catch {}
 }
 
@@ -64,11 +75,10 @@ function loadData() {
       resumeFilename = d.resumeFilename || null;
       resumeFilePath = d.resumeFilePath || null;
       jobs = d.jobs || [];
-      // Migrate existing jobs: derive status from email_sent
-      for (const job of jobs) {
-        if (!job.status) {
-          job.status = job.email_sent ? "email_sent" : "new";
-        }
+      nextJobId = d.nextJobId || 1;
+      // Migrate: assign IDs to jobs that don't have them
+      for (const j of jobs) {
+        if (!j.id) j.id = newJobId();
       }
     }
   } catch {}
@@ -125,26 +135,41 @@ app.post("/api/upload-jobs", upload.array("files[]", MAX_JOBS_FILES), async (req
       }
     }
     if (allJobs.length) {
-      // Append new jobs to existing ones (don't overwrite)
-      const existing = new Set(jobs.map(j => (j.title || "") + "|" + (j.company || "")));
+      // Append new jobs to existing ones — track duplicates separately
+      const existingMap = new Map();
+      for (let i = 0; i < jobs.length; i++) {
+        const key = ((jobs[i].title || "") + "|" + (jobs[i].company || "")).toLowerCase();
+        existingMap.set(key, i);
+      }
       const newJobs = [];
-      const duplicates = [];
+      const duplicateJobs = [];
       for (const j of allJobs) {
-        const key = (j.title || "") + "|" + (j.company || "");
-        if (existing.has(key)) { duplicates.push(key); continue; }
-        existing.add(key);
+        const key = ((j.title || "") + "|" + (j.company || "")).toLowerCase();
+        if (existingMap.has(key)) {
+          j.status = "duplicate";
+          j.duplicate_of = existingMap.get(key);
+          j.created_at = new Date().toISOString();
+          duplicateJobs.push(j);
+          continue;
+        }
+        existingMap.set(key, jobs.length + newJobs.length);
         newJobs.push(j);
       }
       for (const job of newJobs) {
         if (!job.status) job.status = "new";
+        if (!job.id) job.id = newJobId();
         job.created_at = job.created_at || new Date().toISOString();
+        jobs.push(job);
+      }
+      for (const job of duplicateJobs) {
+        if (!job.id) job.id = newJobId();
         jobs.push(job);
       }
       saveData();
       res.json({
-        message: `Added ${newJobs.length} new job(s), ${duplicates.length} duplicate(s) skipped. Total: ${jobs.length}.`,
+        message: `Added ${newJobs.length} new job(s), ${duplicateJobs.length} duplicate(s) moved to Duplicates tab. Total: ${jobs.length}.`,
         added: newJobs.length,
-        duplicates: duplicates.length,
+        duplicates: duplicateJobs.length,
         job_count: jobs.length,
         warnings: errors,
       });
@@ -163,10 +188,31 @@ app.post("/api/upload-jobs", upload.array("files[]", MAX_JOBS_FILES), async (req
 // ─── Match ───────────────────────────────────────────────
 app.post("/api/match", async (req, res) => {
   try {
-    console.log(`[MATCH] /api/match called — resumeText: ${resumeText ? resumeText.length + ' chars' : 'NULL'}, jobs: ${jobs.length}, SCORE_BATCH: ${SCORE_BATCH}, SCORE_MAX_TOKENS: ${SCORE_MAX_TOKENS}`);
+    const scope = req.body?.scope || "unscored";
+    console.log(`[MATCH] /api/match called — resumeText: ${resumeText ? resumeText.length + ' chars' : 'NULL'}, scope: ${scope}`);
     if (!resumeText) return res.status(400).json({ error: "No resume uploaded" });
     if (!jobs.length) return res.status(400).json({ error: "No job listings" });
-    const results = await computeScores(resumeText, jobs);
+
+    // Select which jobs to score based on scope
+    let target = [];
+    if (scope === "unscored") {
+      target = jobs; // computeScores already filters unscored
+    } else if (scope === "all") {
+      // Reset all scores before re-scoring
+      for (const j of jobs) j.score = undefined;
+      target = jobs;
+    } else if (scope === "new") {
+      // Only new jobs — but don't skip already scored ones (re-score them too)
+      for (const j of jobs) { if (j.status === "new") j.score = undefined; }
+      target = jobs;
+    } else if (scope === "ignored") {
+      for (const j of jobs) { if (j.status === "ignored") j.score = undefined; }
+      target = jobs;
+    } else {
+      return res.status(400).json({ error: "Invalid scope. Use: unscored, all, new, ignored" });
+    }
+
+    const results = await computeScores(resumeText, target);
     saveData();
     res.json({ resume: resumeFilename, total_jobs: results.length, results });
   } catch (e) {
@@ -210,21 +256,39 @@ app.patch("/api/jobs/:index/status", (req, res) => {
   res.json({ message: `Status updated to "${status}"`, job: jobs[idx] });
 });
 
-// ─── Delete single job ───────────────────────────────────
+// ─── Delete single job (soft delete) ────────────────────
 app.delete("/api/jobs/:index", (req, res) => {
   const idx = parseInt(req.params.index, 10);
   if (isNaN(idx) || idx < 0 || idx >= jobs.length)
     return res.status(400).json({ error: "Invalid job index" });
-  const removed = jobs.splice(idx, 1);
+  jobs[idx].status = "deleted";
+  jobs[idx].deleted_at = new Date().toISOString();
+  jobs[idx].previous_status = jobs[idx].previous_status || jobs[idx].status === "deleted" ? jobs[idx].previous_status : undefined;
   saveData();
-  res.json({ message: `Deleted "${removed[0]?.title || 'job'}"`, job_count: jobs.length });
+  res.json({ message: `Moved "${jobs[idx]?.title || 'job'}" to Deleted`, job_count: jobs.length, job: jobs[idx] });
+});
+
+// ─── Restore deleted job ─────────────────────────────────
+app.patch("/api/jobs/:index/restore", (req, res) => {
+  const idx = parseInt(req.params.index, 10);
+  if (isNaN(idx) || idx < 0 || idx >= jobs.length)
+    return res.status(400).json({ error: "Invalid job index" });
+  if (jobs[idx].status !== "deleted")
+    return res.status(400).json({ error: "Job is not deleted" });
+  jobs[idx].status = jobs[idx].previous_status || "new";
+  delete jobs[idx].deleted_at;
+  saveData();
+  res.json({ message: `Restored "${jobs[idx]?.title || 'job'}"`, job: jobs[idx] });
 });
 
 // ─── Delete all jobs (keep resume) ───────────────────────
 app.delete("/api/jobs", (req, res) => {
-  jobs = [];
+  for (const j of jobs) {
+    j.status = "deleted";
+    j.deleted_at = new Date().toISOString();
+  }
   saveData();
-  res.json({ message: "All jobs deleted.", job_count: 0 });
+  res.json({ message: "All jobs moved to Deleted.", job_count: jobs.length });
 });
 
 // ─── Status & Clear ─────────────────────────────────────
@@ -257,13 +321,20 @@ function createTransporter(user, pass) {
 
 app.post("/api/send-email", async (req, res) => {
   try {
-    const { jobIdx, gmailUser, gmailPass } = req.body;
-    if (jobIdx === undefined || jobIdx < 0 || jobIdx >= jobs.length)
-      return res.status(400).json({ error: "Invalid job index" });
+    const { id, jobIdx, gmailUser, gmailPass } = req.body;
+    let idx;
+    if (id) {
+      idx = jobs.findIndex(j => j.id === id);
+      if (idx === -1) return res.status(400).json({ error: "Job not found" });
+    } else {
+      idx = parseInt(jobIdx, 10);
+      if (isNaN(idx) || idx < 0 || idx >= jobs.length)
+        return res.status(400).json({ error: "Invalid job index" });
+    }
     if (!gmailUser || !gmailPass)
       return res.status(400).json({ error: "Gmail credentials required" });
 
-    const job = jobs[jobIdx];
+    const job = jobs[idx];
     if (!job.email) return res.status(400).json({ error: "No email address for this job" });
 
     const transporter = createTransporter(gmailUser, gmailPass);
@@ -282,7 +353,7 @@ ${gmailUser}`;
       from: gmailUser,
       to: job.email,
       subject,
-      text,
+      html: (req.body.body || "").replace(/\n/g, "<br>"),
     };
 
     // Attach resume file if available (fallback: scan uploads dir)
@@ -441,20 +512,14 @@ app.get("/api/resume", (req, res) => {
   res.json({ text: resumeText || "", filename: resumeFilename, filePath: resumeFilePath });
 });
 
-// ─── Serve frontend ─────────────────────────────────────
-app.get("/", (req, res, next) => {
+// ─── Serve frontend (SPA fallback) ──────────────────────
+app.get("*", (req, res) => {
   if (fs.existsSync(clientDist)) {
     res.sendFile(path.join(clientDist, "index.html"));
   } else {
-    res.sendFile(path.join(__dirname, "templates", "index.html"));
-  }
-});
-
-app.get("/agent", (req, res, next) => {
-  if (fs.existsSync(clientDist)) {
-    res.sendFile(path.join(clientDist, "index.html"));
-  } else {
-    res.sendFile(path.join(__dirname, "templates", "agent.html"));
+    // Fallback to old templates
+    if (req.path === "/agent") res.sendFile(path.join(__dirname, "templates", "agent.html"));
+    else res.sendFile(path.join(__dirname, "templates", "index.html"));
   }
 });
 
