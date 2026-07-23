@@ -10,7 +10,7 @@ An AI-powered QA Copilot platform: a Claude-like web UI backed by a multi-agent 
 ┌──────────────────────────────────────────────────┐
 │                  Frontend (Next.js)               │
 │   Chat UI  │  Dashboard  │  Test Viewer  │  Config │
-│   (Claude-like dark + amber theme)                │
+│   (Claude-like warm cream/beige theme)             │
 └────────────────────┬─────────────────────────────┘
                      │ REST + SSE Streaming
 ┌────────────────────▼─────────────────────────────┐
@@ -155,8 +155,15 @@ pip install -r requirements.txt
 ```bash
 # backend/.env
 DB_URL=sqlite+aiosqlite:///./qacopilot.db
-ANTHROPIC_API_KEY=your-key-here   # optional, uses mock responses without it
+
+# LLM — set LLM_PROVIDER to openrouter, anthropic, or openai
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=your-key-here   # free models for testing
+ANTHROPIC_API_KEY=your-key-here    # fallback
+OPENAI_API_KEY=your-key-here       # fallback
 ```
+
+> **Note:** Works without an API key — falls back to keyword-based classification and prebuilt test cases. Add a key for LLM-powered responses.
 
 ### 3. Start services
 
@@ -221,18 +228,21 @@ docker compose up -d
 ## Roadmap
 
 ### Phase 1 — Foundation ✅
-- [x] Next.js frontend with Claude-like theme
+- [x] Next.js frontend with warm cream/beige theme
 - [x] FastAPI backend with project CRUD
-- [x] SQLite/PostgreSQL with Alembic-ready models
-- [x] SSE streaming chat with mock agent
+- [x] SQLite/PostgreSQL with SQLAlchemy models
+- [x] SSE streaming chat with mock agent (Phase 1) → real LangGraph pipeline (Phase 2)
 - [x] Docker Compose
 
-### Phase 2 — Core Agents (next)
-- [ ] LangGraph state schema + Orchestrator agent
-- [ ] JIRA MCP integration (fetch issues)
-- [ ] PRD Analyzer agent
-- [ ] Test Generator agent
-- [ ] LLM-powered responses (Claude API)
+### Phase 2 — Core Agents ✅
+- [x] LangGraph state schema + Orchestrator agent (intent classification)
+- [x] Multi-provider LLM client (OpenRouter primary, Anthropic/OpenAI fallback)
+- [x] JIRA Agent (issue key extraction)
+- [x] PRD Analyzer agent (feature extraction)
+- [x] Test Generator agent (structured test cases)
+- [x] Regression Selector agent
+- [x] Response formatter (markdown rendering)
+- [x] SSE streaming chat with real agent pipeline
 
 ### Phase 3 — Vector DB & Regression
 - [ ] ChromaDB setup + embedding pipeline
@@ -266,7 +276,7 @@ docker compose up -d
 - **ChromaDB over Pinecone:** Self-hosted, zero-cost, Python-native. Good for this scale.
 - **tree-sitter + rules over pure LLM migration:** Deterministic AST parsing handles 80% of conversion. LLM polishes remaining 20%.
 - **Docker-per-execution:** Security sandboxing for user-submitted test code. Clean state per run.
-- **Amber-on-dark theme:** Familiar Claude.ai pattern; amber (#d97706) differentiates branding.
+- **Warm cream/beige theme:** Matches Claude.ai aesthetic — `#faf8f5` page bg, `#f0ece3` sidebar, brown text (#1a1410), amber accents (#d97706).
 
 ---
 

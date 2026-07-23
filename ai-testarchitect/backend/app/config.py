@@ -11,11 +11,14 @@ class Settings(BaseSettings):
     # Database — use custom prefix to avoid collision with DATABASE_URL env var
     db_url: str = "sqlite+aiosqlite:///./qacopilot.db"
 
-    # AI
+    # LLM — set LLM_PROVIDER in .env: openrouter, anthropic, or openai
+    llm_provider: str = "openrouter"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "google/gemini-2.0-flash-001"
     anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-20250514"
     openai_api_key: str = ""
-    llm_provider: str = "anthropic"
-    llm_model: str = "claude-sonnet-4-20250514"
+    openai_model: str = "gpt-4o"
 
     # ChromaDB
     chroma_persist_dir: str = "./chroma_data"
