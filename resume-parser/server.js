@@ -22,6 +22,31 @@ const SMTP_SECURE = process.env.SMTP_SECURE !== "false";
 const SCORE_BATCH = parseInt(process.env.SCORE_BATCH_SIZE || "8");
 const SCORE_TIMEOUT_MS = parseInt(process.env.SCORE_TIMEOUT_MS || "120000");
 const SCORE_MAX_TOKENS = parseInt(process.env.SCORE_MAX_TOKENS || "8192");
+const COMPANY_MODEL = process.env.COMPANY_MODEL || "perplexity/sonar-pro";
+const COMPANY_BATCH = parseInt(process.env.COMPANY_BATCH_SIZE || "10");
+
+// In-memory company info cache
+let companyInfo = {};
+const COMPANY_FILE = path.join(__dirname, "company-info.json");
+
+const GENERIC_DOMAINS = new Set([
+  "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
+  "rediffmail.com", "ymail.com", "live.com", "google.com"
+]);
+
+function loadCompanyInfo() {
+  try {
+    if (fs.existsSync(COMPANY_FILE)) {
+      companyInfo = JSON.parse(fs.readFileSync(COMPANY_FILE, "utf-8"));
+    }
+  } catch {}
+}
+function saveCompanyInfo() {
+  try {
+    fs.writeFileSync(COMPANY_FILE, JSON.stringify(companyInfo, null, 2), "utf-8");
+  } catch {}
+}
+loadCompanyInfo();
 
 const app = express();
 app.use(express.json());
@@ -395,6 +420,82 @@ app.post("/api/verify-gmail", async (req, res) => {
     res.json({ verified: true });
   } catch (e) {
     res.status(401).json({ verified: false, error: e.message });
+  }
+});
+
+// ─── Company Info ─────────────────────────────────────
+function getEmailDomain(email) {
+  if (!email || typeof email !== "string") return null;
+  const parts = email.toLowerCase().split("@");
+  return parts.length === 2 ? parts[1] : null;
+}
+
+app.get("/api/company-info", (req, res) => {
+  res.json({ companies: companyInfo });
+});
+
+app.post("/api/company-details", async (req, res) => {
+  try {
+    let { domains } = req.body;
+    if (!Array.isArray(domains) || !domains.length)
+      return res.json({ companies: companyInfo });
+
+    // Filter out generic domains
+    domains = domains.filter(d => d && !GENERIC_DOMAINS.has(d.toLowerCase()));
+    // Dedupe
+    domains = [...new Set(domains.map(d => d.toLowerCase()))];
+
+    // Find domains not yet cached
+    const uncached = domains.filter(d => !companyInfo[d]);
+    if (uncached.length) {
+      // Batch into groups
+      for (let i = 0; i < uncached.length; i += COMPANY_BATCH) {
+        const batch = uncached.slice(i, i + COMPANY_BATCH);
+        // Build prompt with one sample email per domain so LLM can extract person name
+        const domainLines = batch.map(d => {
+          const sample = jobs.find(j => getEmailDomain(j.email) === d);
+          return `Domain: ${d}${sample ? " | Sample Email: " + sample.email : ""}`;
+        }).join("\n");
+
+        const prompt = `Given each email domain, return: company name, person name (from email prefix), location, type (Product/Service/Unknown).
+
+Respond JSON array only:
+[{"domain":"...","company":"...","personName":"...","location":"...","type":"Product|Service|Unknown"}]
+
+Unknown → use "Unknown". No markdown.
+
+${domainLines}`;
+
+        const systemPrompt = "Extract company details from email domains. JSON only.";
+        const content = await callOpenRouter(prompt, systemPrompt, { model: COMPANY_MODEL, timeout: 60000, maxTokens: 2048 });
+        const match = content.match(/\[[\s\S]*\]/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[0]);
+            if (Array.isArray(parsed)) {
+              for (const entry of parsed) {
+                if (entry.domain) {
+                  companyInfo[entry.domain.toLowerCase()] = {
+                    company: entry.company || "Unknown",
+                    personName: entry.personName || "Unknown",
+                    location: entry.location || "Unknown",
+                    type: entry.type || "Unknown",
+                    updatedAt: new Date().toISOString()
+                  };
+                }
+              }
+              saveCompanyInfo();
+            }
+          } catch (e) {
+            console.error("[CompanyInfo] JSON parse failed:", e.message);
+          }
+        }
+      }
+    }
+
+    res.json({ companies: companyInfo });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

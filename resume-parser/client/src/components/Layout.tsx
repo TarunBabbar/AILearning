@@ -1,6 +1,6 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, Mail, ChevronLeft, ChevronRight, BriefcaseBusiness, Ban, TrendingDown } from "lucide-react";
+import { LayoutDashboard, Mail, ChevronLeft, ChevronRight, BriefcaseBusiness, Ban, TrendingDown, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Layout() {
@@ -69,6 +69,16 @@ export default function Layout() {
           >
             <Ban size={17} />
             {!collapsed && "Improper Extraction"}
+          </NavLink>
+          <NavLink
+            to="/companies"
+            className={({ isActive }) => cn(
+              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
+              isActive ? "bg-amber-50 text-amber-800" : "text-[#7c6e60] hover:bg-[#f5f0eb] hover:text-[#1c1917]"
+            )}
+          >
+            <Building2 size={17} />
+            {!collapsed && "Company Info"}
           </NavLink>
         </nav>
 

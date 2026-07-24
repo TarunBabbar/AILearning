@@ -9,4 +9,5 @@ __pycache__/
 *.xlsx
 ~$*
 client/dist/
-backups/ 
+backups/
+company-info.json

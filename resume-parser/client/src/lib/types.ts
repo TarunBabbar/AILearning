@@ -6,3 +6,10 @@ export interface Job {
   scoring_method?: string; email_sent?: boolean; email_sent_at?: string;
   created_at?: string; status_updated_at?: string;
 }
+export interface CompanyEntry {
+  company: string;
+  personName: string;
+  location: string;
+  type: string;
+  updatedAt: string;
+}

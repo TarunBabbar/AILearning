@@ -21,6 +21,8 @@ export const api = {
   updateStatus(id: string, status: string) { return req<{ message: string; job: Job }>("/api/jobs/0/status", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) }); },
   verifyGmail(user: string, pass: string) { return req<{ verified: boolean }>("/api/verify-gmail", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gmailUser: user, gmailPass: pass }) }); },
   sendEmail(id: string, gmailUser: string, gmailPass: string, subject: string, body: string) { return req<{ message: string }>("/api/send-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, gmailUser, gmailPass, subject, body }) }); },
+  getCompanyInfo() { return req<{ companies: Record<string, CompanyEntry> }>("/api/company-info"); },
+  getCompanyDetails(domains: string[]) { return req<{ companies: Record<string, CompanyEntry> }>("/api/company-details", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domains }) }); },
 };
 
-import type { Status, Job } from "./types";
+import type { Status, Job, CompanyEntry } from "./types";

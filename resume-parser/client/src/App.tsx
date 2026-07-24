@@ -4,6 +4,7 @@ import Dashboard from "./components/Dashboard";
 import EmailAgent from "./components/EmailAgent";
 import LowScoreAgent from "./components/LowScoreAgent";
 import IgnoredEmailAgent from "./components/IgnoredEmailAgent";
+import CompanyInfo from "./components/CompanyInfo";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/agent" element={<EmailAgent />} />
           <Route path="/low-score" element={<LowScoreAgent />} />
           <Route path="/ignored-agent" element={<IgnoredEmailAgent />} />
+          <Route path="/companies" element={<CompanyInfo />} />
         </Route>
       </Routes>
     </BrowserRouter>
