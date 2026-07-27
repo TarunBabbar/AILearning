@@ -1,0 +1,10 @@
+feat: sync company info enrichment and client from source repo
+
+Adds the Company Info feature (both frontend and backend) that was missing:
+- server.js: company-info cache, getEmailDomain, /api/company-info, /api/company-details
+- .env: full config including COMPANY_MODEL and updated parsing/scoring settings
+- client: CompanyInfo.tsx component, CompanyEntry type, API methods, route, nav link
+- .gitignore: company-info.json (runtime cache)
+- README: updated docs, port 5001, project structure, new env vars
+
+Co-authored-by: CommandCodeBot <noreply@commandcode.ai>

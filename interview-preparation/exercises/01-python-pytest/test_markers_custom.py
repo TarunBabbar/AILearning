@@ -25,4 +25,17 @@ def test_known_feature_still_works():
 @pytest.mark.regression
 def test_smoke_and_regression():
     """Multiple markers on one test."""
-    assert True
+    assert "True".lower() =="true"
+
+@pytest.mark.skip(reason="Demonstrating skipping a test.")
+def test_skipped():
+    """This test is skipped."""
+    assert 1==2
+
+@pytest.mark.xfail(reason="Demonstrating expected failure.")
+def test_expected_failure():
+    assert 1==3
+
+@pytest.mark.xfail(reason="Demonstrating unexpected pass.")
+def test_unexpected_pass():
+    assert 1==1
