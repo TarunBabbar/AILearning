@@ -1,6 +1,6 @@
 # Phase 1: Python & Pytest
 
-**Status:** In progress — Session 2 complete  
+**Status:** Complete — all Phase 1 topics done  
 **Goal:** Write production-quality tests (parametrized, fixtures, conftest, plugins)
 
 ---
@@ -14,8 +14,9 @@
 - [x] `@pytest.fixture` — what it is, why it matters for NL2SQL eval
 - [x] Fixture scopes: `function` (default) vs `session` with `yield` teardown
 - [x] `conftest.py` — shared fixture auto-discovered by all tests in the directory
-- [ ] Markers and pytest.ini
-- [ ] Plugins: xdist, html, cov
+- [x] Markers: built-in (skip, skipif, xfail) + custom (smoke, slow, regression)
+- [x] `pytest.ini` — register markers, set defaults, strict mode
+- [x] Plugins: pytest-xdist (parallel -n), pytest-html (reporting), pytest-cov (coverage)
 
 ---
 
@@ -75,6 +76,72 @@ def per_session_data():
 - `yield` lets you run cleanup after the test (teardown)
 - Parametrize + fixture = the pattern for NL2SQL eval (one test, many queries, shared DB)
 - The `test_exercise.py` parametrized case caught `-1` as a failure — real validation in action
+
+---
+
+## Markers & pytest.ini (`exercises/01-python-pytest/`)
+
+### Built-in markers
+
+| Marker | Effect | Output |
+|--------|--------|--------|
+| `@pytest.mark.skip` | Always skip | `s` / SKIPPED |
+| `@pytest.mark.skipif(condition)` | Skip conditionally | `s` / SKIPPED |
+| `@pytest.mark.xfail(reason="...")` | Expected to fail — **not** a FAIL | `x` / XFAIL |
+| `@pytest.mark.xfail(strict=True)` | Unexpected pass becomes a FAIL | `X` / XPASS (warns) |
+
+### Custom markers (registered in `pytest.ini`)
+
+```ini
+markers =
+    smoke: quick smoke test verifying core functionality
+    slow: test that takes noticeable time, excluded by default
+    regression: tests that validate against known-good baselines
+```
+
+### Running by marker
+
+```bash
+pytest -m smoke           # only smoke tests
+pytest -m "not slow"      # everything except slow
+pytest -m "smoke and regression"  # tests with BOTH markers
+```
+
+### `pytest.ini`
+
+```ini
+[pytest]
+markers = smoke slow regression
+addopts = -v --strict-markers
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+```
+
+**`--strict-markers`** — catches typos like `@pytest.mark.smokee` at collection time instead of silently ignoring them.
+
+---
+
+## Plugins
+
+| Plugin | Flag | What it does |
+|--------|------|-------------|
+| `pytest-xdist` | `-n <workers>` | Runs tests in parallel across N workers |
+| `pytest-html` | `--html=report.html` | Generates a self-contained HTML report |
+| `pytest-cov` | `--cov` | Measures code coverage (which lines did tests exercise) |
+
+```bash
+# Run 3 test files in parallel with 2 workers, coverage, and an HTML report
+pytest test_a.py test_b.py test_c.py -n 2 --cov --html=report.html
+```
+
+### New exercise files
+
+| File | What it taught |
+|------|---------------|
+| `test_markers.py` | Built-in markers: `skip`, `skipif`, `xfail`, `xpass` |
+| `test_markers_custom.py` | Custom markers `smoke`, `slow`, `regression` with `-m` filtering |
+| `pytest.ini` | Project-level config: marker registry, strict mode, discovery patterns |
 
 ### fixture — set up data once, use in many tests
 

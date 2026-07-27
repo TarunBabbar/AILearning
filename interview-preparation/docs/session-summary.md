@@ -39,13 +39,23 @@ Phase 1 (Python & Pytest) — Session 2 complete. Fixture scopes + conftest soli
 ### Where to Resume
 Session 3 starts with **markers** (`@pytest.mark.smoke`, `@pytest.mark.skip`, custom markers) + **pytest.ini** config + **plugins** (pytest-xdist, pytest-html, pytest-cov). Then move to Phase 2: SQL & NL2SQL validation.
 
-### Docs Created
-- `docs/README.md` — master index
-- `docs/01-python-pytest/README.md` — Phase 1 notes
-- `docs/02-sql-nl2sql/README.md` — Phase 2 notes (empty, ready)
-- `docs/03-rest-api-testing/README.md` — Phase 3 notes (empty)
-- `docs/04-ai-eval/README.md` — Phase 4 notes (empty)
-- `docs/05-tracing/README.md` — Phase 5 notes (empty)
-- `docs/06-capstone/README.md` — Phase 6 notes (empty, has build progress checklist)
-- `docs/07-interview-prep/README.md` — Phase 7 notes (empty)
-- `docs/session-summary.md` — this file
+---
+
+## Session 3 — 2026-07-27
+
+### What We Did
+- Covered **markers** — built-in (`skip`, `skipif`, `xfail`) + custom (`smoke`, `slow`, `regression`)
+- Created `pytest.ini` at project root with marker registration, `--strict-markers`, and discovery patterns
+- Ran `-m smoke` (selective runs), `-m "not slow"` (exclusion)
+- Installed and demoed 3 plugins in one command:
+  - **pytest-xdist**: `-n 2` ran tests across 2 parallel workers
+  - **pytest-html**: generated a self-contained HTML report
+  - **pytest-cov**: showed per-file coverage percentages
+- Created exercise files: `test_markers.py`, `test_markers_custom.py`, `pytest.ini`
+- Updated docs to mark Phase 1 **complete** — all topics done
+
+### Current Phase
+Phase 1 (Python & Pytest) — **Complete.** Ready for Phase 2.
+
+### Where to Resume
+Start Phase 2: **SQL & NL2SQL validation** — joins, aggregations, window functions, execution accuracy vs exact match, comparing result sets.
