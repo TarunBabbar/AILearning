@@ -11,10 +11,6 @@ export async function getVectorStore(): Promise<IVectorStore> {
   if (config.vectorDb === "pinecone" || config.isProduction) {
     const { PineconeStore } = await import("./pinecone-store");
     store = new PineconeStore();
-  } else if (config.vectorDb === "chromadb") {
-    const { ChromaStore } = await import(/* webpackIgnore: true */ "./chroma-store");
-    // Always create fresh ChromaDB client (no singleton caching)
-    return new ChromaStore();
   } else {
     const { LocalStore } = await import("./local-store");
     store = new LocalStore();

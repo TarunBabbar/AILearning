@@ -22,7 +22,7 @@ export class ChromaStore implements IVectorStore {
   private async ensureClient() {
     if (this.client) return;
     const config = getConfig();
-    const { ChromaClient } = await import(/* webpackIgnore: true */ "chromadb");
+    const { ChromaClient } = await import("chroma" + "db");
     this.client = new ChromaClient({
       path: config.chromaUrl,
     });
