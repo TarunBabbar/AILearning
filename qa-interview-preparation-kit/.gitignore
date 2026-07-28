@@ -1,0 +1,6 @@
+node_modules/
+.next/
+pinecone_data/*
+!pinecone_data/ai-topics.json
+*.log
+.env.local

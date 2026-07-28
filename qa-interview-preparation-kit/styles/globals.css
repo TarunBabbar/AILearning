@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --sidebar-bg: #f5f0eb;
+    --sidebar-text: #4a4a4a;
+    --sidebar-hover: #e8e0d8;
+    --sidebar-active: #dcd3c9;
+    --beige: #f5f0eb;
+    --beige-light: #faf7f3;
+    --beige-dark: #e8e0d8;
+    --accent: #c95a3f;
+    --accent-hover: #b04a32;
+    --surface: #ffffff;
+    --border: #e2dcd5;
+    --text: #1a1a1a;
+    --text-muted: #6b6b6b;
+    --text-light: #8a8a8a;
+  }
+
+  body {
+    background-color: var(--beige);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d0c8be;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b8b0a6;
+  }
+}
+
+@layer components {
+  .claude-card {
+    @apply bg-claude-surface border border-claude-border rounded-xl shadow-sm;
+  }
+
+  .claude-input {
+    @apply w-full px-4 py-3 bg-white border border-claude-border rounded-xl
+           text-claude-text placeholder:text-claude-text-light
+           focus:outline-none focus:ring-2 focus:ring-claude-accent/30 focus:border-claude-accent
+           transition-all duration-200;
+  }
+
+  .claude-btn {
+    @apply px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .claude-btn-primary {
+    @apply claude-btn bg-claude-accent text-white hover:bg-claude-accent-hover
+           active:scale-[0.98];
+  }
+
+  .claude-btn-secondary {
+    @apply claude-btn bg-claude-beige-dark text-claude-text hover:bg-claude-border
+           active:scale-[0.98];
+  }
+
+  .message-bubble-user {
+    @apply bg-message-user rounded-2xl rounded-tr-sm px-5 py-3 max-w-[80%] ml-auto;
+  }
+
+  .message-bubble-assistant {
+    @apply bg-message-assistant border border-claude-border rounded-2xl rounded-tl-sm px-5 py-3 max-w-[80%];
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .typing-indicator {
+    display: inline-flex;
+    gap: 4px;
+  }
+
+  .typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background: var(--text-light);
+    border-radius: 50%;
+    animation: typing 1.4s infinite ease-in-out;
+  }
+
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typing {
+    0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+    30% { opacity: 1; transform: scale(1); }
+  }
+
+  .slide-in-left {
+    animation: slideInLeft 0.3s ease-out;
+  }
+
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+}
