@@ -9,7 +9,6 @@ async function embed(input: string | string[]): Promise<number[] | number[][]> {
     model: config.embeddingModel,
     input,
     encoding_format: "float",
-    input_type: Array.isArray(input) ? "passage" : "query",
   });
 
   if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
