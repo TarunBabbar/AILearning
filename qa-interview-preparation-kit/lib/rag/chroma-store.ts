@@ -1,4 +1,3 @@
-import { ChromaClient } from "chromadb";
 import { v4 as uuidv4 } from "uuid";
 import { getConfig } from "../config";
 import type { ChunkData, IVectorStore, QueryResult } from "./vector-store";
@@ -13,17 +12,24 @@ const dummyEmbeddingFunction = {
 };
 
 export class ChromaStore implements IVectorStore {
-  private client: ChromaClient;
+  private client: any = null;
   private collection: any = null;
 
   constructor() {
+    // Lazy init on first use — chromadb may not be installed
+  }
+
+  private async ensureClient() {
+    if (this.client) return;
     const config = getConfig();
+    const { ChromaClient } = await import("chromadb");
     this.client = new ChromaClient({
       path: config.chromaUrl,
     });
   }
 
   private async getCollection() {
+    await this.ensureClient();
     // Always fetch collection by name — don't cache the UUID
     try {
       this.collection = await this.client.getCollection({ name: COLLECTION_NAME, embeddingFunction: dummyEmbeddingFunction });
@@ -34,6 +40,7 @@ export class ChromaStore implements IVectorStore {
   }
 
   async reset(): Promise<void> {
+    await this.ensureClient();
     try {
       await this.client.deleteCollection({ name: COLLECTION_NAME });
     } catch {
