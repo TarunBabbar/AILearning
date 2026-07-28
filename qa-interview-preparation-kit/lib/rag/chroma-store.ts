@@ -5,6 +5,13 @@ import type { ChunkData, IVectorStore, QueryResult } from "./vector-store";
 
 const COLLECTION_NAME = "qa_documents";
 
+// Dummy embedding function — only needed because newer chromadb SDK
+// requires it on getCollection/createCollection. ChromaDB is not used
+// in production (Pinecone is the default).
+const dummyEmbeddingFunction = {
+  generate: async (_texts: string[]) => [],
+};
+
 export class ChromaStore implements IVectorStore {
   private client: ChromaClient;
   private collection: any = null;
@@ -19,9 +26,9 @@ export class ChromaStore implements IVectorStore {
   private async getCollection() {
     // Always fetch collection by name — don't cache the UUID
     try {
-      this.collection = await this.client.getCollection({ name: COLLECTION_NAME });
+      this.collection = await this.client.getCollection({ name: COLLECTION_NAME, embeddingFunction: dummyEmbeddingFunction });
     } catch {
-      this.collection = await this.client.createCollection({ name: COLLECTION_NAME });
+      this.collection = await this.client.createCollection({ name: COLLECTION_NAME, embeddingFunction: dummyEmbeddingFunction });
     }
     return this.collection;
   }
