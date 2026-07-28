@@ -212,7 +212,7 @@ Rules:
 
       const pairs = Array.isArray(parsed)
         ? parsed
-        : parsed.qa_pairs || parsed.questions || parsed.pairs || [];
+        : (parsed as any).qa_pairs || (parsed as any).questions || (parsed as any).pairs || [];
 
       if (!Array.isArray(pairs)) {
         lastError = "LLM returned unexpected format";
