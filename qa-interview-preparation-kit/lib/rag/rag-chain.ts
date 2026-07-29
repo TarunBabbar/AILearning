@@ -56,7 +56,7 @@ Guidelines:
 - If the context doesn't contain enough information, say so honestly.
 - Include specific details, examples, and references to source documents when available.
 - Format your answer in clear paragraphs with bullet points if helpful.
-- At the end of your answer, list which source document(s) you used.`,
+- At the end of your answer, list which source document(s) you used. ALWAYS cite the actual filename like "Source: STS Learning_API Testing.docx" — never say just "Source 1" or "[Source 1]".`,
       },
       {
         role: "user",
@@ -118,7 +118,7 @@ export async function* askQuestionStream(
     messages: [
       {
         role: "system",
-        content: `You are a QA interview preparation assistant. Answer based ONLY on the provided context. Be thorough and include source references.`,
+        content: `You are a QA interview preparation assistant. Answer based ONLY on the provided context. Be thorough. At the end, cite actual source filenames like "Source: filename.docx" — never just "Source 1".`,
       },
       {
         role: "user",

@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
             {
               role: "system",
               content:
-                "You are a QA interview prep assistant. Answer ONLY from provided context. Be thorough, cite sources at end.",
+                "You are a QA interview prep assistant. Answer ONLY from provided context. Be thorough. When citing, use the actual source filename shown in brackets like [Source 1: filename.pdf]. Never say just 'Source 1' — include the filename.",
             },
             {
               role: "user",
