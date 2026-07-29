@@ -1,0 +1,29 @@
+{
+  "documents": [
+    "1. STS_Interview Newsletter_1-256 Qs.pdf",
+    "10. STS Learning_Situational Q&As.docx",
+    "11. STS Learning_Software Testing.docx",
+    "12. STS Learning_BDD-Cucumber.docx",
+    "2. STS_Interview Newsletter_257-405 Qs (with Playwright).pdf",
+    "3. Software Testing Studio_Interview eBook.docx",
+    "4. STS Learning_AI & Testing.pdf",
+    "5. STS Learning_Agile & Scrum.docx",
+    "6. STS Learning_API Testing.docx",
+    "7. STS Learning_Database & SQL.docx",
+    "8. STS Learning_Java Q&As.docx",
+    "9. STS Learning_Selenium & TestNG Q&As.docx"
+  ],
+  "topics": {
+    "Java": 70,
+    "Selenium & TestNG": 69,
+    "Situational Q&A": 62,
+    "BDD & Cucumber": 27,
+    "AI & Testing": 90,
+    "Software Testing": 51,
+    "General Interview": 29,
+    "Agile & Scrum": 48,
+    "Playwright": 11,
+    "Database & SQL": 41,
+    "API Testing": 8
+  }
+}
