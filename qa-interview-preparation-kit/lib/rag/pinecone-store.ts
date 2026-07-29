@@ -183,17 +183,21 @@ export class PineconeStore implements IVectorStore {
   ): Promise<{ question: string; answer: string; source: string }[]> {
     const config = getConfig();
     const index = await this.getIndex();
-    const results = await index.query({
-      vector: new Array(config.embeddingDimensions).fill(0),
-      topK: 100,
-      includeMetadata: true,
-      filter: { topic: { $eq: topic } },
-    });
+    try {
+      const results = await index.query({
+        vector: new Array(config.embeddingDimensions).fill(0),
+        topK: 100,
+        includeMetadata: true,
+        filter: { topic: { $eq: topic } },
+      });
 
-    return (results.matches || []).map((match: any) => ({
-      question: (match.metadata?.question || match.metadata?.text || "").substring(0, 200),
-      answer: match.metadata?.text || "",
-      source: match.metadata?.source || "",
-    }));
+      return (results.matches || []).map((match: any) => ({
+        question: (match.metadata?.question || match.metadata?.text || "").substring(0, 200),
+        answer: match.metadata?.text || "",
+        source: match.metadata?.source || "",
+      }));
+    } catch {
+      return [];
+    }
   }
 }
