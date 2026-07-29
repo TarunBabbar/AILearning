@@ -196,7 +196,8 @@ export class PineconeStore implements IVectorStore {
         answer: match.metadata?.text || "",
         source: match.metadata?.source || "",
       }));
-    } catch {
+    } catch (err: any) {
+      console.error(`[PineconeStore] getQuestionsByTopic("${topic}") failed:`, err.message);
       return [];
     }
   }

@@ -15,6 +15,7 @@ export default function QuestionsPage() {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -33,10 +34,12 @@ export default function QuestionsPage() {
   async function loadTopic(topic: string) {
     setSelectedTopic(topic);
     setQuestions([]);
+    setQuestionsLoading(true);
     setExpandedIndex(null);
     const res = await fetch(`/api/questions?topic=${encodeURIComponent(topic)}&mode=${mode}`);
     const data = await res.json();
     setQuestions(data.questions || []);
+    setQuestionsLoading(false);
   }
 
   function switchMode(newMode: "file" | "ai") {
@@ -121,9 +124,16 @@ export default function QuestionsPage() {
         </div>
 
         <div className="p-6 space-y-3">
-          {selectedTopic && questions.length === 0 && (
+          {selectedTopic && questionsLoading && (
             <div className="text-center py-12">
+              <Loader2 size={20} className="animate-spin text-claude-text-light mx-auto mb-2" />
               <p className="text-claude-text-muted">Loading questions...</p>
+            </div>
+          )}
+
+          {selectedTopic && !questionsLoading && questions.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-claude-text-muted">No questions found for this topic.</p>
             </div>
           )}
 
