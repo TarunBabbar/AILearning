@@ -50,7 +50,7 @@ export class PineconeStore implements IVectorStore {
 
       let paginationToken: string | null | undefined = undefined;
       do {
-        const result = await index.listPaginated({ limit: 99, paginationToken });
+        const result: any = await index.listPaginated({ limit: 99, paginationToken });
         const ids = (result.vectors || []).map((v: any) => v.id);
         paginationToken = (result.pagination?.next as string | null | undefined) ?? undefined;
 
