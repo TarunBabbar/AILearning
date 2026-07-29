@@ -34,8 +34,39 @@ export class PineconeStore implements IVectorStore {
         this.topics = new Map(Object.entries(data.topics || {}));
       }
     } catch {
-      this.documents = new Set();
-      this.topics = new Map();
+      // fall through — will lazily fetch from Pinecone
+    }
+  }
+
+  /** Fetch documents and topics directly from Pinecone when local sidecar is unavailable (e.g. Vercel). */
+  private async ensureMetadata() {
+    // Only rebuild if empty and not already in progress
+    if (this.documents.size > 0 || this.topics.size > 0) return;
+    try {
+      const index = await this.getIndex();
+      const stats = await index.describeIndexStats();
+      const totalRecords = stats.totalRecordCount || 0;
+      if (totalRecords === 0) return;
+
+      let paginationToken: string | null | undefined = undefined;
+      do {
+        const result = await index.listPaginated({ limit: 99, paginationToken });
+        const ids = (result.vectors || []).map((v: any) => v.id);
+        paginationToken = (result.pagination?.next as string | null | undefined) ?? undefined;
+
+        if (ids.length === 0) break;
+        const fetchResult = await index.fetch(ids);
+        for (const vec of Object.values(fetchResult.records || {})) {
+          const meta = (vec as any).metadata || {};
+          if (meta.source) this.documents.add(meta.source as string);
+          if (meta.topic) {
+            const t = meta.topic as string;
+            this.topics.set(t, (this.topics.get(t) || 0) + 1);
+          }
+        }
+      } while (paginationToken);
+    } catch {
+      // Best-effort: if Pinecone query fails, return empty
     }
   }
 
@@ -114,6 +145,7 @@ export class PineconeStore implements IVectorStore {
   }
 
   async listDocuments(): Promise<string[]> {
+    await this.ensureMetadata();
     return Array.from(this.documents).sort();
   }
 
@@ -126,6 +158,7 @@ export class PineconeStore implements IVectorStore {
   }
 
   async getDocumentCount(): Promise<number> {
+    await this.ensureMetadata();
     return this.documents.size;
   }
 
@@ -141,6 +174,7 @@ export class PineconeStore implements IVectorStore {
   }
 
   async getTopics(): Promise<string[]> {
+    await this.ensureMetadata();
     return Array.from(this.topics.keys()).sort();
   }
 
