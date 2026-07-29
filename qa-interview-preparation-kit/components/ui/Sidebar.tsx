@@ -14,7 +14,7 @@ import { useSidebar } from "../../lib/sidebar-context";
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/qa-assistant", label: "QA Assistant", icon: MessageSquare },
-  { href: "/questions", label: "Questions", icon: BookOpen },
+  { href: "/questions", label: "Q&A", icon: BookOpen },
   // { href: "/upload", label: "Upload", icon: Upload }, // disabled — seed only
 ];
 

@@ -9,8 +9,11 @@ import {
   FolderTree,
 } from "lucide-react";
 
+// On Vercel (production), only Refined mode is available — By File needs local Pinecone sidecar
+const isLocal = typeof window !== "undefined" && window.location.hostname === "localhost";
+
 export default function QuestionsPage() {
-  const [mode, setMode] = useState<"file" | "ai">("file");
+  const [mode, setMode] = useState<"file" | "ai">(isLocal ? "file" : "ai");
   const [topics, setTopics] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
@@ -58,30 +61,32 @@ export default function QuestionsPage() {
             className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-claude-border rounded-lg focus:outline-none focus:ring-2 focus:ring-claude-accent/30"
           />
         </div>
-        <div className="flex gap-1 mb-4 p-1 bg-claude-beige-dark rounded-lg">
-          <button
-            onClick={() => switchMode("file")}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-              mode === "file"
-                ? "bg-white text-claude-text font-medium shadow-sm"
-                : "text-claude-text-muted hover:text-claude-text"
-            }`}
-          >
-            <FolderTree size={14} />
-            By File
-          </button>
-          <button
-            onClick={() => switchMode("ai")}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
-              mode === "ai"
-                ? "bg-white text-claude-text font-medium shadow-sm"
-                : "text-claude-text-muted hover:text-claude-text"
-            }`}
-          >
-            <Sparkles size={14} />
-            Refined
-          </button>
-        </div>
+        {isLocal && (
+          <div className="flex gap-1 mb-4 p-1 bg-claude-beige-dark rounded-lg">
+            <button
+              onClick={() => switchMode("file")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+                mode === "file"
+                  ? "bg-white text-claude-text font-medium shadow-sm"
+                  : "text-claude-text-muted hover:text-claude-text"
+              }`}
+            >
+              <FolderTree size={14} />
+              By File
+            </button>
+            <button
+              onClick={() => switchMode("ai")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+                mode === "ai"
+                  ? "bg-white text-claude-text font-medium shadow-sm"
+                  : "text-claude-text-muted hover:text-claude-text"
+              }`}
+            >
+              <Sparkles size={14} />
+              Refined
+            </button>
+          </div>
+        )}
         <h3 className="text-xs font-semibold text-claude-text-muted uppercase tracking-wider mb-3">
           {mode === "ai" ? "Refined Topics" : "Topics by File"}
         </h3>
