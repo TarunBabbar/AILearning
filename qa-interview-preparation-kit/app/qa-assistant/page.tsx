@@ -4,6 +4,17 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Send, Bot, User, Loader2, FileText } from "lucide-react";
 
+function renderMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/```(.+?)```/gs, "<pre><code>$1</code></pre>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/^- (.+)$/gm, "<li>$1</li>")
+    .replace(/(<li>.*<\/li>\n?)+/g, '<ul class="list-disc pl-4 space-y-1 my-1">$&</ul>')
+    .replace(/\n/g, "<br>");
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -133,7 +144,7 @@ function QAAssistantContent() {
               </div>
             )}
             <div className={msg.role === "user" ? "message-bubble-user" : "message-bubble-assistant"}>
-              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              <div className="text-sm prose-sm prose-claude max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
               {msg.sources && msg.sources.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-claude-border">
                   <p className="text-xs font-medium text-claude-text-muted mb-1">Sources:</p>
@@ -161,7 +172,7 @@ function QAAssistantContent() {
               <Bot size={16} className="text-claude-text-muted" />
             </div>
             <div className="message-bubble-assistant">
-              <p className="text-sm whitespace-pre-wrap">{streamedContent}</p>
+              <div className="text-sm prose-sm prose-claude max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(streamedContent) }} />
               {currentSources.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-claude-border">
                   <p className="text-xs font-medium text-claude-text-muted mb-1">Sources:</p>
