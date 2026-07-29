@@ -5,14 +5,76 @@ import { useSearchParams } from "next/navigation";
 import { Send, Bot, User, Loader2, FileText } from "lucide-react";
 
 function renderMarkdown(text: string): string {
-  return text
+  // 1. Extract code blocks first so they're not touched by inline formatting
+  const codeBlocks: string[] = [];
+  let html = text.replace(/```([\s\S]+?)```/g, (_, code) => {
+    codeBlocks.push(code.trim());
+    return `%%%CODEBLOCK${codeBlocks.length - 1}%%%`;
+  });
+
+  // Escape HTML
+  html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Inline formatting
+  html = html
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/```(.+?)```/gs, "<pre><code>$1</code></pre>")
-    .replace(/`(.+?)`/g, "<code>$1</code>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>\n?)+/g, '<ul class="list-disc pl-4 space-y-1 my-1">$&</ul>')
-    .replace(/\n/g, "<br>");
+    .replace(/`(.+?)`/g, "<code>$1</code>");
+
+  // Split into lines for block-level processing
+  const lines = html.split("\n");
+  const out: string[] = [];
+  let inUl = false;
+  let inOl = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const trimmed = line.trim();
+
+    // Empty line — close any open list
+    if (!trimmed) {
+      if (inUl) { out.push("</ul>"); inUl = false; }
+      if (inOl) { out.push("</ol>"); inOl = false; }
+      out.push("");
+      continue;
+    }
+
+    // Unordered list
+    const ulMatch = trimmed.match(/^[-*]\s+(.+)/);
+    if (ulMatch) {
+      if (!inUl) { out.push('<ul class="list-disc pl-4 space-y-1 my-1">'); inUl = true; }
+      out.push(`<li>${ulMatch[1]}</li>`);
+      continue;
+    } else if (inUl) { out.push("</ul>"); inUl = false; }
+
+    // Ordered list
+    const olMatch = trimmed.match(/^\d+[.)]\s+(.+)/);
+    if (olMatch) {
+      if (!inOl) { out.push('<ol class="list-decimal pl-4 space-y-1 my-1">'); inOl = true; }
+      out.push(`<li>${olMatch[1]}</li>`);
+      continue;
+    } else if (inOl) { out.push("</ol>"); inOl = false; }
+
+    // Headers
+    const hMatch = trimmed.match(/^(#{1,3})\s+(.+)/);
+    if (hMatch) {
+      const level = hMatch[1].length;
+      out.push(`<h${level} class="font-semibold text-claude-text mt-3 mb-1">${hMatch[2]}</h${level}>`);
+      continue;
+    }
+
+    // Plain paragraph
+    out.push(`<p class="my-1">${line}</p>`);
+  }
+
+  // Close any unclosed lists
+  if (inUl) out.push("</ul>");
+  if (inOl) out.push("</ol>");
+
+  return out.join("\n").replace(/%%%CODEBLOCK(\d+)%%%/g, (_, idx) =>
+    `<pre><code>${codeBlocks[parseInt(idx)]}</code></pre>`
+  );
 }
 
 interface Message {
