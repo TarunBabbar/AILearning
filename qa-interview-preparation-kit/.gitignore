@@ -1,7 +1,5 @@
 node_modules/
 .next/
 pinecone_data/*
-!pinecone_data/ai-topics.json
-!pinecone_data/pinecone-index.json
 *.log
 .env.local

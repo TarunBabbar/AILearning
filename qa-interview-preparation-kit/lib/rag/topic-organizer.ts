@@ -3,7 +3,7 @@ import { getConfig } from "../config";
 import { loadTopics, saveTopics, clearTopics as clearStoredTopics } from "./topic-store";
 import type { IVectorStore } from "./vector-store";
 
-interface OrganizedTopic {
+export interface OrganizedTopic {
   name: string;
   questions: { question: string; answer: string; source: string }[];
 }
