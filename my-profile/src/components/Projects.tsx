@@ -7,37 +7,37 @@ const projects = [
     title: "QA RAG Platform",
     desc: "Upload documents, ask AI-powered questions with grounded citations. Supports PDF/DOCX/TXT/MD, smart chunking, configurable embeddings, Pinecone vector search.",
     tech: ["Next.js 14", "OpenRouter", "Pinecone", "Mammoth", "Tailwind"],
-    repo: "https://github.com/TarunBabbar/qaragplatform",
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform",
   },
   {
     title: "QA AI Dashboard",
     desc: "Unified platform: resume-job matcher (LLM-scored), QA interview prep RAG chat, test case generator from PRDs, AI learning tutor, document Q&A.",
     tech: ["Next.js 15", "Neon PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
-    repo: "https://github.com/TarunBabbar/qadashboard",
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qadashboard",
   },
   {
     title: "AI Test Architect (QA Copilot)",
     desc: "Multi-agent LangGraph system: PRD → test case generation, bug → regression selection, framework migration (Selenium → Playwright), Docker-sandboxed test execution.",
     tech: ["LangGraph", "FastAPI", "ChromaDB", "Next.js", "Docker"],
-    repo: "https://github.com/TarunBabbar/ai-testarchitect",
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/ai-testarchitect",
   },
   {
     title: "Resume–Job Matcher",
     desc: "Upload resume + job listings → LLM extracts structured jobs, scores matches (0–100) with strengths/gaps, tracks status workflow. Email agent with Gmail SMTP.",
     tech: ["React 19", "Vite 8", "Express", "OpenRouter", "Nodemailer"],
-    repo: "https://github.com/TarunBabbar/resume-parser",
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/resume-parser",
   },
   {
     title: "Playwright + TypeScript Framework",
     desc: "Production-grade Playwright automation framework from scratch — POM, fixtures, parallel execution, CI/CD integration, API mocking, visual testing.",
     tech: ["Playwright", "TypeScript", "Pytest", "GitHub Actions"],
-    repo: "https://github.com/TarunBabbar/learning-playwright-typescript-framework",
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/learning-playwright-typescript-framework",
   },
   {
     title: "AI QA Interview Prep Kit",
     desc: "Structured prep for Senior AI QA roles — NL2SQL validation, LLM evaluation (EM, MRR, precision/recall), golden dataset design, prompt regression, RAG eval.",
     tech: ["Python", "Pytest", "LangSmith", "RAGAS", "DeepEval"],
-    repo: "https://github.com/TarunBabbar/interview-preparation",
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/interview-preparation",
   },
 ];
 
