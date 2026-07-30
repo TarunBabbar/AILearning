@@ -27,7 +27,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <header className="sr-only"><h1>Tarun Kumar Babbar — AI QA Architect</h1></header>
+        {children}
+      </body>
     </html>
   );
 }

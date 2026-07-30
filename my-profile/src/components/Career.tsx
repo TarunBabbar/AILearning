@@ -51,7 +51,7 @@ const roles = [
 
 export default function Career() {
   return (
-    <section className="py-20 sm:py-28">
+    <section id="career" className="py-20 sm:py-28">
       <div className="max-w-5xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

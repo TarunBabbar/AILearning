@@ -27,7 +27,7 @@ export default function Hero() {
         <div className="absolute -top-1/4 -right-1/4 w-[600px] h-[600px] rounded-full bg-amber-500/5 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-1/4 -left-1/4 w-[500px] h-[500px] rounded-full bg-amber-600/4 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-5xl mx-auto px-6 py-24 w-full">
+        <div className="relative z-10 max-w-5xl mx-auto px-6 pt-28 pb-20 w-full">
           <div className="flex items-center gap-12 lg:gap-16">
             {/* Photo */}
             <motion.div
