@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String?
+  email     String   @unique
+  image     String?
+  createdAt DateTime @default(now())
+
+  resumes       Resume[]
+  jobs          Job[]
+  projects      Project[]
+  conversations Conversation[]
+  settings      UserSettings?
+}
+
+model UserSettings {
+  id            String @id @default(uuid())
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  openrouterKey String?
+  gmailUser     String?
+  gmailPass     String?
+  pineconeIndex String?
+}
+
+model Resume {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  company     String
+  email       String?
+  location    String?
+  experience  String?
+  description String?
+  status      String   @default("new")
+  score       Int?
+  strengths   String?
+  gaps        String?
+  emailSent   Boolean  @default(false)
+  emailSentAt DateTime?
+  originalId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  userId    String?
+  name      String
+  type      String
+  content   String
+  summary   String?
+  size      Int
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  jiraUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  testCases   TestCase[]
+}
+
+model TestCase {
+  id               String   @id @default(uuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
+  steps            Json?
+  priority         String   @default("medium")
+  testType         String?
+  automationStatus String?  @default("manual")
+  createdAt        DateTime @default(now())
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  module    String
+  createdAt DateTime @default(now())
+  messages  Message[]
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  sources        Json?
+  createdAt      DateTime     @default(now())
+}
