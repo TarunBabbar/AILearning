@@ -31,10 +31,21 @@ export function ChatArea({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [expandedSources, setExpandedSources] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialSent = useRef(false);
+
+  // Load top suggestion questions from the knowledge base
+  useEffect(() => {
+    fetch("/api/chat/suggestions")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.suggestions?.length) setSuggestions(data.suggestions);
+      })
+      .catch(() => {});
+  }, []);
 
   // Handle ?ask= query param — auto-send question on mount
   useEffect(() => {
@@ -211,12 +222,15 @@ export function ChatArea({
             <div className="text-center max-w-md">
               <p className="text-text-muted text-sm mb-4">{placeholder}</p>
               <div className="flex flex-wrap gap-2 justify-center">
-                {[
-                  "What are the top QA interview questions?",
-                  "Explain Selenium WebDriver architecture",
-                  "What is the difference between regression and smoke testing?",
-                  "How do you write a good test case?",
-                ].map((s) => (
+                {(suggestions.length > 0
+                  ? suggestions
+                  : [
+                      "What are the top QA interview questions?",
+                      "Explain Selenium WebDriver architecture",
+                      "What is the difference between regression and smoke testing?",
+                      "How do you write a good test case?",
+                    ]
+                ).map((s) => (
                   <button
                     key={s}
                     onClick={() => {
