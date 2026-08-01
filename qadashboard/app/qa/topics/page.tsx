@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { BookOpen, ChevronDown, Sparkles, FileText } from "lucide-react";
+import { ChevronDown, MessageSquare, Brain, Database, Sparkles, ArrowRight, ExternalLink } from "lucide-react";
 
 type Question = {
   id: string;
@@ -18,15 +19,15 @@ type Topic = {
 };
 
 export default function QATopicsPage() {
+  const router = useRouter();
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [mode, setMode] = useState<"file" | "ai">("file");
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/topics?mode=${mode}`)
+    fetch(`/api/topics`)
       .then((r) => r.json())
       .then((data) => {
         setTopics(data.topics || []);
@@ -34,46 +35,40 @@ export default function QATopicsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [mode]);
+  }, []);
 
   const currentTopic = topics.find((t) => t.name === selectedTopic);
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="border-b border-border px-6 py-3 bg-white flex items-center justify-between">
+    <div className="flex-1 flex flex-col h-full">
+      <div className="sticky top-0 z-10 border-b border-border px-6 py-3 bg-white flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-text-primary">Q&A Topics</h1>
           <p className="text-sm text-text-muted">Browse interview questions by topic</p>
         </div>
-        <div className="flex items-center gap-1 bg-bg-surface rounded-lg border border-border p-0.5">
-          <button
-            onClick={() => setMode("file")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
-              mode === "file"
-                ? "bg-white text-text-primary shadow-sm font-medium"
-                : "text-text-muted hover:text-text-primary"
-            )}
-          >
-            <FileText size={14} />
-            By File
-          </button>
-          <button
-            onClick={() => setMode("ai")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
-              mode === "ai"
-                ? "bg-white text-text-primary shadow-sm font-medium"
-                : "text-text-muted hover:text-text-primary"
-            )}
-          >
-            <Sparkles size={14} />
-            AI Refined
-          </button>
-        </div>
+        <button
+          onClick={() => router.push("/qa")}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors"
+        >
+          <MessageSquare size={14} />
+          QA Assistant Chat
+          <ExternalLink size={12} />
+        </button>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      {/* RAG Flow Info Bar */}
+      <div className="bg-blue-50 border-b border-blue-200 px-6 py-2.5 flex items-center gap-4 text-xs text-blue-800 flex-wrap">
+        <span className="font-semibold flex items-center gap-1"><Database size={13} /> Interview Docs</span>
+        <ArrowRight size={12} className="text-blue-400" />
+        <span className="flex items-center gap-1"><Brain size={13} /> Embeddings</span>
+        <ArrowRight size={12} className="text-blue-400" />
+        <span className="flex items-center gap-1"><Sparkles size={13} /> Vector Search (Pinecone)</span>
+        <ArrowRight size={12} className="text-blue-400" />
+        <span className="flex items-center gap-1"><MessageSquare size={13} /> LLM Answer</span>
+        <span className="ml-auto text-blue-600/70">Click any question to ask AI →</span>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Topic sidebar */}
         <div className="w-56 border-r border-border overflow-y-auto bg-bg-surface p-2 flex-shrink-0">
           {loading ? (
@@ -105,7 +100,7 @@ export default function QATopicsPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {currentTopic.questions.map((q) => (
+              {currentTopic.questions.map((q, idx) => (
                 <div
                   key={q.id}
                   className="bg-white border border-border rounded-lg overflow-hidden"
@@ -116,11 +111,16 @@ export default function QATopicsPage() {
                     }
                     className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-bg-surface transition-colors"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">
-                        {q.question}
-                      </p>
-                      <p className="text-xs text-text-muted mt-0.5">{q.source}</p>
+                    <div className="flex-1 min-w-0 flex items-start gap-3">
+                      <span className="text-xs font-mono text-text-muted mt-0.5 min-w-[24px]">
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {q.question}
+                        </p>
+                        <p className="text-xs text-text-muted mt-0.5">{q.source}</p>
+                      </div>
                     </div>
                     <ChevronDown
                       size={16}

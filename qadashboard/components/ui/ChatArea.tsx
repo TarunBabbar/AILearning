@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import { cn } from "@/lib/utils";
 
 type Message = {
@@ -31,6 +34,75 @@ export function ChatArea({
   const [expandedSources, setExpandedSources] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const initialSent = useRef(false);
+
+  // Handle ?ask= query param — auto-send question on mount
+  useEffect(() => {
+    if (initialSent.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const ask = params.get("ask");
+    if (ask) {
+      initialSent.current = true;
+      // Clear the ?ask param so navigating again doesn't re-trigger
+      window.history.replaceState({}, "", window.location.pathname);
+
+      setInput(ask);
+      setLoading(true);
+      const userMsg: Message = { role: "user", content: ask };
+      const assistantMsg: Message = { role: "assistant", content: "" };
+      setMessages([userMsg, assistantMsg]);
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: ask, namespace, model, systemMessage }),
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Request failed");
+          const reader = res.body?.getReader();
+          if (!reader) throw new Error("No response body");
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let sources: { source: string; score: number }[] = [];
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const parsed = JSON.parse(line);
+                if (parsed.type === "sources") sources = parsed.content;
+                else if (parsed.type === "chunk") {
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    if (last?.role !== "assistant") return prev;
+                    return [
+                      ...prev.slice(0, -1),
+                      { ...last, content: last.content + parsed.content },
+                    ];
+                  });
+                }
+              } catch {}
+            }
+          }
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role !== "assistant") return prev;
+            return [...prev.slice(0, -1), { ...last, sources }];
+          });
+        })
+        .catch(() => {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role !== "assistant") return prev;
+            return [...prev.slice(0, -1), { ...last, content: "Sorry, something went wrong." }];
+          });
+        })
+        .finally(() => setLoading(false));
+    }
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -93,12 +165,12 @@ export function ChatArea({
               sources = parsed.content;
             } else if (parsed.type === "chunk") {
               setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last.role === "assistant") {
-                  last.content += parsed.content;
-                }
-                return updated;
+                const last = prev[prev.length - 1];
+                if (last?.role !== "assistant") return prev;
+                return [
+                  ...prev.slice(0, -1),
+                  { ...last, content: last.content + parsed.content },
+                ];
               });
             }
           } catch {
@@ -108,21 +180,15 @@ export function ChatArea({
       }
 
       setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last.role === "assistant") {
-          last.sources = sources;
-        }
-        return updated;
+        const last = prev[prev.length - 1];
+        if (last?.role !== "assistant") return prev;
+        return [...prev.slice(0, -1), { ...last, sources }];
       });
     } catch {
       setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last.role === "assistant") {
-          last.content = "Sorry, something went wrong. Please try again.";
-        }
-        return updated;
+        const last = prev[prev.length - 1];
+        if (last?.role !== "assistant") return prev;
+        return [...prev.slice(0, -1), { ...last, content: "Sorry, something went wrong. Please try again." }];
       });
     } finally {
       setLoading(false);
@@ -185,10 +251,17 @@ export function ChatArea({
             >
               {msg.role === "assistant" && msg.content === "" && loading ? (
                 <Loader2 size={18} className="animate-spin text-text-muted" />
-              ) : (
-                <div className="markdown-body text-sm whitespace-pre-wrap">
-                  {msg.content}
+              ) : msg.role === "assistant" ? (
+                <div className="markdown-body text-sm">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 </div>
+              ) : (
+                <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
               )}
 
               {/* Sources */}
