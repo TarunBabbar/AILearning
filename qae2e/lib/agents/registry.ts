@@ -1,4 +1,5 @@
 import type { Agent, AgentId } from "../types";
+import { PLAYWRIGHT_POM_SKILL } from "./prompts/playwright-pom";
 
 // Six specialist QA agents, mirroring Idrikta's agent suite.
 // Each agent is a declarative def: role prompt + the MCP-shaped tools it may call.
@@ -66,16 +67,20 @@ Produce at least 6 strong test cases. Return a short summary of what you saved a
       "Transforms approved coverage into Playwright (TypeScript) UI automation scripts.",
     step: "automate",
     systemPrompt: `You are the Automation Script Agent in an agentic QA platform.
-Transform approved test coverage into UI automation scripts. Use TypeScript + Playwright ONLY — this platform covers TypeScript + Playwright UI automation and nothing else (no Selenium, Cypress, API, supertest, or mobile).
+Your job: turn approved coverage into a production-quality Playwright + TypeScript UI automation framework using Page Object Model.
 
-ALWAYS generate **Playwright (TypeScript)** specs using @playwright/test: page fixtures, expect, test.describe/test blocks.
+${PLAYWRIGHT_POM_SKILL}
+
+CRITICAL CONSTRAINT:
+Free LLMs truncate large tool arguments. NEVER call script_save with full file bodies.
+Always use automation_framework_generate — it builds the complete POM SERVER-SIDE (pages, fixtures, specs, config) from coverage. That is how we get buildable, runnable code.
 
 REQUIRED FLOW:
-1. Call coverage_get with the requirementId. Use the returned coverageId and testCases as the source of truth — automate those cases, do not invent unrelated scenarios.
-2. GitHub is OPTIONAL. Only call github_read_repo if GITHUB_OWNER + GITHUB_REPO (or a repo in the prompt) are available. If GitHub is missing or the call fails, write standalone Playwright TypeScript specs (no framework match needed).
-3. CRITICAL: You MUST call script_save with framework="playwright", language="typescript", coverageId from coverage_get, and files [{path, code}] containing complete runnable .spec.ts code for every generated file. Never finish without script_save.
-4. Return a short summary of the files generated and how to run them (npx playwright test).`,
-    tools: ["coverage_get", "github_read_repo", "script_save"],
+1. Call coverage_get(requirementId).
+2. OPTIONAL: github_read_repo only if owner/repo configured (informational).
+3. Call automation_framework_generate(requirementId, coverageId) — REQUIRED. Do not skip.
+4. Reply with a short summary of the returned file list and: npx playwright test --project=chromium`,
+    tools: ["coverage_get", "github_read_repo", "automation_framework_generate"],
   },
   {
     id: "execution-defect",

@@ -81,7 +81,10 @@ export function getConfig() {
 
     // ---- Local execution ----
     dockerImage: env("DOCKER_IMAGE", "mcr.microsoft.com/playwright:v1.51.0-jammy"),
-    testCommand: env("TEST_COMMAND", "npx playwright test --reporter=junit"),
+    // Command run inside the container (after the node/npm/playwright preflight).
+    // `npm test` prefers the suite's own package.json script; falls back to the
+    // pinned Playwright runner when the suite has no scripts.
+    testCommand: env("TEST_COMMAND", "npm test || npx --yes playwright@1.51.0 test --project=chromium"),
 
     // ---- Connection test defaults ----
     testJiraIssueKey: env("TEST_JIRA_ISSUE_KEY"),

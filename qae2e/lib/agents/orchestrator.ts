@@ -3,6 +3,7 @@
 
 import { runAgent } from "./runner";
 import { insertOne, listAll } from "../store";
+import { isRunnableAutomation } from "../exec/script-quality";
 import type { AgentEvent, Analysis, Coverage, Cycle, Defect, ReleaseReport, Requirement, Script } from "../types";
 import type { RunRecord } from "../runs/store";
 
@@ -86,10 +87,10 @@ export async function orchestrate(
     },
     {
       id: "automation-script",
-      prompt: `Generate Playwright (TypeScript) UI automation scripts for requirement ${requirementId} from its saved coverage.
-1. Call coverage_get(requirementId) to load coverageId + testCases.
-2. GitHub is optional — skip github_read_repo if no repo is configured.
-3. MUST call script_save with framework="playwright", language="typescript", coverageId, and files [{path, code}] (.spec.ts). Never finish without script_save.`,
+      prompt: `Generate Playwright + TypeScript POM automation for requirement ${requirementId}.
+1. Call coverage_get(requirementId).
+2. Call automation_framework_generate(requirementId, coverageId) — REQUIRED.
+3. Do NOT call script_save (payloads truncate on free models). Confirm the returned file list.`,
     },
     {
       id: "execution-defect",
@@ -162,6 +163,14 @@ export async function orchestrate(
         let script = listAll<Script>("scripts")
           .filter((s) => s.requirementId === requirementId)
           .pop();
+        if (script && !isRunnableAutomation(script.files).ok) {
+          emit({
+            type: "status",
+            agentId: "pipeline",
+            message: `Saved scripts incomplete (${isRunnableAutomation(script.files).reason}) — treating as missing.`,
+          });
+          script = undefined;
+        }
 
         // Harden: if AS finished without script_save, retry once, then fallback generator.
         if ((!script || !script.files.length) && !opts.signal?.aborted) {
@@ -173,11 +182,10 @@ export async function orchestrate(
           const retryEvents = await runAgent(
             {
               agentId: "automation-script",
-              userPrompt: `RETRY: You did not call script_save. For requirement ${requirementId}:
+              userPrompt: `RETRY: You did not generate automation. For requirement ${requirementId}:
 1. Call coverage_get now.
-2. Generate Playwright TypeScript .spec.ts files for EVERY test case returned.
-3. Call script_save immediately with coverageId + files[{path,code}]. Do not return prose without script_save.
-GitHub is optional — write standalone Playwright if no repo.`,
+2. Call automation_framework_generate(requirementId, coverageId) immediately.
+Do NOT call script_save. Do not return prose only.`,
               requirementId,
               lifecycle: { index: i, total },
               signal: opts.signal,
@@ -195,6 +203,7 @@ GitHub is optional — write standalone Playwright if no repo.`,
           script = listAll<Script>("scripts")
             .filter((s) => s.requirementId === requirementId)
             .pop();
+          if (script && !isRunnableAutomation(script.files).ok) script = undefined;
         }
 
         if ((!script || !script.files.length) && !opts.signal?.aborted) {
@@ -297,7 +306,7 @@ GitHub is optional — write standalone Playwright if no repo.`,
                 executions.push({
                   id: crypto.randomUUID(),
                   caseId: "suite-empty",
-                  caseTitle: "Suite completed with no parsed JUnit results",
+                  caseTitle: "Suite completed with no parsed Playwright results",
                   status: res.ok ? "passed" : "failed",
                   evidence: res.logs.slice(-5).join("\n"),
                   executedBy: "autofix-runner",
@@ -324,7 +333,7 @@ GitHub is optional — write standalone Playwright if no repo.`,
             type: "error",
             agentId: "pipeline",
             message:
-              "No generated scripts found after AS (+ retry) — skipping Docker. Check that coverage_get + script_save succeeded.",
+              "No generated scripts found after AS (+ retry) — skipping Docker. Check that coverage_get + automation_framework_generate succeeded.",
           });
           break;
         }

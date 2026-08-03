@@ -33,12 +33,13 @@ export function TestRunner({
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [summary, setSummary] = useState<RunSummary | null>(null);
-  const [command, setCommand] = useState("npx playwright test --reporter=junit");
+  const [command, setCommand] = useState("npx --yes playwright@1.51.0 test --project=chromium");
   const [repoUrl, setRepoUrl] = useState("");
   const [jiraProjectKey, setJiraProjectKey] = useState("");
   const [testrailRunId, setTestrailRunId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [extracted, setExtracted] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const run = async () => {
@@ -48,6 +49,7 @@ export function TestRunner({
     setRunning(true);
     setEvents([]);
     setSummary(null);
+    setLastError(null);
     try {
       const res = await fetch("/api/run", {
         method: "POST",
@@ -74,6 +76,7 @@ export function TestRunner({
             continue;
           }
           setEvents((prev) => [...prev, ev]);
+          if (ev.type === "error") setLastError(ev.message);
           if (ev.type === "result") {
             setSummary(ev.summary as unknown as RunSummary);
           }
@@ -82,6 +85,7 @@ export function TestRunner({
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setEvents((prev) => [...prev, { type: "error", message: String(err) }]);
+        setLastError(String(err));
       }
     } finally {
       setRunning(false);
@@ -126,9 +130,15 @@ export function TestRunner({
         <input
           value={command}
           onChange={(e) => setCommand(e.target.value)}
-          placeholder="Command (default: npx playwright test --reporter=junit)"
+          placeholder="Command (default: npx playwright test --project=chromium)"
           className="w-full rounded-lg border border-border-input bg-bg-input px-3 py-2 text-sm font-mono focus:outline-none focus:border-amber-500"
         />
+        <p className="mt-1.5 text-xs text-text-muted">
+          The runner first checks Docker + the Playwright image (pulls it if missing), then verifies node/npm
+          inside the container, runs <code className="font-mono">npm install</code> when <code className="font-mono">node_modules</code> is
+          missing, and installs <code className="font-mono">playwright install chromium</code> when the browser is not present.
+          For a local run, leave the repo URL empty — the saved scripts are materialized automatically.
+        </p>
         <input
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
@@ -166,6 +176,12 @@ export function TestRunner({
           )}
         </div>
         {!requirementId && <p className="mt-2 text-xs text-text-muted">Run the pipeline first to get a requirement.</p>}
+        {lastError && (
+          <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">
+            <p className="font-semibold mb-0.5">Tests could not run</p>
+            <p className="whitespace-pre-wrap">{lastError}</p>
+          </div>
+        )}
 
         {summary && (
           <div className="mt-4 grid grid-cols-4 gap-2 text-center">
@@ -180,7 +196,17 @@ export function TestRunner({
           <div className="mt-4 max-h-[240px] overflow-y-auto rounded-lg border border-border bg-bg-code p-3 font-mono text-[11px] text-[#e8e0d1] space-y-1">
             {events.map((e, i) => (
               <p key={i} className={cn("whitespace-pre-wrap", e.type === "error" && "text-red-400", e.type === "result" && "text-emerald-400")}>
-                {e.type === "status" ? `▸ ${e.message}` : e.type === "log" ? e.text : e.type === "result" ? `✓ ${e.summary}` : e.type === "error" ? `✗ ${e.message}` : `· ${JSON.stringify(e)}`}
+                {e.type === "status"
+                  ? `▸ ${e.message}`
+                  : e.type === "log"
+                    ? e.text
+                    : e.type === "result"
+                      ? `✓ passed=${e.summary.passed} failed=${e.summary.failed} skipped=${e.summary.skipped} total=${e.summary.total} exit=${e.exitCode ?? "?"}`
+                      : e.type === "error"
+                        ? `✗ ${e.message}`
+                        : e.type === "done"
+                          ? "· done"
+                          : `· ${JSON.stringify(e)}`}
               </p>
             ))}
           </div>

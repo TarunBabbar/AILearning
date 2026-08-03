@@ -37,7 +37,14 @@ function basicAuth(user: string, pass: string): string {
 }
 
 function missing(connector: string, fields: string[]) {
-  return { ok: false, status: 0, data: { error: `Missing ${connector} credentials: ${fields.join(", ")}` } };
+  return {
+    ok: false,
+    status: 0,
+    // Marked as a WARNING (not an error): missing credentials are a config
+    // gap, not a runtime failure. UI/runner surface these in amber.
+    warning: true,
+    data: { error: `Missing ${connector} credentials: ${fields.join(", ")}` },
+  };
 }
 
 // ---------------------------------------------------------------------------

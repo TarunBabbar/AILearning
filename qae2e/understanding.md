@@ -55,12 +55,12 @@ passing, and triggered in a real DevOps environment (Docker / CI).
 - ✅ **6-agent orchestrated pipeline** — RI → MT → AS → EX → DO → IQ.
 - ✅ **Artifact persistence** — `data/artifacts.json` (gitignored), in-memory fallback.
 - ✅ **Editable coverage** — AI-drafted test cases you can edit before saving (`PUT /api/artifacts`).
-- ✅ **Real MCP server** — Streamable HTTP at `/api/mcp/sse`, exposing **26 tools** (8 core + 18 integration).
-- ✅ **Manual paste flow** — paste a PRD → AI analysis → editable coverage → generated scripts →
-  simulated cycle/defects → release gauge.
+- ✅ **Real MCP server** — Streamable HTTP at `/api/mcp/sse`, exposing **27 tools** (10 core + 17 integration).
+- ✅ **Manual paste flow** — paste a PRD → AI analysis → editable coverage → **server-side Playwright POM** →
+  Docker run with real cycle/defects → release gauge.
 - ✅ **Connector layer** — real REST clients for Jira, Confluence, Figma, GitHub, Zephyr, TestRail
   (`lib/connectors/`): fetch, list, publish, branch/commit/multi-file-commit, workflow dispatch,
-  defect create (Jira), result add (TestRail), connectivity tests.
+  defect sync (Jira), result sync (TestRail), connectivity tests.
 - ✅ **Connector wizard UI** — `ConnectorsPanel` in the workspace right rail: shows configured/missing
   credentials, tests connections, saves creds to `.env` (gitignored).
 - ✅ **RAG pipeline** — free local embeddings (transformers.js, hash fallback) + Pinecone free-serverless
@@ -72,23 +72,31 @@ passing, and triggered in a real DevOps environment (Docker / CI).
   `github_commit_file`, `github_commit_multiple` (git data API: blobs → tree → commit → ref),
   `github_dispatch_workflow` — plus the `GitHubCheckin` UI component (read framework → create branch →
   commit generated scripts → dispatch CI).
-- ✅ **Local Docker test runner** — `lib/exec/`: checks Docker, **clones the repo automatically** if a
-  `repoUrl` is given, runs the suite in a container, parses JUnit XML, records results on the cycle.
-  `TestRunner` UI streams logs + pass/fail summary.
-- ✅ **Post-run sync** — failed runs create a Jira defect (`jira_create_defect`); results post to TestRail
-  (`testrail_add_result`) when `JIRA_PROJECT_KEY` / `TESTRAIL_RUN_ID` configured.
+- ✅ **Local Docker test runner** — `lib/exec/`: materializes saved Script artifacts (not `process.cwd()`),
+  checks Docker, **auto-pulls the Playwright image** when missing, **preflights the container** (node/npm
+  check, `npm install` when `node_modules` missing, `playwright install chromium` when the browser is
+  missing), **clones the repo automatically** if a `repoUrl` is given, runs the suite, parses **Playwright
+  JSON** (`test-results/results.json`; list-reporter fallback), records results on the cycle.
+  `TestRunner` / `TestRunReport` stream logs + pass/fail summary.
+- ✅ **Server-side Playwright POM** — `automation_framework_generate` builds a complete skill-aligned
+  suite from coverage (`tests/e2e`, `tests/pages/*.page.ts`, fixtures, utils, config with list+json+html).
+  Free LLMs truncate `script_save` args — AS is forced to prefer the server builder; `script-quality.ts`
+  rejects empty/`{` stubs; orchestrator retries AS then calls `saveFallbackScripts`.
+- ✅ **Stoppable pipeline UX** — banner + PipelineSetup **Stop**; `readNdjsonStream` returns a real
+  Promise so `running` stays true until the stream ends (no early flip back to Run).
+- ✅ **Post-run sync** — failed runs create a Jira defect (`jira_sync_defect`); results post to TestRail
+  (`testrail_sync_result`) when `JIRA_PROJECT_KEY` / `TESTRAIL_RUN_ID` configured.
 - ✅ **Image → text extraction** — `/api/upload` stores the image, `lib/vision/` extracts text via a free
   OpenRouter vision model; `image_extract` tool + upload UI in `TestRunner`.
 - ✅ **AS agent framework-aware** — reads the existing GitHub framework before generating scripts; falls
-  back to standalone Playwright if no repo configured.
-- ✅ **TypeScript + Playwright only** — the supported automation stack is TypeScript + Playwright UI
-  automation (no Selenium/Cypress/API/supertest/mobile); AS always generates Playwright `.spec.ts` files
-  and `script_save` restricts `framework` to `playwright`, `language` to `typescript`.
+  back to server-side POM if no repo configured.
+- ✅ **TypeScript + Playwright only** — UI automation only (no Selenium/Cypress/JUnit/Java/API/mobile);
+  `script_save` restricts `framework` to `playwright`, `language` to `typescript`.
 - ✅ **Fetch from source in Connect step** — workspace can pull a Jira issue / Confluence page / Figma file
   directly into the requirement box; RI agent gets a source hint to fetch if content empty.
 - ✅ **Post-run sync config in UI** — TestRunner has Jira project key + TestRail run ID inputs.
 - ✅ **Example CI workflow** — `scripts/e2e-workflow.yml` (copy into repo at `.github/workflows/e2e.yml`).
-- ✅ **Hardened JUnit parser** — multi-suite, errors, namespaced tags.
+- ✅ **Playwright JSON parser** — `parsePlaywrightJson` in `lib/exec/index.ts` (replaces JUnit XML).
 - ✅ **Live `.env` reload** — `lib/config.ts` re-reads `.env` on every call (mtime-cached); edit `.env` and
   use new keys with NO server restart; no secrets hardcoded anywhere.
 
@@ -97,7 +105,7 @@ passing, and triggered in a real DevOps environment (Docker / CI).
 | Capability | Status | What's needed |
 |---|---|---|
 | End-to-end validation with real credentials | ⏳ | User creates free accounts / free trials and provides creds; UI already prompts for them |
-| JUnit parsing edge cases (exotic reporters) | ⏳ | Rare formats beyond Playwright/Jest JUnit XML |
+| Live pipeline smoke (SauceDemo / own PRD) | ⏳ | Restart dev server; run full pipeline; confirm Docker finds `tests/e2e` specs |
 
 ---
 
@@ -156,6 +164,14 @@ The workspace "Run pipeline" button previously ran **only the Requirement Intell
   to a temp dir, runs them in a local Docker container, and if tests fail the **LLM fixes the failing
   files and re-runs** (up to 3 attempts). Real results are recorded on a real cycle. Status events
   stream so the UI shows "Running generated tests in Docker…" / "Tests passed after N attempt(s)".
+- **AS hardened against free-model truncation** — AS must call `coverage_get` then
+  `automation_framework_generate` (server builds full POM). Runner nudges if AS returns prose only;
+  orchestrator retries once, then `saveFallbackScripts` from coverage. `script_save` still exists but
+  quality gates reject truncated `{` bodies and config-only saves.
+- **Playwright JSON, not JUnit** — generated `playwright.config.ts` uses list + json + html reporters;
+  `parsePlaywrightJson` reads `test-results/results.json`. No Java/JUnit path.
+- **Stop stays until stream ends** — `lib/utils.ts` `readNdjsonStream` is `async` and must be awaited;
+  previously `await` resolved immediately and the Stop button flipped back to Run while agents still ran.
 - **No fabricated execution** — EX and DO are strictly forbidden from simulating test results. EX/DO
   record **only** real results provided to them (from the Docker autofix run) onto the real cycle; if
   no Docker run happened, they report "tests were not run" instead of inventing pass/fail evidence,
@@ -170,8 +186,59 @@ The workspace "Run pipeline" button previously ran **only the Requirement Intell
   the left column (was inline mid-page): `GitHubCheckin` + `TestRunner` expand on demand.
 
 Both the requirement and every artifact persist server-side first, linked by `requirementId`; the right
-rail (TraceabilityRail, ReleaseGauge) populates live as artifacts appear. Connectors are used when
-configured; with none configured the pipeline still runs to local results (manual source).
+rail (TraceabilityRail, ReleaseGauge) populates live as artifacts appear (live/green agent states).
+Connectors are used when configured; with none configured the pipeline still runs to local results
+(manual source).
+
+---
+
+## Findings (2026-08-03) — automation reliability & UX
+
+### Free LLMs truncate `script_save` → 0 tests in Docker
+
+Root cause of "tests were not run" / ScriptView showing `[object Object]` / empty suites:
+
+1. Free models truncated huge tool args → saved files like `code: "{"`.
+2. `/api/run` sometimes used `process.cwd()` instead of materializing the Script artifact.
+3. Wrong layout / missing specs → Playwright found 0 tests.
+
+**Fix:** prefer `automation_framework_generate` (server-side builder in `lib/exec/fallback-scripts.ts`),
+reject bad saves in `script-quality.ts`, materialize in `autofix.ts` with default
+`testDir: ./tests/e2e` + json reporter, parse JSON results in `lib/exec/index.ts`.
+
+### Generated layout (playwright-e2e skill)
+
+```
+package.json / tsconfig.json / playwright.config.ts
+tests/
+  e2e/.../*.spec.ts
+  pages/base.page.ts + feature *.page.ts
+  fixtures/test.fixture.ts
+  utils/test-data.ts
+```
+
+Prompt: `lib/agents/prompts/playwright-pom.ts` (aligned with `.cursor/skills/playwright-e2e/SKILL.md`).
+
+### Container preflight + auto image pull → tests actually run
+
+Before every container run, `lib/exec/index.ts` now does three things:
+
+1. `docker image inspect` → `docker pull` when the image is missing (no manual pull needed, and a clear
+   "could not be pulled" error instead of a cryptic one).
+2. A `PREFLIGHT_COMMAND` inside the container: `node -v`, `npm -v`, `npm install` when `package.json`
+   exists and `node_modules` is missing, and `npx playwright@1.51.0 install chromium` when `/ms-playwright`
+   has no chromium (a no-op on the official Playwright images, which ship browsers).
+3. The test command defaults to `npm test || npx --yes playwright@1.51.0 test --project=chromium`
+   (`TEST_COMMAND` env / TestRunner field override). `npm test` prefers the suite's own script; the
+   fallback keeps the pinned `--project=chromium` behavior.
+
+When Docker is not running, both `/api/run` and the autofix path return a clear
+"Start Docker Desktop, then retry" error instead of a dead end.
+
+### Stop button flipped to Run too early
+
+`readNdjsonStream` was not returning a Promise; `await` was a no-op → `setRunning(false)` while the
+pipeline stream was still open. Fixed in `lib/utils.ts`.
 
 ---
 
@@ -203,18 +270,20 @@ configured; with none configured the pipeline still runs to local results (manua
 ### Stage 4 — Check in the automation (GitHub)
 - User connects **GitHub** (fine-grained PAT) and provides the **existing automation repo** (framework).
 - QAE2E **reads the existing framework** and existing test code.
-- LLM generates automation for the **new** test cases in that framework's style.
+- LLM generates automation for the **new** test cases in that framework's style (or server-side POM
+  via `automation_framework_generate` when no repo is connected).
 - Creates a **new branch** in that repo, adds the new test automation locally.
-- **Runs all tests locally** (the app clones + installs + runs). If they pass → commit to the new branch.
-- If no repo provided → generate the code locally as files and tell the user "these are the test cases /
-  this is the automation" (no push).
+- **Runs all tests locally** (the app materializes scripts + installs + runs in Docker). If they pass →
+  commit to the new branch.
+- If no repo provided → generate the skill-aligned Playwright suite under `tests/` and keep it in
+  artifacts / ZIP download (no push).
 
 ### Stage 5 — DevOps execution
-- **Primary: local Docker.** The user starts Docker on their machine; clicking "run tests" triggers the
-  suite in a local Docker container. (GitHub Actions / Jenkins remains an optional later path.)
-- The full branch's test suite runs in that environment.
-- **Results are posted back**: pass/fail evidence linked to the cycle, defects raised, results to
-  Jira/TestRail as configured.
+- **Primary: local Docker.** The user starts Docker on their machine; clicking "run tests" (or the
+  post-AS autofix step) triggers the suite in a local Docker container. (GitHub Actions / Jenkins
+  remains an optional later path.)
+- Results come from Playwright's **JSON reporter** (`test-results/results.json`), then pass/fail is
+  linked to the cycle, defects raised, and results synced to Jira/TestRail as configured.
 
 ---
 
@@ -255,16 +324,18 @@ configured; with none configured the pipeline still runs to local results (manua
 **Phase 3 — GitHub check-in + local run ✅ (built)**
 - ✅ GitHub connector: connect repo, read the existing automation framework (`github_read_repo` / `github_get_tree`).
 - ✅ Generate new automation in that framework's style (AS agent reads framework first; falls back to
-  standalone Playwright if no repo).
+  server-side Playwright POM if no repo).
 - ✅ Create a new branch (`github_branch_create`), commit multiple files (`github_commit_multiple` via git
   data API: blobs → tree → commit → ref).
 - ✅ `GitHubCheckin` UI: read framework → create branch → commit → dispatch CI.
-- ✅ No repo provided → generate code locally as files, tell the user "these are the test cases / this is the automation".
+- ✅ No repo provided → generate skill-aligned POM under `tests/` via `automation_framework_generate` /
+  `fallback-scripts.ts`.
 
 **Phase 4 — DevOps execution (local Docker) ✅ (built)**
 - ✅ `lib/exec/` local Docker runner: user starts Docker; "Run tests" triggers the suite in a local container
-  (auto-clones repo if `repoUrl`).
-- ✅ Parse JUnit results, record pass/fail on the cycle, surface summary in `TestRunner` UI.
+  (auto-clones repo if `repoUrl`; materializes Script artifact files).
+- ✅ Parse **Playwright JSON** results, record pass/fail on the cycle, surface summary in `TestRunner` UI.
+- ✅ Autofix loop (`autofix.ts`) with default config `testDir: ./tests/e2e` + json reporter.
 - ✅ `github_dispatch_workflow` — trigger GitHub Actions (workflow_dispatch) on the branch.
 - ✅ Example workflow at `scripts/e2e-workflow.yml` (copy into repo as `.github/workflows/e2e.yml`).
 
@@ -272,6 +343,7 @@ configured; with none configured the pipeline still runs to local results (manua
 - User will create free accounts / free trials for Jira, Confluence, TestRail as needed and provide the
   credentials; the UI prompts for them at that point (already built).
 - End-to-end verification of the full flow once credentials are in place.
+- Live smoke: SauceDemo-style PRD → many files under `tests/` → Docker finds specs → EX gets real results.
 
 ---
 
@@ -291,12 +363,12 @@ configured; with none configured the pipeline still runs to local results (manua
 
 ```
 app/api/agents/[agentId]/route.ts   POST → NDJSON event stream per agent (step-by-step mode)
-app/api/pipeline/route.ts           POST → NDJSON full 6-agent run (one-click mode)
+app/api/pipeline/route.ts           POST → NDJSON full 6-agent run (one-click mode; abortable)
 app/api/artifacts/route.ts          GET/PUT artifacts (JSON store)
 app/api/connectors/route.ts         GET status / POST test / POST save (.env)
 app/api/export/route.ts             GET CSV/XLSX download
 app/api/github/route.ts             POST tree/read/create-branch/commit/dispatch
-app/api/run/route.ts                POST streaming local Docker test run
+app/api/run/route.ts                POST streaming local Docker test run (materializes Script)
 app/api/upload/route.ts             POST image upload → vision text extraction
 app/api/mcp/sse/route.ts            Real MCP server (Streamable HTTP)
 lib/llm/openrouter.ts               OpenRouter chat + tool-call primitives (free-only guard)
@@ -304,23 +376,31 @@ lib/connectors/index.ts             Connector defs + status (which creds are mis
 lib/connectors/client.ts            Real REST clients (Jira, Confluence, Figma, GitHub, Zephyr, TestRail)
 lib/rag/index.ts                    Free embeddings (transformers.js + hash fallback) + Pinecone client
 lib/export/index.ts                 CSV + XLSX generation
-lib/exec/index.ts                   Local Docker runner + JUnit XML parser
-lib/exec/autofix.ts                 Auto-healing run: materialize scripts → Docker → LLM fix → re-run (max 3)
+lib/exec/index.ts                   Local Docker runner + Playwright JSON parser (no JUnit)
+lib/exec/autofix.ts                 Materialize scripts → Docker → LLM fix → re-run (max 3)
+lib/exec/fallback-scripts.ts        Server-side skill-aligned Playwright POM from coverage
+lib/exec/script-quality.ts          Reject truncated/empty/config-only script saves
 lib/vision/index.ts                 Image → text via free vision model
-lib/agents/registry.ts              6 agent defs (RI/MT/EX/AS/DO/IQ)
-lib/agents/runner.ts                Tool-calling loop → NDJSON events
-lib/agents/tools.ts                 8 core MCP tools
-lib/agents/tools.integrations.ts    18 integration MCP tools (fetch/publish/export/RAG/GitHub/image/test-run/dispatch/sync)
-lib/agents/orchestrator.ts          connect→analyze→coverage→automate→execute→release
+lib/utils.ts                        cn() + awaitable readNdjsonStream (Stop stays until done)
+lib/agents/registry.ts              6 agent defs (RI/MT/EX/AS/DO/IQ); AS prefers automation_framework_generate
+lib/agents/runner.ts                Tool-calling loop → NDJSON events; AS nudges for generate tool
+lib/agents/tools.ts                 10 core MCP tools (incl. coverage_get, automation_framework_generate)
+lib/agents/tools.integrations.ts    17 integration MCP tools (fetch/publish/export/RAG/GitHub/image/run/sync)
+lib/agents/prompts/playwright-pom.ts  AS skill prompt (tests/e2e POM layout; no JUnit)
+lib/agents/orchestrator.ts          RI→MT→AS→Docker autofix→EX→DO→IQ (+ AS retry/fallback)
 lib/mcp/server.ts                   McpServer wired to same tool handlers
 lib/store.ts                        JSON persistence + in-memory fallback
 lib/config.ts                       Env config — reads .env live (mtime-cached, no restart); all secrets from env only
+.cursor/skills/playwright-e2e/SKILL.md  Playwright E2E skill source of truth for generated layout
 components/workspace/ConnectorsPanel.tsx   Connector wizard UI
-components/workspace/PipelineSetup.tsx     One-shot pre-run intake form (optional GitHub/Jira/TestRail/Docker)
-components/workspace/GitHubCheckin.tsx     GitHub check-in UI (read/commit/branch/dispatch) — in collapsed DevOps section
-components/workspace/TestRunner.tsx        Docker run + image upload UI — in collapsed DevOps section
+components/workspace/PipelineSetup.tsx     One-shot pre-run intake + Stop while running
+components/workspace/GitHubCheckin.tsx     GitHub check-in UI (read/commit/branch/dispatch)
+components/workspace/TestRunner.tsx        Docker run + image upload UI
+components/workspace/TestRunReport.tsx     Pass/fail report from real Docker results
+components/workspace/ScriptView.tsx        Script browser (warns on truncated/empty files)
 components/workspace/AgentStream.tsx       Agent workbench (per-agent timeline, durations, badges)
 components/workspace/PipelineSummary.tsx   Run summary: agent statuses, artifact counts, highlighted issues
+components/workspace/TraceabilityRail.tsx  Live/green agent states tied to requirementId
 lib/runs/store.ts                   Run history persistence (Vercel Postgres + file fallback)
 lib/runs/bundle.ts                  ZIP bundle builder (code + logs + results + README)
 components/workspace/RunHistory.tsx Run history panel (list + ZIP download)
@@ -336,6 +416,8 @@ scripts/probe-free-models.mjs       Free-model tool-calling probe (OpenRouter)
 - **Vector store** — **Pinecone free serverless tier** (not local). User will provide the API key.
 - **Where tests run** — **local Docker** (user starts Docker; "run tests" triggers a local container).
   GitHub Actions / Jenkins is an optional later path.
+- **Automation stack** — **TypeScript + Playwright UI only** (no JUnit/Java/Selenium/Cypress). Generated
+  suites follow the playwright-e2e skill POM layout under `tests/`; results via Playwright JSON reporter.
 - **Credentials** — user has none yet. The UI will prompt for what each connector needs; user will create
   free accounts / free trials (Jira, Confluence, TestRail) later for end-to-end testing and provide the
   credentials then.

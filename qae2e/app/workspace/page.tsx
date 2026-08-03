@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
-import { ArrowLeft, Play, Loader2, Sparkles, Wand2, GitBranch, ChevronDown, Square } from "lucide-react";
+import { ArrowLeft, Play, Loader2, Sparkles, Wand2, GitBranch, ChevronDown, Square, AlertTriangle, RotateCcw } from "lucide-react";
 import { Stepper, PIPELINE_STEPS } from "@/components/workspace/Stepper";
 import { AgentStream } from "@/components/workspace/AgentStream";
 import { AnalysisView } from "@/components/workspace/AnalysisView";
@@ -59,6 +59,8 @@ export default function WorkspacePage() {
   const [doneSteps, setDoneSteps] = useState<Set<string>>(new Set());
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [currentAgent, setCurrentAgent] = useState<{ code: string; name: string; index: number; total: number } | null>(null);
+  // Agent that failed (if any) — drives the "Retry from this agent" banner.
+  const [failedAgent, setFailedAgent] = useState<{ code: string; name: string; index: number; total: number; message: string } | null>(null);
   const [devOpsOpen, setDevOpsOpen] = useState(false);
 
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -71,6 +73,10 @@ export default function WorkspacePage() {
 
   const abortRef = useRef<AbortController | null>(null);
   const agentSectionRef = useRef<HTMLDivElement | null>(null);
+  // Last intake values + requirement metadata, so "Retry from failed agent"
+  // can resume with the same env overrides without re-collecting the form.
+  const setupRef = useRef<SetupValues>({});
+  const reqRef = useRef<{ id: string; title: string; source: string; sourceKey?: string; content: string } | null>(null);
 
   const refreshArtifacts = useCallback(async () => {
     const rid = requirement?.id;
@@ -156,9 +162,29 @@ export default function WorkspacePage() {
 
     if (e.type === "agent_start") {
       setCurrentAgent({ code: e.code, name: e.name, index: e.index, total: e.total });
+      // A new agent started — clear any stale failed-agent retry banner.
+      setFailedAgent(null);
     }
     if (e.type === "agent_done") {
       setCurrentAgent(null);
+      setFailedAgent(null);
+    }
+    if (e.type === "error") {
+      // Hard error — stop the pipeline and remember WHICH agent failed so the
+      // user can retry from that agent instead of re-running the whole pipeline.
+      setRunning(false);
+      setCurrentAgent(null);
+      abortRef.current?.abort();
+      if (e.agentId && e.agentId !== "pipeline") {
+        const errEv = e as AgentEvent & { code?: string; name?: string; index?: number; total?: number };
+        setFailedAgent({
+          code: errEv.code || "",
+          name: errEv.name || e.agentId,
+          index: errEv.index ?? 0,
+          total: errEv.total ?? 0,
+          message: e.message,
+        });
+      }
     }
     if (e.type === "step" && e.step && e.done) {
       setDoneSteps((prev) => new Set(prev).add(e.step));
@@ -196,6 +222,7 @@ export default function WorkspacePage() {
     setDoneSteps(new Set());
     setCurrentStep(0);
     setCurrentAgent(null);
+    setFailedAgent(null);
     setAnalysis(null);
     setCoverage(null);
     setScript(null);
@@ -206,6 +233,8 @@ export default function WorkspacePage() {
 
     const req = buildRequirement();
     setRequirement(req);
+    setupRef.current = setup || {};
+    reqRef.current = { id: req.id, title: req.title, source: req.source, sourceKey: sourceKey || undefined, content: req.content + sourceHint };
 
     // Scroll to the live agent section so the user sees the pipeline started.
     requestAnimationFrame(() => {
@@ -239,6 +268,60 @@ export default function WorkspacePage() {
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(`Pipeline failed: ${res.status}`);
+      await readNdjsonStream(res, (ev) => handleAgentEvent(ev, req.id), controller.signal);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        setEvents((prev) => [
+          ...prev,
+          { type: "error", agentId: "pipeline", message: String(err) },
+        ]);
+      }
+    } finally {
+      setRunning(false);
+      await refreshArtifactsWith(req.id);
+    }
+  };
+
+  /**
+   * Resume from the agent that failed: re-run that agent, then automatically
+   * continue the remaining agents (the orchestrator's `startFrom` skips the
+   * earlier agents). Uses the same requirement + intake env as the last run.
+   */
+  const resumePipeline = async () => {
+    if (!failedAgent || !reqRef.current) return;
+    const startFrom = Math.max(0, failedAgent.index);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setRunning(true);
+    setCurrentAgent(null);
+    setFailedAgent(null);
+
+    const setup = setupRef.current;
+    const req = reqRef.current;
+    try {
+      const env: Record<string, string> = {};
+      if (setup?.githubToken) env.GITHUB_TOKEN = setup.githubToken;
+      if (setup?.githubOwner) env.GITHUB_OWNER = setup.githubOwner;
+      if (setup?.githubRepo) env.GITHUB_REPO = setup.githubRepo;
+      if (setup?.jiraProjectKey) env.JIRA_PROJECT_KEY = setup.jiraProjectKey;
+      if (setup?.testrailRunId) env.TESTRAIL_RUN_ID = setup.testrailRunId;
+      if (setup?.dockerImage) env.DOCKER_IMAGE = setup.dockerImage;
+
+      const res = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requirementId: req.id,
+          title: req.title,
+          source: req.source,
+          sourceKey: setup?.sourceKey || req.sourceKey,
+          content: req.content,
+          startFrom,
+          env: Object.keys(env).length ? env : undefined,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok || !res.body) throw new Error(`Resume failed: ${res.status}`);
       await readNdjsonStream(res, (ev) => handleAgentEvent(ev, req.id), controller.signal);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
@@ -398,6 +481,25 @@ export default function WorkspacePage() {
               </div>
             )}
             </div>
+
+            {/* Retry banner — shown after an agent failed */}
+            {failedAgent && !running && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-red-500/40 bg-red-500/10">
+                <AlertTriangle size={16} className="text-red-600 shrink-0" />
+                <p className="text-sm text-text-primary flex-1 min-w-0">
+                  <span className="font-bold text-red-700">
+                    {failedAgent.code ? `Agent ${failedAgent.index + 1}/${failedAgent.total || 6}: ${failedAgent.code}` : failedAgent.name}
+                  </span>{" "}
+                  failed — {failedAgent.message}
+                </p>
+                <button
+                  onClick={resumePipeline}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600"
+                >
+                  <RotateCcw size={13} /> Retry from {failedAgent.code || "this agent"}
+                </button>
+              </div>
+            )}
 
             {/* Live agent stream */}
             <Card className="p-4">

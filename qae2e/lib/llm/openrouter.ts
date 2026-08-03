@@ -36,6 +36,7 @@ export interface ChatCompletionOptions {
   maxTokens?: number;
   tools?: ChatTool[];
   toolChoice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
+  signal?: AbortSignal;
 }
 
 interface ChatCompletionResponse {
@@ -94,6 +95,7 @@ export async function chatCompletion(
       "X-Title": cfg.appName.replace(/[^\x20-\x7E]/g, ""),
     },
     body: JSON.stringify(body),
+    signal: opts.signal,
   });
 
   if (!res.ok) {

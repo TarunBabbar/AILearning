@@ -36,7 +36,7 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
 
   // Give the agent its traceability root so every tool call links to it.
   const requirementHint = opts.requirementId
-    ? `\nThe requirementId is "${opts.requirementId}". Use this exact id when calling requirement_save / requirement_analyze / coverage_get / coverage_save / script_save / cycle_create / defect_create / release_confidence, and reference it in any JSON you return.`
+    ? `\nThe requirementId is "${opts.requirementId}". Use this exact id when calling requirement_save / requirement_analyze / coverage_get / coverage_save / automation_framework_generate / script_save / cycle_create / defect_create / release_confidence, and reference it in any JSON you return.`
     : "";
   const messages: ChatMessage[] = [
     { role: "system", content: agent.systemPrompt },
@@ -44,7 +44,7 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
   ];
 
   const isAS = agent.id === "automation-script";
-  const maxSteps = opts.maxSteps ?? (isAS ? 16 : 10);
+  const maxSteps = opts.maxSteps ?? (isAS ? 12 : 10);
   let steps = 0;
   let scriptSaved = false;
   let coverageFetched = false;
@@ -59,11 +59,11 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
       if (opts.signal?.aborted) break;
       steps++;
 
-      // AS: force tool use until script_save succeeds (free models often stop at prose).
+      // AS: force tools until server-side framework generate succeeds.
       let toolChoice: "auto" | "required" | { type: "function"; function: { name: string } } = "auto";
       if (isAS && !scriptSaved) {
         if (coverageFetched) {
-          toolChoice = { type: "function", function: { name: "script_save" } };
+          toolChoice = { type: "function", function: { name: "automation_framework_generate" } };
         } else {
           toolChoice = "required";
         }
@@ -72,7 +72,7 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
       const res = await chatCompletion(messages, {
         model: agent.model,
         temperature: 0.2,
-        maxTokens: 8192,
+        maxTokens: isAS ? 4096 : 8192,
         tools: tools.map((t) => ({
           type: "function" as const,
           function: {
@@ -82,27 +82,31 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
           },
         })),
         toolChoice,
+        signal: opts.signal,
       });
 
       const message = res.choices[0]?.message;
       const toolCalls = extractToolCalls(message && message.role === "assistant" ? message : undefined);
 
+      // Stop as soon as the pipeline is aborted — no more LLM calls, no more
+      // tool side effects, no "agent finished" after the pipeline died.
+      if (opts.signal?.aborted) break;
+
       if (!toolCalls.length) {
         const content = extractContent(message);
         if (content) push({ type: "chunk", agentId: agent.id, text: content });
 
-        // AS often announces "I'll generate…" then stops without script_save — nudge and continue.
         if (isAS && !scriptSaved && asNudges < 2 && steps < maxSteps) {
           asNudges++;
           push({
             type: "status",
             agentId: agent.id,
-            message: `AS returned prose without script_save — nudge ${asNudges}/2`,
+            message: `AS returned prose without automation_framework_generate — nudge ${asNudges}/2`,
           });
           messages.push({
             role: "user",
             content:
-              "STOP. Do not write more prose. Call script_save NOW with framework=\"playwright\", language=\"typescript\", coverageId from coverage_get, and files[{path, code}] containing complete .spec.ts source for the test cases. Empty reply without the tool call is a failure.",
+              "STOP. Call automation_framework_generate NOW with requirementId (and coverageId from coverage_get). Do not call script_save. Do not write prose.",
           });
           continue;
         }
@@ -112,6 +116,8 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
       messages.push(message);
 
       for (const call of toolCalls) {
+        // Check before EACH tool so a mid-loop abort skips remaining tools.
+        if (opts.signal?.aborted) break;
         const tool = getTool(call.function.name);
         push({ type: "tool_call", agentId: agent.id, tool: call.function.name, args: safeParse(call.function.arguments) });
 
@@ -136,7 +142,10 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
           if (tool.name === "coverage_get" && !text.startsWith("ERROR")) {
             coverageFetched = true;
           }
-          if (tool.name === "script_save" && text.startsWith("Script saved")) {
+          if (
+            (tool.name === "automation_framework_generate" || tool.name === "script_save") &&
+            text.startsWith("Script saved")
+          ) {
             scriptSaved = true;
             const id = text.match(/id=([^\s]+)/)?.[1];
             if (id) push({ type: "artifact", agentId: agent.id, artifact: "script", id });
@@ -154,8 +163,12 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
       if (isAS && scriptSaved) break;
     }
 
-    push({ type: "status", agentId: agent.id, message: `${agent.name} finished` });
-    push({ type: "agent_done", agentId: agent.id, code: agent.code, name: agent.name, index: lc.index, total: lc.total });
+    // Only mark the agent done if the pipeline was not aborted — otherwise the
+    // UI would show "Agent N/6 running…" even though the pipeline stopped.
+    if (!opts.signal?.aborted) {
+      push({ type: "status", agentId: agent.id, message: `${agent.name} finished` });
+      push({ type: "agent_done", agentId: agent.id, code: agent.code, name: agent.name, index: lc.index, total: lc.total });
+    }
   } catch (err) {
     const msg =
       err instanceof LlmError
@@ -163,7 +176,16 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
         : err instanceof Error
           ? err.message
           : String(err);
-    push({ type: "error", agentId: agent.id, message: msg });
+    // Include agent metadata so the client can offer "Retry from this agent".
+    push({
+      type: "error",
+      agentId: agent.id,
+      code: agent.code,
+      name: agent.name,
+      index: lc.index,
+      total: lc.total,
+      message: msg,
+    } as AgentEvent & { code: string; name: string; index: number; total: number });
   }
 
   return events;

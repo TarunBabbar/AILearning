@@ -105,7 +105,7 @@ export async function buildRunZip(r: RunRecord): Promise<Buffer> {
   files.file(
     "package.json",
     JSON.stringify(
-      { name: "qae2e-run", private: true, version: "1.0.0", dependencies: { "@playwright/test": "^1.45.0", playwright: "^1.45.0" }, scripts: { test: "playwright test --reporter=junit" } },
+      { name: "qae2e-run", private: true, version: "1.0.0", dependencies: { "@playwright/test": "^1.51.0" }, scripts: { test: "playwright test --project=chromium" } },
       null,
       2
     )

@@ -3,6 +3,7 @@
 
 import { insertOne, updateOne, getOne, listAll } from "../store";
 import { integrationTools } from "./tools.integrations";
+import { normalizeScriptFiles, isRunnableAutomation } from "../exec/script-quality";
 import type {
   MCPTool,
   Requirement,
@@ -168,12 +169,52 @@ const coverageGet: MCPTool = {
 };
 
 // ---------------------------------------------------------------------------
+// automation_framework_generate — server-side POM builder (avoids LLM truncation)
+// ---------------------------------------------------------------------------
+const automationFrameworkGenerate: MCPTool = {
+  name: "automation_framework_generate",
+  description:
+    "PREFERRED way to create Playwright+TypeScript POM automation. Builds a complete runnable framework SERVER-SIDE from saved coverage (pages, fixtures, data, specs, config). Use this instead of script_save with huge file payloads — free models truncate script_save args.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      requirementId: { type: "string" },
+      coverageId: { type: "string", description: "Optional; defaults to latest coverage for requirementId" },
+    },
+    required: ["requirementId"],
+  },
+  handler: async (args) => {
+    const requirementId = String(args.requirementId);
+    let coverage = args.coverageId
+      ? getOne<Coverage>("coverages", String(args.coverageId))
+      : undefined;
+    if (!coverage) {
+      coverage = listAll<Coverage>("coverages")
+        .filter((c) => c.requirementId === requirementId)
+        .pop();
+    }
+    if (!coverage?.testCases?.length) {
+      return ok(
+        `ERROR: no coverage with test cases for requirement ${requirementId}. Call coverage_get first / ensure MT saved coverage.`
+      );
+    }
+    const { saveFallbackScripts } = await import("../exec/fallback-scripts");
+    const script = saveFallbackScripts(requirementId, coverage);
+    return ok(
+      `Script saved. id=${script.id} framework=${script.framework} with ${script.files.length} file(s): ${script.files
+        .map((f) => f.path)
+        .join(", ")}. Generated server-side (POM). Run: npx playwright test --project=chromium`
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
 // script_save — persist generated automation scripts
 // ---------------------------------------------------------------------------
 const scriptSave: MCPTool = {
   name: "script_save",
   description:
-    "Save framework-ready UI automation scripts (TypeScript + Playwright) generated from approved coverage. coverageId is optional — if omitted, the latest coverage for the requirement is used.",
+    "OPTIONAL low-level save of Playwright files. Prefer automation_framework_generate. If you use script_save, every file must include FULL source (no truncated '{' bodies) and include tests/**/*.spec.ts.",
   inputSchema: {
     type: "object",
     properties: {
@@ -197,9 +238,17 @@ const scriptSave: MCPTool = {
   },
   handler: async (args) => {
     const requirementId = String(args.requirementId);
-    const files = (args.files as Script["files"]) || [];
+    const files = normalizeScriptFiles(args.files);
     if (!files.length) {
-      return ok("ERROR: files[] is empty. Provide at least one {path, code} Playwright spec.");
+      return ok("ERROR: files[] is empty. Prefer automation_framework_generate, or send full POM under tests/.");
+    }
+    const quality = isRunnableAutomation(files);
+    if (!quality.ok) {
+      return ok(
+        `ERROR: script_save rejected — ${quality.reason}. ` +
+          `You sent ${files.length} file(s): ${files.map((f) => f.path).join(", ") || "(none)"}. ` +
+          `REQUIRED: package.json, tsconfig.json, playwright.config.ts, tests/pages/base.page.ts, feature *.page.ts, tests/fixtures/test.fixture.ts, tests/utils/test-data.ts, and tests/e2e/**/*.spec.ts. Prefer automation_framework_generate instead.`
+      );
     }
     let coverageId = args.coverageId ? String(args.coverageId) : "";
     if (!coverageId) {
@@ -223,7 +272,12 @@ const scriptSave: MCPTool = {
       createdAt: new Date().toISOString(),
     };
     insertOne("scripts", script);
-    return ok(`Script saved. id=${script.id} framework=${script.framework} with ${script.files.length} file(s).`);
+    const note = !quality.hasPage
+      ? " NOTE: no src/pages/*Page.ts detected — prefer POM pages next time."
+      : "";
+    return ok(
+      `Script saved. id=${script.id} framework=${script.framework} with ${script.files.length} file(s): ${files.map((f) => f.path).join(", ")}.${note}`
+    );
   },
 };
 
@@ -400,6 +454,7 @@ export const tools: MCPTool[] = [
   requirementAnalyze,
   coverageSave,
   coverageGet,
+  automationFrameworkGenerate,
   scriptSave,
   cycleCreate,
   executionRecord,

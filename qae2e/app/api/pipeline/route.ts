@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
         }
       };
 
+      let failed = false;
+
       const emit = (e: AgentEvent) => {
         if (e.type === "status" && e.message.includes("finished")) {
           const agent = getAgent(e.agentId as AgentId);
@@ -49,6 +51,23 @@ export async function POST(req: NextRequest) {
         if (e.type === "chunk") {
           const artifact = maybePersistArtifact(e.agentId as AgentId, e.text, requirementId);
           if (artifact) send({ type: "artifact", agentId: e.agentId, artifact: artifact.type, id: artifact.id });
+        }
+        // Attach agent metadata (code/name/index) to error events so the UI can
+        // offer "Retry from this agent" — the runner already enriches them.
+        if (e.type === "error") {
+          failed = true;
+          const agent = getAgent(e.agentId as AgentId);
+          if (agent) {
+            send({
+              ...e,
+              code: agent.code,
+              name: agent.name,
+              index: (e as unknown as { index?: number }).index ?? 0,
+            } as AgentEvent & { code: string; name: string; index: number });
+          } else {
+            send(e);
+          }
+          return;
         }
         send(e);
       };
@@ -78,6 +97,7 @@ export async function POST(req: NextRequest) {
           }
         );
       } catch (err) {
+        failed = true;
         if (req.signal.aborted) {
           // client already gone — don't send anything
           return;
@@ -85,7 +105,11 @@ export async function POST(req: NextRequest) {
         send({ type: "error", agentId: "pipeline", message: err instanceof Error ? err.message : String(err) });
       }
 
-      send({ type: "done", agentId: "pipeline", artifact: "release", id: requirementId });
+      // Only emit `done` when the pipeline actually completed — an error or
+      // abort is already surfaced via the error event above.
+      if (!failed && !req.signal.aborted) {
+        send({ type: "done", agentId: "pipeline", artifact: "release", id: requirementId });
+      }
       try {
         controller.close();
       } catch {

@@ -29,6 +29,14 @@ function ok(text: string) {
   return { content: [{ type: "text" as const, text }] };
 }
 
+// Missing credentials are a configuration gap, not a runtime failure — surface
+// them as a NOTE (amber in the UI) and let the agent decide to skip, instead of
+// stopping the pipeline as if the connector call itself failed.
+function isMissingCreds(res: { data?: unknown }): boolean {
+  const error = (res.data as { error?: string } | undefined)?.error || "";
+  return /^Missing .+ credentials:/.test(error);
+}
+
 // ---------------------------------------------------------------------------
 // connector_status — what's configured / what's missing
 // ---------------------------------------------------------------------------
@@ -55,7 +63,11 @@ const jiraFetch: MCPTool = {
   inputSchema: { type: "object", properties: { issueKey: { type: "string", description: "Jira issue key, e.g. QA-123" } }, required: ["issueKey"] },
   handler: async (args) => {
     const res = await jiraFetchIssue(String(args.issueKey));
-    if (!res.ok) return ok(`ERROR: ${(res.data as { error?: string })?.error || `Jira returned ${res.status}`}`);
+    if (!res.ok) {
+      const err = (res.data as { error?: string })?.error || `Jira returned ${res.status}`;
+      // Missing credentials → warning (amber), not a pipeline-stopping error.
+      return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping Jira fetch — proceed with manual or other source.` : `ERROR: ${err}`);
+    }
     const d = res.data as { key?: string; title?: string; issueType?: string; content?: string };
     return ok(`Jira issue ${d.key} (${d.issueType}):\nTitle: ${d.title}\n\n${(d.content || "").slice(0, 4000)}`);
   },
@@ -70,7 +82,10 @@ const confluenceFetch: MCPTool = {
   inputSchema: { type: "object", properties: { pageId: { type: "string", description: "Confluence page ID" } }, required: ["pageId"] },
   handler: async (args) => {
     const res = await confluenceFetchPage(String(args.pageId));
-    if (!res.ok) return ok(`ERROR: ${(res.data as { error?: string })?.error || `Confluence returned ${res.status}`}`);
+    if (!res.ok) {
+      const err = (res.data as { error?: string })?.error || `Confluence returned ${res.status}`;
+      return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping Confluence fetch — proceed with manual or other source.` : `ERROR: ${err}`);
+    }
     const d = res.data as { id?: string; title?: string; content?: string };
     return ok(`Confluence page ${d.id}:\nTitle: ${d.title}\n\n${(d.content || "").slice(0, 4000)}`);
   },
@@ -92,7 +107,10 @@ const figmaFetch: MCPTool = {
   },
   handler: async (args) => {
     const res = await figmaFetchFile(String(args.fileKey), args.frameName ? String(args.frameName) : undefined);
-    if (!res.ok) return ok(`ERROR: ${(res.data as { error?: string })?.error || `Figma returned ${res.status}`}`);
+    if (!res.ok) {
+      const err = (res.data as { error?: string })?.error || `Figma returned ${res.status}`;
+      return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping Figma fetch — proceed with manual or other source.` : `ERROR: ${err}`);
+    }
     const d = res.data as { name?: string; frames?: string[]; content?: string };
     return ok(d.content || `Figma file: ${d.name}`);
   },
@@ -148,7 +166,7 @@ const zephyrPublish: MCPTool = {
     const cov = listAll<Coverage>("coverages").find((c) => c.id === args.coverageId);
     if (!cov) return ok(`ERROR: coverage ${args.coverageId} not found`);
     const projectKey = String(args.projectKey || getConfig().zephyrProjectKey || "");
-    if (!projectKey) return ok("ERROR: no Zephyr project key provided and none in env (ZEPHYR_PROJECT_KEY)");
+    if (!projectKey) return ok("NOTE: no Zephyr project key provided and none in env (ZEPHYR_PROJECT_KEY) — skipping publish.");
     const created: string[] = [];
     for (const tc of cov.testCases) {
       const res = await zephyrCreateTestCase(projectKey, tc.title, tc.description || "", tc.steps);
@@ -204,11 +222,17 @@ const casesIndex: MCPTool = {
     let cases: ExternalTestCase[] = [];
     if (source === "zephyr") {
       const res = await zephyrListTestCases(String(args.projectKey));
-      if (!res.ok) return ok(`ERROR: ${(res.data as { error?: string })?.error || "Zephyr list failed"}`);
+      if (!res.ok) {
+        const err = (res.data as { error?: string })?.error || "Zephyr list failed";
+        return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping existing-case index.` : `ERROR: ${err}`);
+      }
       cases = res.data as ExternalTestCase[];
     } else {
       const res = await testrailListTestCases(String(args.projectKey), args.suiteId ? String(args.suiteId) : undefined);
-      if (!res.ok) return ok(`ERROR: ${(res.data as { error?: string })?.error || "TestRail list failed"}`);
+      if (!res.ok) {
+        const err = (res.data as { error?: string })?.error || "TestRail list failed";
+        return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping existing-case index.` : `ERROR: ${err}`);
+      }
       cases = res.data as ExternalTestCase[];
     }
     if (!cases.length) return ok(`No existing cases found in ${source} — nothing to index.`);
@@ -305,9 +329,9 @@ const githubBranch: MCPTool = {
     const owner = String(args.owner || getConfig().githubOwner);
     const repo = String(args.repo || getConfig().githubRepo);
     const res = await githubCreateBranch(owner, repo, String(args.branch), String(args.base || getConfig().githubBranch));
-    return res.ok
-      ? ok(`Branch ${args.branch} created in ${owner}/${repo}.`)
-      : ok(`ERROR: ${(res.data as { error?: string })?.error || `GitHub returned ${res.status}`}`);
+    if (res.ok) return ok(`Branch ${args.branch} created in ${owner}/${repo}.`);
+    const err = (res.data as { error?: string })?.error || `GitHub returned ${res.status}`;
+    return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping branch creation.` : `ERROR: ${err}`);
   },
 };
 
@@ -330,9 +354,9 @@ const githubCommit: MCPTool = {
     const owner = String(args.owner || getConfig().githubOwner);
     const repo = String(args.repo || getConfig().githubRepo);
     const res = await githubCommitFile(owner, repo, String(args.branch), String(args.path), String(args.content), String(args.message));
-    return res.ok
-      ? ok(`Committed ${args.path} to ${owner}/${repo}@${args.branch}.`)
-      : ok(`ERROR: ${(res.data as { error?: string })?.error || `GitHub returned ${res.status}`}`);
+    if (res.ok) return ok(`Committed ${args.path} to ${owner}/${repo}@${args.branch}.`);
+    const err = (res.data as { error?: string })?.error || `GitHub returned ${res.status}`;
+    return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping commit.` : `ERROR: ${err}`);
   },
 };
 
@@ -368,7 +392,7 @@ const imageExtract: MCPTool = {
 const testRunLocal: MCPTool = {
   name: "test_run_local",
   description:
-    "Run the generated automation locally in Docker (user must have Docker running). Clones the repo if repoUrl provided, parses JUnit output, records results on the cycle, and syncs to Jira/TestRail if configured.",
+    "Run the generated automation locally in Docker (user must have Docker running). Clones the repo if repoUrl provided, checks the image + node/npm + Playwright Chromium preflight first, parses Playwright JSON results, records results on the cycle, and syncs to Jira/TestRail if configured.",
   inputSchema: {
     type: "object",
     properties: {
@@ -421,7 +445,7 @@ const jiraSyncDefect: MCPTool = {
   handler: async (args) => {
     const cfg = getConfig();
     const projectKey = String(args.projectKey || cfg.jiraProjectKey || "");
-    if (!projectKey) return ok("ERROR: no Jira project key — set JIRA_PROJECT_KEY or pass projectKey");
+    if (!projectKey) return ok("NOTE: no Jira project key configured (set JIRA_PROJECT_KEY or pass projectKey) — skipping defect sync.");
     const res = await jiraCreateDefect(projectKey, String(args.summary), String(args.description));
     return res.ok
       ? ok(`Defect created in Jira project ${projectKey}.`)
@@ -448,7 +472,7 @@ const testrailSyncResult: MCPTool = {
   handler: async (args) => {
     const cfg = getConfig();
     const runId = args.runId ? Number(args.runId) : cfg.testrailRunId ? Number(cfg.testrailRunId) : 0;
-    if (!runId) return ok("ERROR: no TestRail run id — set TESTRAIL_RUN_ID or pass runId");
+    if (!runId) return ok("NOTE: no TestRail run id configured (set TESTRAIL_RUN_ID or pass runId) — skipping result sync.");
     const res = await testrailAddResult(runId, Number(args.caseId), String(args.status) as "passed" | "failed", String(args.comment || "QAE2E result"));
     return res.ok ? ok(`Result posted to TestRail run ${runId}.`) : ok(`ERROR: ${JSON.stringify(res.data).slice(0, 200)}`);
   },
@@ -475,9 +499,9 @@ const githubDispatch: MCPTool = {
     const owner = String(args.owner || getConfig().githubOwner);
     const repo = String(args.repo || getConfig().githubRepo);
     const res = await githubDispatchWorkflow(owner, repo, String(args.workflowFile), String(args.branch), (args.inputs as Record<string, string>) || {});
-    return res.ok
-      ? ok(`Workflow ${args.workflowFile} dispatched on ${owner}/${repo}@${args.branch}.`)
-      : ok(`ERROR: ${(res.data as { error?: string })?.error || `GitHub returned ${res.status}`}`);
+    if (res.ok) return ok(`Workflow ${args.workflowFile} dispatched on ${owner}/${repo}@${args.branch}.`);
+    const err = (res.data as { error?: string })?.error || `GitHub returned ${res.status}`;
+    return ok(isMissingCreds(res) ? `NOTE: ${err}\nSkipping workflow dispatch.` : `ERROR: ${err}`);
   },
 };
 

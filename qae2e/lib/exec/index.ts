@@ -1,19 +1,24 @@
-// Local Docker test runner + JUnit XML parser.
-// User starts Docker; "Run tests" spawns a container, runs the command,
-// captures output, parses JUnit results, records executions on a cycle.
+// Local Docker test runner for Playwright + TypeScript UI tests.
+// Parses Playwright JSON reporter output (no JUnit / Java).
+//
+// Before running, the container gets a "preflight" command that checks for the
+// toolchain (node / npm), installs npm dependencies when needed, installs the
+// Chromium browser when missing, and pulls the configured Docker image first if
+// it is not already present locally.
 
 import { execFile, type ExecFileOptions } from "child_process";
 import { getConfig } from "../config";
-import { insertOne, getOne, updateOne, listAll } from "../store";
+import { insertOne, getOne, updateOne } from "../store";
 import type { Cycle, ExecutionStatus } from "../types";
 import { jiraCreateDefect, testrailAddResult } from "../connectors/client";
 import { join } from "path";
+import { existsSync, readFileSync } from "fs";
 
 export interface RunRequest {
   requirementId: string;
   cycleId?: string;
   repoDir?: string;
-  repoUrl?: string; // if provided, clone into a temp dir first
+  repoUrl?: string;
   command?: string;
   framework?: string;
   jiraProjectKey?: string;
@@ -21,12 +26,25 @@ export interface RunRequest {
   testrailProjectId?: string;
 }
 
+export interface RunSummary {
+  passed: number;
+  failed: number;
+  skipped: number;
+  total: number;
+}
+
 export interface RunResult {
   ok: boolean;
   stdout: string;
   stderr: string;
   exitCode: number | null;
-  summary: { passed: number; failed: number; skipped: number; total: number };
+  summary: RunSummary;
+  failures?: Array<{ test: string; message: string }>;
+}
+
+export interface DetailedFailure {
+  test: string;
+  message: string;
 }
 
 function hasDocker(): Promise<boolean> {
@@ -51,42 +69,153 @@ function runProcess(
   });
 }
 
-// --- JUnit XML parsing (handles multi-suite, errors, namespaced tags) ---
+/**
+ * Command that runs INSIDE the container before the test command. It verifies
+ * the toolchain (node / npm / npx), installs npm dependencies when a
+ * package.json is present and node_modules is missing, and installs the
+ * Playwright Chromium browser when it is not already available (the official
+ * `mcr.microsoft.com/playwright` images already ship browsers under
+ * /ms-playwright, so this is a no-op there and only matters on generic
+ * node-based images).
+ */
+export const PREFLIGHT_COMMAND = [
+  "node -v",
+  "npm -v",
+  "if [ -f package.json ] && [ ! -d node_modules ]; then echo '[preflight] installing npm dependencies…'; npm install --no-audit --no-fund; fi",
+  "if ! [ -d /ms-playwright ] || ! ls /ms-playwright/chromium* >/dev/null 2>&1; then echo '[preflight] installing playwright chromium…'; npx --yes playwright@1.51.0 install chromium; fi",
+].join(" && ");
 
-function parseJunit(xml: string): { passed: number; failed: number; skipped: number; total: number } {
+/**
+ * True when the Docker image is already present locally. Uses `docker image
+ * inspect` (never triggers a pull by itself).
+ */
+function hasImageLocally(image: string): Promise<boolean> {
+  return runProcess("docker", ["image", "inspect", image], { timeout: 15000 }).then(
+    (r) => r.exitCode === 0
+  );
+}
+
+/**
+ * Ensure the configured image is present locally; pull it when missing.
+ * `docker run` pulls implicitly, but doing it explicitly first gives the user
+ * a clear "pulling image…" status instead of a cryptic error deep inside the
+ * container run.
+ */
+async function ensureImage(image: string): Promise<{ ok: boolean; message?: string }> {
+  if (await hasImageLocally(image)) return { ok: true };
+  const res = await runProcess("docker", ["pull", image], { timeout: 0 });
+  return res.exitCode === 0
+    ? { ok: true }
+    : { ok: false, message: (res.stderr || res.stdout).trim().slice(0, 800) };
+}
+
+/** Parse Playwright JSON reporter file (test-results/results.json). */
+export function parsePlaywrightJson(raw: string): {
+  summary: RunSummary;
+  failures: DetailedFailure[];
+} {
+  const failures: DetailedFailure[] = [];
   let passed = 0;
   let failed = 0;
   let skipped = 0;
 
-  // Split into individual <testcase> blocks, tolerant of namespaces (junit:testcase, x:testcase).
-  const re = /<(?:[a-zA-Z0-9_-]+:)?testcase\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?testcase>/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(xml)) !== null) {
-    const body = m[1] || "";
-    // failure / error → failed; skipped / disabled → skipped; else passed
-    if (/<(?:[a-zA-Z0-9_-]+:)?(failure|error)\b/.test(body)) failed++;
-    else if (/<(?:[a-zA-Z0-9_-]+:)?(skipped|disabled)\b/.test(body)) skipped++;
-    else passed++;
-  }
+  try {
+    const data = JSON.parse(raw) as {
+      suites?: unknown[];
+      stats?: { expected?: number; unexpected?: number; skipped?: number; flaky?: number };
+    };
 
-  // Fallback: no testcase tags but suites with tests/failures attributes (e.g. some reporters).
-  if (passed + failed + skipped === 0) {
-    const suiteRe = /<(?:[a-zA-Z0-9_-]+:)?testsuite\b[^>]*tests="(\d+)"[^>]*failures="(\d+)"[^>]*(?:errors="(\d+)")?[^>]*skipped="(\d+)"/g;
-    let sm: RegExpExecArray | null;
-    while ((sm = suiteRe.exec(xml)) !== null) {
-      const total = Number(sm[1]) || 0;
-      const fails = Number(sm[2]) || 0;
-      const skips = Number(sm[4]) || 0;
-      passed += Math.max(0, total - fails - skips);
-      failed += fails;
-      skipped += skips;
+    if (data.stats) {
+      passed = Number(data.stats.expected || 0);
+      failed = Number(data.stats.unexpected || 0);
+      skipped = Number(data.stats.skipped || 0);
     }
+
+    const walk = (suites: unknown[], titlePrefix = "") => {
+      for (const s of suites) {
+        const suite = s as {
+          title?: string;
+          suites?: unknown[];
+          specs?: Array<{
+            title?: string;
+            tests?: Array<{
+              status?: string;
+              results?: Array<{ status?: string; error?: { message?: string } }>;
+              projectName?: string;
+            }>;
+          }>;
+        };
+        const nextPrefix = [titlePrefix, suite.title].filter(Boolean).join(" › ");
+        if (suite.suites?.length) walk(suite.suites, nextPrefix);
+        for (const spec of suite.specs || []) {
+          for (const t of spec.tests || []) {
+            const status = t.results?.[0]?.status || t.status || "";
+            const name = [nextPrefix, spec.title, t.projectName].filter(Boolean).join(" › ");
+            if (status === "skipped" || status === "pending") {
+              // counted via stats when present
+            } else if (status === "failed" || status === "timedOut" || status === "interrupted") {
+              failures.push({
+                test: name || "unknown",
+                message: (t.results?.[0]?.error?.message || status).slice(0, 600),
+              });
+            }
+          }
+        }
+      }
+    };
+    if (Array.isArray(data.suites)) walk(data.suites);
+
+    // If stats missing, derive from failures + walk counts
+    if (!data.stats) {
+      failed = failures.length;
+      // rough total from specs
+      let totalSpecs = 0;
+      const countSpecs = (suites: unknown[]) => {
+        for (const s of suites) {
+          const suite = s as { suites?: unknown[]; specs?: unknown[] };
+          totalSpecs += suite.specs?.length || 0;
+          if (suite.suites) countSpecs(suite.suites);
+        }
+      };
+      if (Array.isArray(data.suites)) countSpecs(data.suites);
+      passed = Math.max(0, totalSpecs - failed - skipped);
+    }
+  } catch {
+    // fall through empty
   }
 
+  return {
+    summary: { passed, failed, skipped, total: passed + failed + skipped },
+    failures,
+  };
+}
+
+/** Fallback: scrape Playwright list reporter lines from stdout. */
+export function parsePlaywrightList(stdout: string): RunSummary {
+  // e.g. "  3 passed (12.3s)" or "  2 failed" / "  1 skipped"
+  const passed = Number(stdout.match(/(\d+)\s+passed/i)?.[1] || 0);
+  const failed = Number(stdout.match(/(\d+)\s+failed/i)?.[1] || 0);
+  const skipped = Number(stdout.match(/(\d+)\s+skipped/i)?.[1] || 0);
   return { passed, failed, skipped, total: passed + failed + skipped };
 }
 
-// --- Main run ---
+function readResultsJson(repoDir: string): string | null {
+  const candidates = [
+    join(repoDir, "test-results", "results.json"),
+    join(repoDir, "results.json"),
+    join(repoDir, "playwright-report", "results.json"),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      try {
+        return readFileSync(p, "utf-8");
+      } catch {
+        // continue
+      }
+    }
+  }
+  return null;
+}
 
 export async function runTests(req: RunRequest): Promise<RunResult> {
   const cfg = getConfig();
@@ -98,10 +227,10 @@ export async function runTests(req: RunRequest): Promise<RunResult> {
       stderr: "Docker is not running. Start Docker Desktop, then retry.",
       exitCode: 1,
       summary: { passed: 0, failed: 0, skipped: 0, total: 0 },
+      failures: [],
     };
   }
 
-  // Clone the repo into a temp dir if a repoUrl is provided (no hardcoded paths).
   let repoDir = req.repoDir;
   if (!repoDir && req.repoUrl) {
     const base = process.env.TEMP || process.env.TMP || ".";
@@ -116,6 +245,7 @@ export async function runTests(req: RunRequest): Promise<RunResult> {
         stderr: `Repo clone failed: ${err instanceof Error ? err.message : String(err)}`,
         exitCode: 1,
         summary: { passed: 0, failed: 0, skipped: 0, total: 0 },
+        failures: [],
       };
     }
   }
@@ -124,41 +254,87 @@ export async function runTests(req: RunRequest): Promise<RunResult> {
   const command = req.command || cfg.testCommand;
   const mount = process.platform === "win32" ? `${repoDir.replace(/\\/g, "/")}:/app` : `${repoDir}:/app`;
 
+  // 1) Make sure the image exists locally — pull it first when missing so the
+  //    user sees a clear "pulling image…" instead of a cryptic run error.
+  const image = await ensureImage(cfg.dockerImage);
+  if (!image.ok) {
+    return {
+      ok: false,
+      stdout: "",
+      stderr: `Docker image "${cfg.dockerImage}" is not available locally and could not be pulled: ${image.message || "unknown error"}. Check your network connection, then retry.`,
+      exitCode: 1,
+      summary: { passed: 0, failed: 0, skipped: 0, total: 0 },
+      failures: [],
+    };
+  }
+
+  // 2) Preflight inside the container: verify node/npm, install npm
+  //    dependencies when needed, install the Chromium browser when missing.
+  const preflight = await runProcess(
+    "docker",
+    ["run", "--rm", "-v", mount, "-w", "/app", cfg.dockerImage, "sh", "-c", PREFLIGHT_COMMAND],
+    { timeout: 0 }
+  );
+  if (preflight.exitCode !== 0) {
+    return {
+      ok: false,
+      stdout: preflight.stdout,
+      stderr: `Container preflight failed (missing node/npm, npm install, or Playwright Chromium install). ${preflight.stderr || preflight.stdout}`.slice(0, 2000),
+      exitCode: preflight.exitCode,
+      summary: { passed: 0, failed: 0, skipped: 0, total: 0 },
+      failures: [],
+    };
+  }
+
+  // 3) Run the actual test command.
   const { stdout, stderr, exitCode } = await runProcess(
     "docker",
     ["run", "--rm", "-v", mount, "-w", "/app", cfg.dockerImage, "sh", "-c", command],
-    { timeout: 0 } // no timeout — long test runs
+    { timeout: 0 }
   );
 
-  const summary = parseJunit(stdout);
+  let summary: RunSummary = { passed: 0, failed: 0, skipped: 0, total: 0 };
+  let failures: DetailedFailure[] = [];
+
+  const jsonRaw = readResultsJson(repoDir);
+  if (jsonRaw) {
+    const parsed = parsePlaywrightJson(jsonRaw);
+    summary = parsed.summary;
+    failures = parsed.failures;
+  } else {
+    summary = parsePlaywrightList(stdout + "\n" + stderr);
+  }
 
   if (req.cycleId) {
     recordOnCycle(req.cycleId, req.requirementId, summary, exitCode);
   }
 
-  // Post-run sync to external tools (only if configured).
   await syncResults(req, summary, exitCode);
 
-  return { ok: exitCode === 0, stdout, stderr, exitCode, summary };
+  return {
+    ok: exitCode === 0 && summary.failed === 0,
+    stdout,
+    stderr,
+    exitCode,
+    summary,
+    failures,
+  };
 }
 
-// Push run outcomes back to Jira (defects for failures) and/or TestRail (results).
-async function syncResults(req: RunRequest, summary: RunResult["summary"], exitCode: number | null) {
+async function syncResults(req: RunRequest, summary: RunSummary, exitCode: number | null) {
   const cfg = getConfig();
   const logs: string[] = [];
 
-  // Jira: raise a defect if there are failures (requires JIRA_PROJECT_KEY).
   if (summary.failed > 0 && (req.jiraProjectKey || cfg.jiraProjectKey)) {
     const key = req.jiraProjectKey || cfg.jiraProjectKey;
     const res = await jiraCreateDefect(
       key,
       `[QAE2E] ${summary.failed} test(s) failed for requirement ${req.requirementId}`,
-      `Automated run completed with exit code ${exitCode}.\nPassed: ${summary.passed}, Failed: ${summary.failed}, Skipped: ${summary.skipped}.`
+      `Playwright run exit ${exitCode}. Passed: ${summary.passed}, Failed: ${summary.failed}, Skipped: ${summary.skipped}.`
     );
     logs.push(`jira: ${res.ok ? "defect created" : `failed ${JSON.stringify(res.data).slice(0, 120)}`}`);
   }
 
-  // TestRail: post per-category results to a run (requires TESTRAIL_RUN_ID).
   if (req.testrailRunId && req.testrailProjectId) {
     for (const [label, count, status] of [
       ["passed", summary.passed, "passed" as const],
@@ -181,46 +357,42 @@ async function syncResults(req: RunRequest, summary: RunResult["summary"], exitC
   }
 }
 
-function recordOnCycle(cycleId: string, requirementId: string, summary: RunResult["summary"], exitCode: number | null) {
+function recordOnCycle(cycleId: string, requirementId: string, summary: RunSummary, exitCode: number | null) {
   const cycle = getOne<Cycle>("cycles", cycleId);
   if (!cycle) {
-    // create a cycle if the run was requested without one
     const c: Cycle = {
       id: cycleId,
       requirementId,
-      name: "Automated run",
-      status: exitCode === 0 ? "completed" : "running",
+      name: "Local Playwright run",
+      status: "completed",
       executions: [],
       createdAt: new Date().toISOString(),
     };
-    insertOne("cycles", c);
     recordExecutions(c, summary, exitCode);
+    insertOne("cycles", c);
     return;
   }
   recordExecutions(cycle, summary, exitCode);
-  cycle.status = exitCode === 0 ? "completed" : "completed";
   updateOne("cycles", cycle);
 }
 
-function recordExecutions(cycle: Cycle, summary: RunResult["summary"], exitCode: number | null) {
-  const baseStatus: ExecutionStatus = exitCode === 0 ? "passed" : "failed";
-  // One aggregate execution entry per run category for traceability.
-  const entries = [
-    { caseId: "suite-passed", caseTitle: `Passed (${summary.passed})`, status: "passed" as ExecutionStatus },
-    { caseId: "suite-failed", caseTitle: `Failed (${summary.failed})`, status: "failed" as ExecutionStatus },
-    { caseId: "suite-skipped", caseTitle: `Skipped (${summary.skipped})`, status: "skipped" as ExecutionStatus },
-  ].filter((e) => (e.caseId === "suite-passed" ? summary.passed > 0 : e.caseId === "suite-failed" ? summary.failed > 0 : summary.skipped > 0));
-  void baseStatus;
-  cycle.executions = entries.map((e) => ({
-    id: crypto.randomUUID(),
-    caseId: e.caseId,
-    caseTitle: e.caseTitle,
-    status: e.status,
-    evidence: `Automated run completed with exit code ${exitCode}.`,
-    executedBy: "docker-runner",
-    executedAt: new Date().toISOString(),
-  }));
-  updateOne("cycles", cycle);
+function recordExecutions(c: Cycle, summary: RunSummary, exitCode: number | null) {
+  const stamp = new Date().toISOString();
+  const push = (caseTitle: string, status: ExecutionStatus, evidence: string) => {
+    c.executions.push({
+      id: crypto.randomUUID(),
+      caseId: crypto.randomUUID(),
+      caseTitle,
+      status,
+      evidence,
+      executedBy: "playwright-runner",
+      executedAt: stamp,
+    });
+  };
+  if (summary.passed) push(`Passed (${summary.passed})`, "passed", "Playwright JSON reporter");
+  if (summary.failed) push(`Failed (${summary.failed})`, "failed", `exit=${exitCode}`);
+  if (summary.skipped) push(`Skipped (${summary.skipped})`, "skipped", "");
+  c.status = "completed";
 }
 
 export { hasDocker };

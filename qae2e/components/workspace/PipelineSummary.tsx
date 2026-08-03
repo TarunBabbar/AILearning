@@ -25,13 +25,14 @@ interface AgentStatus {
   total: number;
   status: "running" | "done" | "error" | "skipped";
   issues: string[];
+  warnings: string[];
   artifacts: string[];
 }
 
 export function PipelineSummary({ events }: { events: AgentEvent[] }) {
   const [copied, setCopied] = useState(false);
 
-  const { agents, issues, ranTests, counts } = useMemo(() => {
+  const { agents, issues, warnings, ranTests, counts } = useMemo(() => {
     const map = new Map<string, AgentStatus>();
     let chainStopped = false;
 
@@ -44,6 +45,7 @@ export function PipelineSummary({ events }: { events: AgentEvent[] }) {
           total: e.total,
           status: "running",
           issues: [],
+          warnings: [],
           artifacts: [],
         });
       } else if (e.type === "agent_done") {
@@ -55,7 +57,9 @@ export function PipelineSummary({ events }: { events: AgentEvent[] }) {
         a.issues.push(e.message);
       } else if (e.type === "tool_result" && map.has(e.agentId)) {
         const a = map.get(e.agentId)!;
-        if (e.summary.startsWith("ERROR")) a.issues.push(`${e.tool}: ${e.summary}`);
+        // Missing credentials / config gaps are warnings (amber), not errors.
+        if (e.summary.startsWith("NOTE:")) a.warnings.push(`${e.tool}: ${e.summary.split("\n")[0]}`);
+        else if (e.summary.startsWith("ERROR")) a.issues.push(`${e.tool}: ${e.summary}`);
         if (e.summary.startsWith("Requirement saved")) a.artifacts.push("requirement");
         if (e.summary.startsWith("Coverage saved")) a.artifacts.push("coverage");
         if (e.summary.startsWith("Script saved")) a.artifacts.push("scripts");
@@ -77,9 +81,12 @@ export function PipelineSummary({ events }: { events: AgentEvent[] }) {
       else if (sawError && a.status === "running") a.status = "skipped";
     }
 
-    // Real issues only, in agent order.
+    // Real issues/warnings only, in agent order.
     const issues = agentsArr.flatMap((a) =>
       a.issues.length ? a.issues.map((m) => `Agent ${a.index + 1} (${a.code}): ${m}`) : []
+    );
+    const warnings = agentsArr.flatMap((a) =>
+      a.warnings.length ? a.warnings.map((m) => `Agent ${a.index + 1} (${a.code}): ${m}`) : []
     );
     if (chainStopped && issues.length) issues.push("Pipeline stopped after an agent error.");
 
@@ -96,20 +103,23 @@ export function PipelineSummary({ events }: { events: AgentEvent[] }) {
       events.some((e) => e.type === "test_run" && e.attempts > 0) ||
       agentsArr.some((a) => a.artifacts.includes("cycle"));
 
-    return { agents: agentsArr, issues, ranTests, counts };
+    return { agents: agentsArr, issues, warnings, ranTests, counts };
   }, [events]);
 
   const copySummary = async () => {
     const lines = [
       "QAE2E Run Summary",
       "================",
-      ...agents.map((a) => `• Agent ${a.index + 1}/${a.total} (${a.code}): ${a.status}${a.issues.length ? " — " + a.issues.join("; ") : ""}`),
+      ...agents.map((a) => `• Agent ${a.index + 1}/${a.total} (${a.code}): ${a.status}${a.issues.length ? " — " + a.issues.join("; ") : ""}${a.warnings.length ? " — " + a.warnings.join("; ") : ""}`),
       "",
       `Artifacts: ${counts.requirements} requirement(s), ${counts.analyses} analysis(es), ${counts.coverages} coverage(s), ${counts.scripts} script(s), ${counts.cycles} cycle(s), ${counts.defects} defect(s), ${counts.releases} release(s)`,
       `Tests run: ${ranTests ? "yes" : "no"}`,
       "",
       "Issues:",
       ...(issues.length ? issues.map((i) => `• ${i}`) : ["None"]),
+      "",
+      "Warnings:",
+      ...(warnings.length ? warnings.map((i) => `• ${i}`) : ["None"]),
     ];
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
@@ -165,6 +175,22 @@ export function PipelineSummary({ events }: { events: AgentEvent[] }) {
             {issues.map((i, idx) => (
               <li key={idx} className="flex items-start gap-2 text-xs text-text-secondary">
                 <span className="mt-1 w-1 h-1 rounded-full bg-red-500 shrink-0" /> {i}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Warnings — config gaps / missing credentials (amber, not errors) */}
+      {warnings.length > 0 && (
+        <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-2 flex items-center gap-1.5">
+            <AlertTriangle size={13} /> Warnings
+          </p>
+          <ul className="space-y-1.5">
+            {warnings.map((i, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-xs text-text-secondary">
+                <span className="mt-1 w-1 h-1 rounded-full bg-amber-500 shrink-0" /> {i}
               </li>
             ))}
           </ul>
