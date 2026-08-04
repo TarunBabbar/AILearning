@@ -1,0 +1,63 @@
+{
+  "pipeline_cwd": "",
+  "output_dir": "output",
+  "characters_dir": "../video_gen/characters",
+  "api_key": "",
+  "base_url": "https://openrouter.ai/api/v1",
+  "chat_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "chat_model_fallbacks": [
+    "openai/gpt-oss-20b:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "inclusionai/ling-3.0-flash:free"
+  ],
+  "video_models": {
+    "wan-2.6": {
+      "id": "alibaba/wan-2.6",
+      "label": "Wan 2.6 (audio lip-sync)",
+      "cost_per_second": 0.04,
+      "supports_audio_input": true,
+      "description": "Generates video FROM your TTS audio — lips sync to the actual Hindi words.",
+      "resolution": "720p",
+      "aspect_ratio": "9:16"
+    },
+    "wan-2.7": {
+      "id": "alibaba/wan-2.7",
+      "label": "Wan 2.7 (audio lip-sync)",
+      "cost_per_second": 0.10,
+      "supports_audio_input": true,
+      "description": "Newer Wan with audio input + lip-sync.",
+      "resolution": "720p",
+      "aspect_ratio": "9:16"
+    },
+    "seedance-1.5-pro": {
+      "id": "bytedance/seedance-1-5-pro",
+      "label": "Seedance 1.5 Pro (no audio input)",
+      "cost_per_second": 0.012,
+      "supports_audio_input": false,
+      "description": "Cheapest draft model — lips will NOT match your TTS.",
+      "resolution": "720p",
+      "aspect_ratio": "9:16"
+    }
+  },
+  "default_video_model": "wan-2.6",
+  "language": "hi",
+  "tts_voice_hi": "hi-IN-SwaraNeural",
+  "tts_voice_en": "en-US-AriaNeural",
+  "tts_rate": "+0%",
+  "scene_duration": 5,
+  "video_fps": 30,
+  "output_size": "1080x1920",
+  "video_codec": "libx264",
+  "video_preset": "fast",
+  "video_crf": 20,
+  "audio_codec": "aac",
+  "audio_bitrate": "192k",
+  "chat_timeout_s": 60,
+  "video_job_timeout_min": 20,
+  "poll_interval_s": 5,
+  "ffmpeg_timeout_s": 600,
+  "download_timeout_s": 120,
+  "user_agent": "audio-first/1.0",
+  "skip_existing": true,
+  "allow_mock": true
+}

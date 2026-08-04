@@ -1,0 +1,25 @@
+{
+  "title": "गाजर से अच्छी आँखें",
+  "hook": "गाजर खाने से आँखें तेज़ होती हैं।",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "mom",
+      "dialogue": "गाजर में विटामिन ए होता है, यह आँखों के लिए अच्छा है।",
+      "visual": "Mom holding a bright orange carrot, smiling gently at Son.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom in a bright pink saree holding a shiny carrot, close-up shot with Son looking curious.",
+      "duration": 5,
+      "subtitle": "गाजर आँखों के लिए अच्छा होता है।"
+    },
+    {
+      "id": 2,
+      "speaker": "son",
+      "dialogue": "क्या मैं रोज गाजर खा सकता हूँ?",
+      "visual": "Son looking excited, holding a small carrot piece, looking up at Mom.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Son in yellow t-shirt holding carrot piece, smiling and looking up at Mom eagerly.",
+      "duration": 5,
+      "subtitle": "क्या मैं रोज गाजर खा सकता हूँ?"
+    }
+  ],
+  "topic": "गजर आख क लए अचछ हत ह"
+}

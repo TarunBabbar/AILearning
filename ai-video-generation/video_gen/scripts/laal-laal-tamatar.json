@@ -1,0 +1,23 @@
+{
+  "title": "लाल टमाटर की ताकत",
+  "hook": "लाल लाल टमाटर खाने से ताकत बढ़ती है!",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "mom",
+      "dialogue": "लाल लाल टमाटर खाने से ताकत बढ़ती है!",
+      "visual": "Mom holds a shiny red tomato and smiles at the camera.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom holds a shiny red tomato and says, \"लाल लाल टमाटर खाने से ताकत बढ़ती है!\".",
+      "duration": 5
+    },
+    {
+      "id": 2,
+      "speaker": "son",
+      "dialogue": "माँ, टमाटर क्यों लाल होता है?",
+      "visual": "Son looks puzzled at the tomato in his hand.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Son looks puzzled at the tomato in his hand and asks, \"माँ, टमाटर क्यों लाल होता है?\".",
+      "duration": 5
+    }
+  ],
+  "topic": "laal laal tamatar"
+}

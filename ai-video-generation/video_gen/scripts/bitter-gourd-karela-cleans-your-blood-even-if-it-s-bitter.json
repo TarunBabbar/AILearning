@@ -1,0 +1,23 @@
+{
+  "title": "करेला खून का हीरो",
+  "hook": "करेला खून को साफ़ करता है, इसलिए खाओ और स्वस्थ रहो!",
+  "scenes": [
+    {
+      "speaker": "mom",
+      "dialogue": "करेला खून को साफ़ करता है, इसलिए खाओ और स्वस्थ रहो!",
+      "visual": "Mom holds up a bright green bitter gourd, smiling warmly in a cozy kitchen.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom cheerfully shows a karela to the camera, saying \"करेला खून को साफ़ करता है, इसलिए खाओ और स्वस्थ रहो!\".",
+      "duration": 5,
+      "id": 1
+    },
+    {
+      "speaker": "son",
+      "dialogue": "वाह, माँ! मैं आज कarela खाऊँगा!",
+      "visual": "Son jumps excitedly, clutching a plate with sliced karela, eyes sparkling.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Son enthusiastically jumps with a plate of karela slices, exclaiming \"वाह, माँ! मैं आज कarela खाऊँगा!\".",
+      "duration": 5,
+      "id": 2
+    }
+  ],
+  "topic": "Bitter gourd (karela) cleans your blood even if it's bitter"
+}

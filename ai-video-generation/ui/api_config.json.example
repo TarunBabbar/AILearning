@@ -1,0 +1,15 @@
+{
+  "host": "127.0.0.1",
+  "port": 8000,
+  "reload": false,
+  "python_interpreter": "python",
+  "pipeline_main": "main.py",
+  "pipeline_cwd": "../video_gen",
+  "output_dir": "../video_gen/output",
+  "allowed_languages": ["en", "hi"],
+  "allowed_durations": [5, 10, 15, 20, 30],
+  "default_language": "hi",
+  "default_duration": 10,
+  "max_wait_seconds": 900,
+  "allow_mock": true
+}

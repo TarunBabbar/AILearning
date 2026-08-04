@@ -1,0 +1,55 @@
+{
+  "title": "हरी सब्जी का सुपर पावर",
+  "hook": "आज हम हरी सब्जियों के फायदे जानेंगे!",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "mom",
+      "dialogue": "आज हम हरी सब्जियों के फायदे जानेंगे!",
+      "visual": "Mom stands in a bright kitchen, holding a bunch of spinach and smiling at the camera.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom stands in a bright kitchen, holding a bunch of spinach, smiling as she says, \"आज हम हरी सब्जियों के फायदे जानेंगे!\", with matching lip movement.",
+      "duration": 5
+    },
+    {
+      "id": 2,
+      "speaker": "mom",
+      "dialogue": "हरी सब्जियों में आयरन और विटामिन होते हैं जो शरीर को मजबूत बनाते हैं।",
+      "visual": "Mom points to a colorful chart showing spinach, broccoli, and beans with glowing nutrient icons.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom points to a colorful chart showing spinach, broccoli, and beans with glowing nutrient icons while she says, \"हरी सब्जियों में आयरन और विटामिन होते हैं जो शरीर को मजबूत बनाते हैं।\", with matching lip movement.",
+      "duration": 5
+    },
+    {
+      "id": 3,
+      "speaker": "son",
+      "dialogue": "वाकई? फिर मैं हर दिन हरी सब्जी खाऊँगा!",
+      "visual": "Son's eyes widen, he jumps slightly and claps his hands excitedly.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Son's eyes widen, he jumps slightly and claps his hands excitedly as he says, \"वाकई? फिर मैं हर दिन हरी सब्जी खाऊँगा!\", with matching lip movement.",
+      "duration": 5
+    },
+    {
+      "id": 4,
+      "speaker": "mom",
+      "dialogue": "हां बेटा, इससे तुम ऊर्जावान और स्वस्थ रहोगे।",
+      "visual": "Mom kneels to Son's level, giving him a reassuring hug while a soft golden glow surrounds them.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom kneels to Son's level, giving him a reassuring hug while a soft golden glow surrounds them as she says, \"हां बेटा, इससे तुम ऊर्जावान और स्वस्थ रहोगे।\", with matching lip movement.",
+      "duration": 5
+    },
+    {
+      "id": 5,
+      "speaker": "mom",
+      "dialogue": "पालक, ब्रोकली, और बीन्स में ये पोषक तत्व होते हैं।",
+      "visual": "Mom lifts up each vegetable—spinach, broccoli florets, and green beans—showing them clearly.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom lifts up each vegetable—spinach, broccoli florets, and green beans—showing them clearly as she says, \"पालक, ब्रोकली, और बीन्स में ये पोषक तत्व होते हैं।\", with matching lip movement.",
+      "duration": 5
+    },
+    {
+      "id": 6,
+      "speaker": "son",
+      "dialogue": "मैं अब अपनी प्लेट में हरी सब्जी जोड़ूँगा!",
+      "visual": "Son eagerly places a spoonful of mixed greens onto his plate and gives a thumbs‑up.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Son eagerly places a spoonful of mixed greens onto his plate and gives a thumbs‑up as he says, \"मैं अब अपनी प्लेट में हरी सब्जी जोड़ूँगा!\", with matching lip movement.",
+      "duration": 5
+    }
+  ],
+  "topic": "hari sabji ke fayde"
+}

@@ -1,0 +1,55 @@
+{
+  "api_key": "",
+  "base_url": "https://openrouter.ai/api/v1",
+
+  "chat_model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "chat_model_fallbacks": [
+    "openai/gpt-oss-20b:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "inclusionai/ling-3.0-flash:free",
+    "poolside/laguna-s-2.1:free",
+    "cohere/north-mini-code:free"
+  ],
+  "image_model": "black-forest-labs/flux.2-klein-4b",
+  "video_model": "bytedance/seedance-1-5-pro",
+  "tts_model": "google/lyria-3-pro-preview",
+
+  "video_resolution": "720p",
+  "video_aspect_ratio": "9:16",
+  "video_duration": 10,
+  "scene_duration": 5,
+  "video_fps": 30,
+  "output_size": "1080x1920",
+  "video_codec": "libx264",
+  "video_preset": "fast",
+  "video_crf": 20,
+  "audio_codec": "aac",
+  "audio_bitrate": "192k",
+  "keep_clip_audio": true,
+
+  "language": "hi",
+
+  "tts_engine": "edge",
+  "tts_voice_hi": "hi-IN-SwaraNeural",
+  "tts_voice_en": "en-US-AriaNeural",
+  "tts_rate": "+0%",
+
+  "image_size": "1024x1792",
+  "image_format": "png",
+
+  "user_agent": "cartoon-gen/1.0",
+  "request_timeout_s": 300,
+  "chat_timeout_s": 60,
+  "download_timeout_s": 120,
+  "http_timeout_s": 60,
+  "ffmpeg_timeout_s": 600,
+  "mock_tone_hz": 440,
+  "mock_audio_bitrate": "128k",
+
+  "skip_existing": true,
+  "dry_run": false,
+  "mock": false,
+  "allow_paid_calls": false,
+  "poll_interval_s": 20,
+  "max_poll_minutes": 15
+}

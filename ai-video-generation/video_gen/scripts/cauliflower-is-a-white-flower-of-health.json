@@ -1,0 +1,23 @@
+{
+  "title": "सफ़ेद फूल का सुपर पावर!",
+  "hook": "आज हम सफ़ेद फूल के बारे में सीखेंगे!",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "mom",
+      "dialogue": "कॉलीफ़्लावर एक सफ़ेद फूल है जो सेहत के लिए बहुत अच्छा होता है।",
+      "visual": "Mom holds a bright white cauliflower, smiles, and shows it to the camera.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom holds a bright white cauliflower, smiles, and says, \"कॉलीफ़्लावर एक सफ़ेद फूल है जो सेहत के लिए बहुत अच्छा होता है\" while the camera gently zooms in.",
+      "duration": 5
+    },
+    {
+      "id": 2,
+      "speaker": "mom",
+      "dialogue": "तो चलिए इसे खाकर मज़ेदार ताकत बनाते हैं!",
+      "visual": "Mom and son sit at a small table, eating cauliflower florets, son claps excitedly.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom and son sit at a small table, eating cauliflower florets, son claps excitedly as Mom says, \"तो चलिए इसे खाकर मज़ेदार ताकत बनाते हैं\".",
+      "duration": 5
+    }
+  ],
+  "topic": "Cauliflower is a white flower of health"
+}

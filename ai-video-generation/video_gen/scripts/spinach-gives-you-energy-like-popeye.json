@@ -1,0 +1,23 @@
+{
+  "title": "पालक खाओ, ताकत बढ़ाओ",
+  "hook": "पालक में आयरन होता है जो आपको पोपेय जैसी ताकत देता है",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "mom",
+      "dialogue": "पालक में आयरन होता है जो आपको पोपेय जैसी ताकत देता है",
+      "visual": "Mom holds a bunch of fresh spinach, smiles at the camera, bright kitchen background.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. The Mom says, \"पालक में आयरन होता है जो आपको पोपेय जैसी ताकत देता है\", with matching lip movement, as she holds a bunch of fresh spinach in a bright kitchen.",
+      "duration": 5
+    },
+    {
+      "id": 2,
+      "speaker": "mom",
+      "dialogue": "बेटा कहता है, 'वाह!' और मैं कहती हूँ, पालक खाकर आप मजबूत बनेंगे",
+      "visual": "Mom and her son stand excitedly beside a bowl of spinach, both smiling.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. The Mom says, \"बेटा कहता है, 'वाह!' और मैं कहती हूँ, पालक खाकर आप मजबूत बनेंगे\", with matching lip movement, as she and her son stand excitedly beside a bowl of spinach.",
+      "duration": 5
+    }
+  ],
+  "topic": "Spinach gives you energy like Popeye"
+}

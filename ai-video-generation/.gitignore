@@ -1,0 +1,41 @@
+# Secrets — never commit keys (use config.json locally or OPENROUTER_API_KEY)
+.env
+.env.*
+**/config.json
+!**/config.json.example
+ui/api_config.json
+!ui/api_config.json.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+
+# Generated media, intermediates, cache
+**/output/
+**/clips/
+**/audio/
+**/work*/
+**/.cache/
+*.mp4
+*.mp3
+*.ass
+*.log
+
+# Large reference / sample videos
+1000+*.mp4
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

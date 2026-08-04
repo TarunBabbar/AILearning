@@ -1,0 +1,23 @@
+{
+  "title": "टमाटर का दिल का दोस्त",
+  "hook": "बच्चों, टमाटर खाने से दिल खुश हो जाता है!",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "mom",
+      "dialogue": "टमाटर में लाइकोपीन होता है जो दिल को मजबूत बनाता है",
+      "visual": "Mom holds a bright red tomato and points to a glowing heart icon",
+      "video_prompt": "3D Pixar-style cartoon, warm lighting, vertical composition. Mom holds a bright red tomato, points to a glowing heart icon, and says, \\\"टमाटर में लाइकोपीन होता है जो दिल को मजबूत बनाता है\\\"",
+      "duration": 5
+    },
+    {
+      "id": 2,
+      "speaker": "mom",
+      "dialogue": "तो रोज़ एक टमाटर खाकर दिल को स्वस्थ रखो",
+      "visual": "Son jumps excitedly and claps his hands while Mom smiles",
+      "video_prompt": "3D Pixar-style cartoon, warm lighting, vertical composition. Son jumps with excitement, claps his hands, while Mom smiles and says, \\\"तो रोज़ एक टमाटर खाकर दिल को स्वस्थ रखो\\\"",
+      "duration": 5
+    }
+  ],
+  "topic": "Tomatoes keep your heart healthy"
+}

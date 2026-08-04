@@ -1,0 +1,23 @@
+{
+  "title": "गाजर की रोशनी",
+  "hook": "गाजर खाने से आँखें चमकती हैं, बच्चों को ये पसंद है!",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "mom",
+      "dialogue": "गाजर खाने से आँखें चमकती हैं, बच्चों को ये पसंद है!",
+      "visual": "Mom holds a bright orange carrot, smiling in a cheerful kitchen with floating veggie sparkles.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Mom holds a glowing carrot and says, \"गाजर खाने से आँखें चमकती हैं, बच्चों को ये पसंद है!\", while the kitchen background sparkles warmly.",
+      "duration": 5
+    },
+    {
+      "id": 2,
+      "speaker": "mom",
+      "dialogue": "तो रोज़ एक गाजर खाओ और देखो जादू!",
+      "visual": "Son's eyes widen and he jumps excitedly as a glowing carrot floats between him and Mom, who nods approvingly.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. Son's eyes sparkle and he jumps as Mom says, \"तो रोज़ एक गाजर खाओ और देखो जादू!\", with a shining carrot floating between them.",
+      "duration": 5
+    }
+  ],
+  "topic": "Why carrots are good for your eyes"
+}

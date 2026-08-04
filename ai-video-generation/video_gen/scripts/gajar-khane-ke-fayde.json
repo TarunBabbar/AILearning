@@ -1,0 +1,23 @@
+{
+  "title": "गाजर का जादू",
+  "hook": "आज हम गाजर का जादू सीखेंगे!",
+  "scenes": [
+    {
+      "id": 1,
+      "speaker": "son",
+      "dialogue": "गाजर खाने से क्या होता है?",
+      "visual": "Son holds a bright orange carrot, eyes wide with curiosity, Mom smiles beside him.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. The Son says, \"गाजर खाने से क्या होता है?\", while holding a carrot in a sunny kitchen.",
+      "duration": 5
+    },
+    {
+      "id": 2,
+      "speaker": "mom",
+      "dialogue": "गाजर से आँखें चमकती हैं और ताकत बढ़ती है!",
+      "visual": "Mom points to the carrot, a sparkle shows in Son's eyes, both laugh happily.",
+      "video_prompt": "3D cartoon, Pixar style, warm lighting, vertical composition. The Mom says, \"गाजर से आँखें चमकती हैं और ताकत बढ़ती है!\", as she gestures to the carrot and Son's eyes shine.",
+      "duration": 5
+    }
+  ],
+  "topic": "gajar khane ke fayde"
+}
