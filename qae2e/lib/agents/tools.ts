@@ -1,7 +1,7 @@
 // Tool handlers shared by the web agent runner and the real MCP server.
 // Each tool is MCP-shaped: { name, description, inputSchema, handler }.
 
-import { insertOne, updateOne, getOne, listAll } from "../store";
+import { insertOne, updateOne, getOne, listAll, listByRequirement } from "../store";
 import { integrationTools } from "./tools.integrations";
 import { normalizeScriptFiles, isRunnableAutomation } from "../exec/script-quality";
 import type {
@@ -46,7 +46,7 @@ const requirementSave: MCPTool = {
       content: String(args.content),
       createdAt: new Date().toISOString(),
     };
-    insertOne("requirements", req);
+    await insertOne("requirements", req);
     return ok(`Requirement saved. id=${req.id} title="${req.title}" source=${req.source}${req.sourceKey ? ` key=${req.sourceKey}` : ""}`);
   },
 };
@@ -66,7 +66,7 @@ const requirementAnalyze: MCPTool = {
     required: ["requirementId"],
   },
   handler: async (args) => {
-    const req = getOne<Requirement>("requirements", String(args.requirementId));
+    const req = await getOne<Requirement>("requirements", String(args.requirementId));
     if (!req) return ok(`ERROR: requirement ${args.requirementId} not found`);
     return ok(
       `Analysis requested for requirement ${req.id} ("${req.title}"). ` +
@@ -126,7 +126,7 @@ const coverageSave: MCPTool = {
       testCases: args.testCases as Coverage["testCases"],
       createdAt: new Date().toISOString(),
     };
-    insertOne("coverages", cov);
+    await insertOne("coverages", cov);
     return ok(`Coverage saved. id=${cov.id} with ${cov.testCases.length} test cases.`);
   },
 };
@@ -147,9 +147,8 @@ const coverageGet: MCPTool = {
   },
   handler: async (args) => {
     const requirementId = String(args.requirementId);
-    const cov = listAll<Coverage>("coverages")
-      .filter((c) => c.requirementId === requirementId)
-      .pop();
+    const covs = await listByRequirement<Coverage>("coverages", requirementId);
+    const cov = covs.pop();
     if (!cov) {
       return ok(
         `ERROR: no coverage found for requirement ${requirementId}. The Manual Test Case Agent must call coverage_save first.`
@@ -186,12 +185,11 @@ const automationFrameworkGenerate: MCPTool = {
   handler: async (args) => {
     const requirementId = String(args.requirementId);
     let coverage = args.coverageId
-      ? getOne<Coverage>("coverages", String(args.coverageId))
+      ? await getOne<Coverage>("coverages", String(args.coverageId))
       : undefined;
     if (!coverage) {
-      coverage = listAll<Coverage>("coverages")
-        .filter((c) => c.requirementId === requirementId)
-        .pop();
+      const covs = await listByRequirement<Coverage>("coverages", requirementId);
+      coverage = covs.pop();
     }
     if (!coverage?.testCases?.length) {
       return ok(
@@ -199,7 +197,7 @@ const automationFrameworkGenerate: MCPTool = {
       );
     }
     const { saveFallbackScripts } = await import("../exec/fallback-scripts");
-    const script = saveFallbackScripts(requirementId, coverage);
+    const script = await saveFallbackScripts(requirementId, coverage);
     return ok(
       `Script saved. id=${script.id} framework=${script.framework} with ${script.files.length} file(s): ${script.files
         .map((f) => f.path)
@@ -252,10 +250,8 @@ const scriptSave: MCPTool = {
     }
     let coverageId = args.coverageId ? String(args.coverageId) : "";
     if (!coverageId) {
-      const cov = listAll<Coverage>("coverages")
-        .filter((c) => c.requirementId === requirementId)
-        .pop();
-      coverageId = cov?.id || "";
+      const covs = await listByRequirement<Coverage>("coverages", requirementId);
+      coverageId = covs.pop()?.id || "";
     }
     if (!coverageId) {
       return ok(
@@ -271,7 +267,7 @@ const scriptSave: MCPTool = {
       files,
       createdAt: new Date().toISOString(),
     };
-    insertOne("scripts", script);
+    await insertOne("scripts", script);
     const note = !quality.hasPage
       ? " NOTE: no src/pages/*Page.ts detected — prefer POM pages next time."
       : "";
@@ -319,7 +315,7 @@ const cycleCreate: MCPTool = {
       executions: (args.executions as Cycle["executions"]) || [],
       createdAt: new Date().toISOString(),
     };
-    insertOne("cycles", cycle);
+    await insertOne("cycles", cycle);
     return ok(`Test cycle created. id=${cycle.id} with ${cycle.executions.length} recorded execution(s).`);
   },
 };
@@ -341,7 +337,7 @@ const executionRecord: MCPTool = {
     required: ["cycleId", "caseTitle", "status"],
   },
   handler: async (args) => {
-    const cycle = getOne<Cycle>("cycles", String(args.cycleId));
+    const cycle = await getOne<Cycle>("cycles", String(args.cycleId));
     if (!cycle) return ok(`ERROR: cycle ${args.cycleId} not found`);
     const status = String(args.status) as ExecutionStatus;
     const existing = cycle.executions.findIndex((e) => e.caseId === args.caseId);
@@ -356,7 +352,7 @@ const executionRecord: MCPTool = {
     };
     if (existing >= 0) cycle.executions[existing] = record;
     else cycle.executions.push(record);
-    updateOne("cycles", cycle);
+    await updateOne("cycles", cycle.id, cycle);
     return ok(`Execution recorded on cycle ${cycle.id}: "${record.caseTitle}" → ${status}.`);
   },
 };
@@ -396,7 +392,7 @@ const defectCreate: MCPTool = {
       evidence: args.evidence ? String(args.evidence) : undefined,
       createdAt: new Date().toISOString(),
     };
-    insertOne("defects", defect);
+    await insertOne("defects", defect);
     return ok(`Defect created. id=${defect.id} severity=${defect.severity} "${defect.summary}"`);
   },
 };
@@ -417,9 +413,11 @@ const releaseConfidence: MCPTool = {
   },
   handler: async (args) => {
     const requirementId = String(args.requirementId);
-    const coverage = listAll<Coverage>("coverages").find((c) => c.requirementId === requirementId);
-    const cycle = listAll<Cycle>("cycles").filter((c) => c.requirementId === requirementId).pop();
-    const defects = listAll<Defect>("defects").filter((d) => d.requirementId === requirementId);
+    const covs = await listByRequirement<Coverage>("coverages", requirementId);
+    const coverage = covs.find((c) => c.requirementId === requirementId);
+    const cycs = await listByRequirement<Cycle>("cycles", requirementId);
+    const cycle = cycs.pop();
+    const defects = await listByRequirement<Defect>("defects", requirementId);
 
     const totalCases = coverage?.testCases.length || 0;
     const executions = cycle?.executions || [];

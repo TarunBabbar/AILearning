@@ -538,7 +538,7 @@ function inventorySafe(): string {
 }
 
 /** Persist framework and return Script artifact. */
-export function saveFallbackScripts(requirementId: string, coverage: Coverage): Script {
+export async function saveFallbackScripts(requirementId: string, coverage: Coverage): Promise<Script> {
   const files = buildAutomationFiles(coverage);
   const script: Script = {
     id: crypto.randomUUID(),
@@ -549,6 +549,6 @@ export function saveFallbackScripts(requirementId: string, coverage: Coverage): 
     files,
     createdAt: new Date().toISOString(),
   };
-  insertOne("scripts", script);
+  await insertOne("scripts", script);
   return script;
 }

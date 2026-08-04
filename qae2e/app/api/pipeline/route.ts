@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
       let failed = false;
 
-      const emit = (e: AgentEvent) => {
+      const emit = async (e: AgentEvent) => {
         if (e.type === "status" && e.message.includes("finished")) {
           const agent = getAgent(e.agentId as AgentId);
           if (agent) {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         // (analysis / coverage / script / release). This is what makes the
         // traceability rail and summary populate.
         if (e.type === "chunk") {
-          const artifact = maybePersistArtifact(e.agentId as AgentId, e.text, requirementId);
+          const artifact = await maybePersistArtifact(e.agentId as AgentId, e.text, requirementId);
           if (artifact) send({ type: "artifact", agentId: e.agentId, artifact: artifact.type, id: artifact.id });
         }
         // Attach agent metadata (code/name/index) to error events so the UI can
@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
             title: body.title ? String(body.title) : "Untitled requirement",
             content: body.content ? String(body.content) : "",
             startFrom: body.startFrom ? Number(body.startFrom) : undefined,
+            workspaceId: body.workspaceId ? String(body.workspaceId) : undefined,
             env: body.env && typeof body.env === "object" ? (body.env as Record<string, string>) : undefined,
             signal: req.signal,
           }

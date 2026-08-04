@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 import { runTests } from "@/lib/exec";
 import { materializeScripts } from "@/lib/exec/autofix";
 import { isRunnableAutomation } from "@/lib/exec/script-quality";
-import { listAll } from "@/lib/store";
+import { listAll, withWorkspace } from "@/lib/store";
 import type { Script } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
   const command = String(body.command || "");
   const jiraProjectKey = String(body.jiraProjectKey || "");
   const testrailRunId = body.testrailRunId ? Number(body.testrailRunId) : undefined;
+  const workspaceId = String(body.workspaceId || "");
   if (!requirementId) return Response.json({ error: "requirementId required" }, { status: 400 });
 
   const encoder = new TextEncoder();
@@ -39,9 +40,9 @@ export async function POST(req: NextRequest) {
         let repoDir = repoDirIn || undefined;
         // No external repo? Materialize the latest saved automation for this requirement.
         if (!repoDir && !repoUrl) {
-          const script = listAll<Script>("scripts")
-            .filter((s) => s.requirementId === requirementId)
-            .pop();
+          const script = await withWorkspace(workspaceId, () =>
+            listAll<Script>("scripts").then((s) => s.filter((x) => x.requirementId === requirementId).pop())
+          );
           if (!script) {
             send({
               type: "error",
@@ -66,15 +67,17 @@ export async function POST(req: NextRequest) {
           send({ type: "status", message: `Materialized ${mat.files.length} file(s) → ${repoDir}` });
         }
 
-        const result = await runTests({
-          requirementId,
-          cycleId: cycleId || undefined,
-          repoDir,
-          repoUrl: repoUrl || undefined,
-          command: command || undefined,
-          jiraProjectKey: jiraProjectKey || undefined,
-          testrailRunId,
-        });
+        const result = await withWorkspace(workspaceId, () =>
+          runTests({
+            requirementId,
+            cycleId: cycleId || undefined,
+            repoDir,
+            repoUrl: repoUrl || undefined,
+            command: command || undefined,
+            jiraProjectKey: jiraProjectKey || undefined,
+            testrailRunId,
+          })
+        );
 
         if (!result.ok && /Docker is not running/.test(result.stderr)) {
           send({

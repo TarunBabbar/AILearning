@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, CircleDot, Workflow, ShieldCheck } from "lucide-react";
+import { getSessionUser } from "@/lib/auth/session";
 
 const metrics = [
   { label: "Connect", value: "Jira, Confluence and more" },
@@ -7,7 +8,9 @@ const metrics = [
   { label: "Prove", value: "quality with evidence" },
 ];
 
-export function Hero() {
+export async function Hero() {
+  const user = await getSessionUser();
+  const href = user ? "/workspaces" : "/login";
   return (
     <section className="mx-auto max-w-6xl px-6 pt-16 pb-10 grid lg:grid-cols-[0.78fr_1fr] gap-10 items-center">
       <div className="rise-in">
@@ -24,8 +27,8 @@ export function Hero() {
           insight. Six specialist AI agents, one connected quality record.
         </p>
         <div className="mt-8 flex gap-3 flex-wrap">
-          <Button href="/workspace">
-            Open the workspace <ArrowRight size={16} />
+          <Button href={href}>
+            {user ? "My workspaces" : "Get started"} <ArrowRight size={16} />
           </Button>
           <Button href="/#flow" variant="secondary">
             Explore the platform

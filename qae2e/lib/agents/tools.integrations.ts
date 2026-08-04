@@ -131,12 +131,13 @@ const casesExport: MCPTool = {
     required: ["coverageId", "format"],
   },
   handler: async (args) => {
-    const cov = listAll<Coverage>("coverages").find((c) => c.id === args.coverageId);
+    const covs = await listAll<Coverage>("coverages");
+    const cov = covs.find((c) => c.id === args.coverageId);
     if (!cov) return ok(`ERROR: coverage ${args.coverageId} not found`);
     const format = String(args.format || "csv") as "csv" | "xlsx";
     const data = format === "csv" ? coverageToCsv(cov) : (coverageToXlsx(cov) as unknown as string);
     const name = (cov.module || cov.product || "coverage").replace(/[^a-z0-9-_]/gi, "_").toLowerCase();
-    insertOne("exports", {
+    await insertOne("exports", {
       id: crypto.randomUUID(),
       requirementId: cov.requirementId,
       format,
@@ -163,7 +164,8 @@ const zephyrPublish: MCPTool = {
     required: ["coverageId"],
   },
   handler: async (args) => {
-    const cov = listAll<Coverage>("coverages").find((c) => c.id === args.coverageId);
+    const covs = await listAll<Coverage>("coverages");
+    const cov = covs.find((c) => c.id === args.coverageId);
     if (!cov) return ok(`ERROR: coverage ${args.coverageId} not found`);
     const projectKey = String(args.projectKey || getConfig().zephyrProjectKey || "");
     if (!projectKey) return ok("NOTE: no Zephyr project key provided and none in env (ZEPHYR_PROJECT_KEY) — skipping publish.");
@@ -189,7 +191,8 @@ const testrailPublish: MCPTool = {
     required: ["coverageId", "projectId", "sectionId"],
   },
   handler: async (args) => {
-    const cov = listAll<Coverage>("coverages").find((c) => c.id === args.coverageId);
+    const covs = await listAll<Coverage>("coverages");
+    const cov = covs.find((c) => c.id === args.coverageId);
     if (!cov) return ok(`ERROR: coverage ${args.coverageId} not found`);
     const created: string[] = [];
     for (const tc of cov.testCases) {
@@ -375,7 +378,8 @@ const imageExtract: MCPTool = {
     required: ["uploadId"],
   },
   handler: async (args) => {
-    const upload = listAll<{ id: string; base64: string; mime: string }>("uploads").find((u) => u.id === args.uploadId);
+    const uploads = await listAll<{ id: string; base64: string; mime: string }>("uploads");
+    const upload = uploads.find((u) => u.id === args.uploadId);
     if (!upload) return ok(`ERROR: upload ${args.uploadId} not found — upload the image in the workspace first.`);
     try {
       const text = await extractTextFromImage(upload.base64, upload.mime);

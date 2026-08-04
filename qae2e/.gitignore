@@ -13,3 +13,7 @@ node_modules/
 
 # Runtime artifacts
 data/
+test-results/
+
+# Local-only working notes (never commit)
+UI-NOTES.md

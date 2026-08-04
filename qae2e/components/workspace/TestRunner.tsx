@@ -24,10 +24,12 @@ type RunEvent =
 export function TestRunner({
   requirementId,
   coverage,
+  workspaceId = "",
   onRequirementText,
 }: {
   requirementId: string | null;
   coverage: Coverage | null;
+  workspaceId?: string;
   onRequirementText: (text: string) => void;
 }) {
   const [running, setRunning] = useState(false);
@@ -54,7 +56,7 @@ export function TestRunner({
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requirementId, command, repoUrl: repoUrl || undefined, jiraProjectKey: jiraProjectKey || undefined, testrailRunId: testrailRunId ? Number(testrailRunId) : undefined }),
+        body: JSON.stringify({ requirementId, workspaceId, command, repoUrl: repoUrl || undefined, jiraProjectKey: jiraProjectKey || undefined, testrailRunId: testrailRunId ? Number(testrailRunId) : undefined }),
         signal: controller.signal,
       });
       if (!res.body) return;
@@ -104,6 +106,7 @@ export function TestRunner({
       const fd = new FormData();
       fd.append("file", file);
       if (requirementId) fd.append("requirementId", requirementId);
+      if (workspaceId) fd.append("workspaceId", workspaceId);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const d = await res.json();
       if (d.ok && d.text) {

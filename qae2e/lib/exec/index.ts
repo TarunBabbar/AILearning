@@ -8,7 +8,7 @@
 
 import { execFile, type ExecFileOptions } from "child_process";
 import { getConfig } from "../config";
-import { insertOne, getOne, updateOne } from "../store";
+import { insertOne, getOne, updateOne, currentWorkspace } from "../store";
 import type { Cycle, ExecutionStatus } from "../types";
 import { jiraCreateDefect, testrailAddResult } from "../connectors/client";
 import { join } from "path";
@@ -218,6 +218,20 @@ function readResultsJson(repoDir: string): string | null {
 }
 
 export async function runTests(req: RunRequest): Promise<RunResult> {
+  // Merge workspace secrets into env so connector sync (Jira/TestRail) uses
+  // the workspace's own credentials when a workspace context is active.
+  const ws = currentWorkspace();
+  if (ws && ws !== "default") {
+    try {
+      const { getWorkspaceSecrets } = await import("../db");
+      const secrets = await getWorkspaceSecrets(ws);
+      for (const [k, v] of Object.entries(secrets)) {
+        if (v) process.env[k] = v;
+      }
+    } catch {
+      // ignore — env fallback stays
+    }
+  }
   const cfg = getConfig();
   const dockerAvailable = await hasDocker();
   if (!dockerAvailable) {
@@ -306,7 +320,7 @@ export async function runTests(req: RunRequest): Promise<RunResult> {
   }
 
   if (req.cycleId) {
-    recordOnCycle(req.cycleId, req.requirementId, summary, exitCode);
+    await recordOnCycle(req.cycleId, req.requirementId, summary, exitCode);
   }
 
   await syncResults(req, summary, exitCode);
@@ -357,8 +371,8 @@ async function syncResults(req: RunRequest, summary: RunSummary, exitCode: numbe
   }
 }
 
-function recordOnCycle(cycleId: string, requirementId: string, summary: RunSummary, exitCode: number | null) {
-  const cycle = getOne<Cycle>("cycles", cycleId);
+async function recordOnCycle(cycleId: string, requirementId: string, summary: RunSummary, exitCode: number | null) {
+  const cycle = await getOne<Cycle>("cycles", cycleId);
   if (!cycle) {
     const c: Cycle = {
       id: cycleId,
@@ -369,11 +383,11 @@ function recordOnCycle(cycleId: string, requirementId: string, summary: RunSumma
       createdAt: new Date().toISOString(),
     };
     recordExecutions(c, summary, exitCode);
-    insertOne("cycles", c);
+    await insertOne("cycles", c);
     return;
   }
   recordExecutions(cycle, summary, exitCode);
-  updateOne("cycles", cycle);
+  await updateOne("cycles", cycle.id, cycle);
 }
 
 function recordExecutions(c: Cycle, summary: RunSummary, exitCode: number | null) {

@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/Button";
 import { ArrowRight } from "lucide-react";
+import { getSessionUser } from "@/lib/auth/session";
 
-export function CtaPanel() {
+export async function CtaPanel() {
+  const user = await getSessionUser();
+  const href = user ? "/workspaces" : "/login";
+
   return (
     <section className="py-20">
       <div className="mx-auto max-w-6xl px-6">
@@ -16,8 +20,8 @@ export function CtaPanel() {
               dots from intent to evidence — with real, editable artifacts and a release-confidence gauge.
             </p>
           </div>
-          <Button href="/workspace" className="shrink-0">
-            Open the workspace <ArrowRight size={16} />
+          <Button href={href} className="shrink-0">
+            {user ? "My workspaces" : "Get started"} <ArrowRight size={16} />
           </Button>
         </div>
       </div>

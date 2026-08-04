@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { getSessionUser } from "@/lib/auth/session";
 
-export function Header() {
+export async function Header() {
+  const user = await getSessionUser();
+
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-bg-page/80 backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-6 h-[72px] flex items-center justify-between">
@@ -16,11 +19,22 @@ export function Header() {
           <Link href="/#flow" className="hover:text-amber-700 transition-colors">The flow</Link>
           <Link href="/#agents" className="hover:text-amber-700 transition-colors">AI agents</Link>
           <Link href="/#integrations" className="hover:text-amber-700 transition-colors">Integrations</Link>
-          <Link href="/workspace" className="hover:text-amber-700 transition-colors">Workspace</Link>
+          {user && (
+            <Link href="/workspaces" className="hover:text-amber-700 transition-colors">My workspaces</Link>
+          )}
         </nav>
-        <Button href="/workspace" className="min-h-9 px-4">
-          Open workspace
-        </Button>
+        {user ? (
+          <div className="flex items-center gap-2">
+            {user.name && <span className="text-sm text-text-secondary hidden sm:inline">{user.name}</span>}
+            <Button href="/workspaces" className="min-h-9 px-4">
+              My workspaces <ArrowRight size={15} />
+            </Button>
+          </div>
+        ) : (
+          <Button href="/login" className="min-h-9 px-4">
+            Sign in <ArrowRight size={15} />
+          </Button>
+        )}
       </div>
     </header>
   );

@@ -57,6 +57,7 @@ async function pgRunTable(): Promise<boolean> {
     const { sql } = await import("@vercel/postgres");
     await sql`CREATE TABLE IF NOT EXISTS qae2e_runs (
       id TEXT PRIMARY KEY,
+      workspace_id TEXT,
       requirement_id TEXT NOT NULL,
       title TEXT,
       source TEXT,
@@ -77,13 +78,13 @@ export async function initRunStore(): Promise<boolean> {
   return pgRunTable();
 }
 
-export async function saveRun(record: RunRecord): Promise<void> {
+export async function saveRun(record: RunRecord, workspaceId = "default"): Promise<void> {
   if (pgConfigured()) {
     try {
       await pgRunTable();
       const { sql } = await import("@vercel/postgres");
-      await sql`INSERT INTO qae2e_runs (id, requirement_id, title, source, started_at, finished_at, status, data)
-        VALUES (${record.id}, ${record.requirementId}, ${record.title}, ${record.source}, ${record.startedAt}, ${record.finishedAt}, ${record.status}, ${JSON.stringify(record)}::jsonb)
+      await sql`INSERT INTO qae2e_runs (id, workspace_id, requirement_id, title, source, started_at, finished_at, status, data)
+        VALUES (${record.id}, ${workspaceId}, ${record.requirementId}, ${record.title}, ${record.source}, ${record.startedAt}, ${record.finishedAt}, ${record.status}, ${JSON.stringify(record)}::jsonb)
         ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, finished_at = EXCLUDED.finished_at, data = EXCLUDED.data`;
       return;
     } catch {
@@ -109,12 +110,14 @@ export async function saveRun(record: RunRecord): Promise<void> {
   writeFileSync(file, JSON.stringify(runs.slice(0, 50), null, 2), "utf-8");
 }
 
-export async function listRuns(limit = 50): Promise<RunRecord[]> {
+export async function listRuns(limit = 50, workspaceId?: string): Promise<RunRecord[]> {
   if (pgConfigured()) {
     try {
       await pgRunTable();
       const { sql } = await import("@vercel/postgres");
-      const rows = await sql`SELECT data FROM qae2e_runs ORDER BY started_at DESC LIMIT ${limit}`;
+      const rows = workspaceId
+        ? await sql`SELECT data FROM qae2e_runs WHERE workspace_id = ${workspaceId} ORDER BY started_at DESC LIMIT ${limit}`
+        : await sql`SELECT data FROM qae2e_runs ORDER BY started_at DESC LIMIT ${limit}`;
       return (rows.rows || []).map((r) => r.data as RunRecord);
     } catch {
       // fall through
@@ -130,12 +133,14 @@ export async function listRuns(limit = 50): Promise<RunRecord[]> {
   }
 }
 
-export async function getRun(id: string): Promise<RunRecord | null> {
+export async function getRun(id: string, workspaceId?: string): Promise<RunRecord | null> {
   if (pgConfigured()) {
     try {
       await pgRunTable();
       const { sql } = await import("@vercel/postgres");
-      const rows = await sql`SELECT data FROM qae2e_runs WHERE id = ${id}`;
+      const rows = workspaceId
+        ? await sql`SELECT data FROM qae2e_runs WHERE id = ${id} AND workspace_id = ${workspaceId} LIMIT 1`
+        : await sql`SELECT data FROM qae2e_runs WHERE id = ${id} LIMIT 1`;
       if (rows.rows?.[0]) return rows.rows[0].data as RunRecord;
     } catch {
       // fall through
@@ -151,11 +156,12 @@ export async function getRun(id: string): Promise<RunRecord | null> {
   }
 }
 
-export async function deleteRun(id: string): Promise<void> {
+export async function deleteRun(id: string, workspaceId?: string): Promise<void> {
   if (pgConfigured()) {
     try {
       const { sql } = await import("@vercel/postgres");
-      await sql`DELETE FROM qae2e_runs WHERE id = ${id}`;
+      if (workspaceId) await sql`DELETE FROM qae2e_runs WHERE id = ${id} AND workspace_id = ${workspaceId}`;
+      else await sql`DELETE FROM qae2e_runs WHERE id = ${id}`;
       return;
     } catch {
       // fall through

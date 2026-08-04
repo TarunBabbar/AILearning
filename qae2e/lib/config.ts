@@ -93,4 +93,45 @@ export function getConfig() {
   };
 }
 
+/**
+ * Config for a specific workspace: merges per-workspace connector secrets
+ * (workspace_secrets table) on top of the env-based config, so connector reads
+ * resolve the workspace's own credentials.
+ */
+export async function getWorkspaceConfig(workspaceId: string): Promise<AppConfig> {
+  const base = getConfig();
+  if (!workspaceId) return base;
+  try {
+    const { getWorkspaceSecrets } = await import("./db");
+    const secrets = await getWorkspaceSecrets(workspaceId);
+    return {
+      ...base,
+      jiraUrl: secrets.JIRA_URL || base.jiraUrl,
+      jiraEmail: secrets.JIRA_EMAIL || base.jiraEmail,
+      jiraApiToken: secrets.JIRA_API_TOKEN || base.jiraApiToken,
+      jiraProjectKey: secrets.JIRA_PROJECT_KEY || base.jiraProjectKey,
+      confluenceUrl: secrets.CONFLUENCE_URL || base.confluenceUrl,
+      confluenceEmail: secrets.CONFLUENCE_EMAIL || base.confluenceEmail,
+      confluenceApiToken: secrets.CONFLUENCE_API_TOKEN || base.confluenceApiToken,
+      figmaToken: secrets.FIGMA_TOKEN || base.figmaToken,
+      githubToken: secrets.GITHUB_TOKEN || base.githubToken,
+      githubOwner: secrets.GITHUB_OWNER || base.githubOwner,
+      githubRepo: secrets.GITHUB_REPO || base.githubRepo,
+      githubBranch: secrets.GITHUB_BRANCH || base.githubBranch,
+      zephyrBaseUrl: secrets.ZEPHYR_BASE_URL || base.zephyrBaseUrl,
+      zephyrToken: secrets.ZEPHYR_TOKEN || base.zephyrToken,
+      zephyrProjectKey: secrets.ZEPHYR_PROJECT_KEY || base.zephyrProjectKey,
+      testrailUrl: secrets.TESTRAIL_URL || base.testrailUrl,
+      testrailUser: secrets.TESTRAIL_USER || base.testrailUser,
+      testrailApiKey: secrets.TESTRAIL_API_KEY || base.testrailApiKey,
+      testrailRunId: secrets.TESTRAIL_RUN_ID || base.testrailRunId,
+      pineconeApiKey: secrets.PINECONE_API_KEY || base.pineconeApiKey,
+      pineconeIndex: secrets.PINECONE_INDEX || base.pineconeIndex,
+      pineconeHost: secrets.PINECONE_HOST || base.pineconeHost,
+    };
+  } catch {
+    return base;
+  }
+}
+
 export type AppConfig = ReturnType<typeof getConfig>;

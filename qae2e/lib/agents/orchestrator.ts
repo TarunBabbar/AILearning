@@ -2,7 +2,7 @@
 // confidence by chaining the specialist agents on a single traceability root.
 
 import { runAgent } from "./runner";
-import { insertOne, listAll } from "../store";
+import { insertOne, listAll, withWorkspace, currentWorkspace } from "../store";
 import { isRunnableAutomation } from "../exec/script-quality";
 import type { AgentEvent, Analysis, Coverage, Cycle, Defect, ReleaseReport, Requirement, Script } from "../types";
 import type { RunRecord } from "../runs/store";
@@ -19,6 +19,9 @@ export interface OrchestrationOptions {
   content?: string; // requirement text (persisted before the chain starts)
   // Start the chain from this agent index (for step-by-step / resume).
   startFrom?: number;
+  // Workspace the run belongs to. When set, the whole chain runs inside
+  // withWorkspace() so every tool/store call is scoped to it.
+  workspaceId?: string;
   // Optional user-provided values collected up front (intake form). Applied as
   // process.env overrides for the duration of the run so the agent tools can
   // use them. Keys are env var names (e.g. "GITHUB_TOKEN", "GITHUB_OWNER").
@@ -37,9 +40,20 @@ export async function orchestrate(
   emit: (e: AgentEvent) => void,
   opts: OrchestrationOptions = {}
 ): Promise<OrchestrationResult> {
+  // Scope the whole run to the workspace (if provided) so every store call
+  // made by tool handlers resolves the correct workspace.
+  const run = () => orchestrateInner(requirementId, emit, opts);
+  return opts.workspaceId ? withWorkspace(opts.workspaceId, run) : run();
+}
+
+async function orchestrateInner(
+  requirementId: string,
+  emit: (e: AgentEvent) => void,
+  opts: OrchestrationOptions
+): Promise<OrchestrationResult> {
   // Persist the traceability root up front so every agent's tools can load it.
   if (opts.content != null) {
-    const existing = listAll<Requirement>("requirements").find((r) => r.id === requirementId);
+    const existing = (await listAll<Requirement>("requirements")).find((r) => r.id === requirementId);
     if (!existing) {
       const req: Requirement = {
         id: requirementId,
@@ -49,7 +63,7 @@ export async function orchestrate(
         content: String(opts.content),
         createdAt: new Date().toISOString(),
       };
-      insertOne("requirements", req);
+      await insertOne("requirements", req);
       emit({ type: "artifact", agentId: "orchestrator", artifact: "requirement", id: requirementId });
     }
   }
@@ -62,6 +76,24 @@ export async function orchestrate(
         overrides[k] = process.env[k];
         process.env[k] = v;
       }
+    }
+  }
+  // Merge per-workspace connector secrets so agent-time connector calls
+  // (jira_fetch_issue / confluence_fetch_page / figma_fetch_file during RI)
+  // resolve the workspace's own credentials.
+  const ws = currentWorkspace();
+  if (ws && ws !== "default") {
+    try {
+      const { getWorkspaceSecrets } = await import("../db");
+      const secrets = await getWorkspaceSecrets(ws);
+      for (const [k, v] of Object.entries(secrets)) {
+        if (v && !overrides[k]) {
+          overrides[k] = process.env[k];
+          process.env[k] = v;
+        }
+      }
+    } catch {
+      // ignore — env fallback stays
     }
   }
   const restore = () => {
@@ -160,7 +192,7 @@ export async function orchestrate(
       if (step.id === "automation-script") {
         if (opts.signal?.aborted) break;
 
-        let script = listAll<Script>("scripts")
+        let script = (await listAll<Script>("scripts"))
           .filter((s) => s.requirementId === requirementId)
           .pop();
         if (script && !isRunnableAutomation(script.files).ok) {
@@ -200,19 +232,19 @@ Do NOT call script_save. Do not return prose only.`,
               message: "AS retry failed — trying deterministic fallback scripts from coverage…",
             });
           }
-          script = listAll<Script>("scripts")
+          script = (await listAll<Script>("scripts"))
             .filter((s) => s.requirementId === requirementId)
             .pop();
           if (script && !isRunnableAutomation(script.files).ok) script = undefined;
         }
 
         if ((!script || !script.files.length) && !opts.signal?.aborted) {
-          const coverage = listAll<Coverage>("coverages")
+          const coverage = (await listAll<Coverage>("coverages"))
             .filter((c) => c.requirementId === requirementId)
             .pop();
           if (coverage?.testCases?.length) {
             const { saveFallbackScripts } = await import("../exec/fallback-scripts");
-            script = saveFallbackScripts(requirementId, coverage);
+            script = await saveFallbackScripts(requirementId, coverage);
             emit({
               type: "status",
               agentId: "pipeline",
@@ -321,7 +353,7 @@ Do NOT call script_save. Do not return prose only.`,
                 executions,
                 createdAt: new Date().toISOString(),
               };
-              insertOne("cycles", cycle);
+              await insertOne("cycles", cycle);
               createdCycleId = cycle.id;
               emit({ type: "artifact", agentId: "pipeline", artifact: "cycle", id: cycle.id });
             }
@@ -341,7 +373,7 @@ Do NOT call script_save. Do not return prose only.`,
 
       // After EX runs, capture the cycle it created so DO uses the real id.
       if (step.id === "execution-defect") {
-        const cycle = listAll<Cycle>("cycles")
+        const cycle = (await listAll<Cycle>("cycles"))
           .filter((c) => c.requirementId === requirementId)
           .pop();
         if (cycle) {
@@ -369,13 +401,13 @@ async function saveRunRecord(
 ): Promise<void> {
   try {
     const runs = await import("../runs/store");
-    const { listAll } = await import("../store");
 
-    const req = listAll<Requirement>("requirements").find((r) => r.id === requirementId);
-    const coverage = listAll<Coverage>("coverages").filter((c) => c.requirementId === requirementId).pop();
-    const script = listAll<Script>("scripts").filter((s) => s.requirementId === requirementId).pop();
-    const defects = listAll<Defect>("defects").filter((d) => d.requirementId === requirementId);
-    const releases = listAll<ReleaseReport>("releases").filter((r) => r.requirementId === requirementId);
+    const req = (await listAll<Requirement>("requirements")).find((r) => r.id === requirementId);
+    const coverage = (await listAll<Coverage>("coverages")).filter((c) => c.requirementId === requirementId).pop();
+    const script = (await listAll<Script>("scripts")).filter((s) => s.requirementId === requirementId).pop();
+    const defects = (await listAll<Defect>("defects")).filter((d) => d.requirementId === requirementId);
+    const releases = (await listAll<ReleaseReport>("releases")).filter((r) => r.requirementId === requirementId);
+    const analyses = await listAll<Analysis>("analyses");
 
     const agentMap = new Map<string, { code: string; name: string; status: "done" | "error" | "skipped" | "running"; index: number; total: number }>();
     for (const e of events as Array<Record<string, unknown>>) {
@@ -409,7 +441,7 @@ async function saveRunRecord(
       status: sawError ? "failed" : defects.length > 0 ? "partial" : "success",
       agents,
       counts: {
-        analyses: listAll<Analysis>("analyses").filter((a) => a.requirementId === requirementId).length,
+        analyses: analyses.filter((a) => a.requirementId === requirementId).length,
         coverages: coverage ? 1 : 0,
         testCases: coverage?.testCases.length || 0,
         scripts: script?.files.length || 0,
@@ -422,7 +454,7 @@ async function saveRunRecord(
       issues,
       testRun,
     };
-    await runs.saveRun(record);
+    await runs.saveRun(record, currentWorkspace());
   } catch (err) {
     console.error("Failed to save run record:", err);
   }

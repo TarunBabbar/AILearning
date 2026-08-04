@@ -4,15 +4,16 @@ import { buildRunZip } from "@/lib/runs/bundle";
 
 export const runtime = "nodejs";
 
-// GET /api/runs              → list saved runs (newest first)
-// GET /api/runs?id=...       → one run's full record
-// GET /api/runs?id=...&download=1 → ZIP bundle (code + logs + results)
+// GET /api/runs?workspaceId=...        → list saved runs for a workspace (newest first)
+// GET /api/runs?id=...&workspaceId=...  → one run's full record
+// GET /api/runs?id=...&workspaceId=...&download=1 → ZIP bundle (code + logs + results)
 export async function GET(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const id = sp.get("id");
+  const workspaceId = sp.get("workspaceId") || undefined;
 
   if (id) {
-    const run = await getRun(id);
+    const run = await getRun(id, workspaceId);
     if (!run) return Response.json({ ok: false, error: "Run not found" }, { status: 404 });
     if (sp.get("download")) {
       const zip = await buildRunZip(run);
@@ -28,6 +29,6 @@ export async function GET(req: NextRequest) {
   }
 
   const limit = Math.min(Number(sp.get("limit") || 50), 200);
-  const runs = await listRuns(limit);
+  const runs = await listRuns(limit, workspaceId);
   return Response.json({ ok: true, runs });
 }

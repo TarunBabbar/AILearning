@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Loader2, Plug, XCircle } from "lucide-react";
 
-export function ConnectorsPanel() {
+export function ConnectorsPanel({ workspaceId = "" }: { workspaceId?: string }) {
   const [statuses, setStatuses] = useState<ConnectorStatus[] | null>(null);
   const [selected, setSelected] = useState<ConnectorId | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -17,11 +17,11 @@ export function ConnectorsPanel() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch("/api/connectors")
+    fetch(`/api/connectors?workspaceId=${encodeURIComponent(workspaceId)}`)
       .then((r) => r.json())
       .then((d) => setStatuses(d.connectors))
       .catch(() => setStatuses([]));
-  }, []);
+  }, [workspaceId]);
 
   const def = useMemo(() => CONNECTORS.find((c) => c.id === selected) || null, [selected]);
   const statusFor = (id: ConnectorId) => statuses?.find((s) => s.id === id);
@@ -33,7 +33,7 @@ export function ConnectorsPanel() {
       const res = await fetch("/api/connectors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "test", connector: selected, fields: values }),
+        body: JSON.stringify({ action: "test", connector: selected, fields: values, workspaceId }),
       });
       const d = await res.json();
       setTestResult({ ok: d.ok, detail: d.detail || "Test complete" });
@@ -50,7 +50,7 @@ export function ConnectorsPanel() {
       await fetch("/api/connectors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save", connector: selected, fields: values }),
+        body: JSON.stringify({ action: "save", connector: selected, fields: values, workspaceId }),
       });
       setSaved(true);
     } catch {

@@ -35,11 +35,11 @@ function extractJson(text: string): Record<string, unknown> | null {
  * Best-effort persistence of the final structured JSON each agent produces.
  * `requirementId` is injected when the model omits it (common for free models).
  */
-export function maybePersistArtifact(
+export async function maybePersistArtifact(
   agentId: AgentId,
   text: string,
   requirementId?: string
-): PersistedArtifact | null {
+): Promise<PersistedArtifact | null> {
   const parsed = extractJson(text);
   if (!parsed) return null;
   const rid = String(parsed.requirementId || requirementId || "");
@@ -58,7 +58,7 @@ export function maybePersistArtifact(
       missingInfo: (parsed.missingInfo as string[]) || [],
       createdAt: new Date().toISOString(),
     };
-    insertOne("analyses", a);
+    await insertOne("analyses", a);
     return { type: "analysis", id: a.id };
   }
 
@@ -71,15 +71,14 @@ export function maybePersistArtifact(
       testCases: (parsed.testCases as Coverage["testCases"]) || [],
       createdAt: new Date().toISOString(),
     };
-    insertOne("coverages", c);
+    await insertOne("coverages", c);
     return { type: "coverage", id: c.id };
   }
 
   if (agentId === "automation-script" && Array.isArray(parsed.files)) {
     const requirementIdFinal = rid;
-    const coverage = listAll<Coverage>("coverages")
-      .filter((c) => c.requirementId === requirementIdFinal)
-      .pop();
+    const covs = await listAll<Coverage>("coverages");
+    const coverage = covs.filter((c) => c.requirementId === requirementIdFinal).pop();
     const s: Script = {
       id: crypto.randomUUID(),
       requirementId: requirementIdFinal,
@@ -89,7 +88,7 @@ export function maybePersistArtifact(
       files: (parsed.files as Script["files"]) || [],
       createdAt: new Date().toISOString(),
     };
-    insertOne("scripts", s);
+    await insertOne("scripts", s);
     return { type: "script", id: s.id };
   }
 
@@ -107,7 +106,7 @@ export function maybePersistArtifact(
       recommendations: (parsed.recommendations as string[]) || [],
       createdAt: new Date().toISOString(),
     };
-    insertOne("releases", r);
+    await insertOne("releases", r);
     return { type: "release", id: r.id };
   }
 
