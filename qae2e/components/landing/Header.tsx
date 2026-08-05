@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { SignOutButton } from "./SignOutButton";
 import { getSessionUser } from "@/lib/auth/session";
 
 export async function Header() {
@@ -26,9 +27,7 @@ export async function Header() {
         {user ? (
           <div className="flex items-center gap-2">
             {user.name && <span className="text-sm text-text-secondary hidden sm:inline">{user.name}</span>}
-            <Button href="/workspaces" className="min-h-9 px-4">
-              My workspaces <ArrowRight size={15} />
-            </Button>
+            <SignOutButton />
           </div>
         ) : (
           <Button href="/login" className="min-h-9 px-4">
