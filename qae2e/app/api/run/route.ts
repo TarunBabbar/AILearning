@@ -9,7 +9,8 @@ import { listAll, withWorkspace } from "@/lib/store";
 import type { Script } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 600;
+// Hobby plan caps serverless functions at 300s (5 min).
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
