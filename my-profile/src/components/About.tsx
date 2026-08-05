@@ -3,6 +3,9 @@
 import { motion } from "framer-motion";
 
 const highlights = [
+  "Service & Product Org Leadership",
+  "0 → 100% Automation Adoption",
+  "AI QA Transformation",
   "Selenium WebDriver & Playwright",
   "RAG & Vector DBs (ChromaDB, Pinecone)",
   "Multi-Agent Orchestration (LangGraph)",
@@ -11,6 +14,7 @@ const highlights = [
   "C#, TypeScript, Python",
   "BDD / SpecFlow / Cucumber",
   "CI/CD & Quality Gates",
+  "Framework Architecture & Mentorship",
 ];
 
 export default function About() {
@@ -31,18 +35,22 @@ export default function About() {
               Architect of Quality.<br />Builder of AI Systems.
             </h2>
             <p className="text-text-secondary leading-relaxed mb-4">
-              I design and build test automation frameworks that merge classical QA
-              engineering with modern AI — RAG pipelines, multi-agent orchestration,
-              vector databases, and LLM-driven test generation. From Selenium to
-              Playwright, from C# to TypeScript to Python, I ship frameworks that
-              teams actually want to use.
+              I lead quality engineering across both{" "}
+              <strong className="text-text">service-based</strong> and{" "}
+              <strong className="text-text">product-based</strong> organisations,
+              architecting test automation and AI-augmented quality programs that
+              scale with the business. I&apos;ve taken teams from{" "}
+              <strong className="text-text">no automation to 100% automation
+              adoption</strong> — building the frameworks, CI/CD pipelines, and
+              engineering culture to make it stick.
             </p>
             <p className="text-text-secondary leading-relaxed">
-              Currently building an{" "}
-              <strong className="text-text">AI Test Copilot</strong> — a LangGraph
-              multi-agent system that generates test cases from PRDs, selects
-              regression suites via semantic search, migrates frameworks
-              automatically, and executes tests in sandboxed containers.
+              Today I drive <strong className="text-text">AI in Quality
+              Engineering</strong> — LLM-driven test generation, RAG pipelines,
+              multi-agent orchestration, and vector databases that turn QA from a
+              bottleneck into an accelerator. From Selenium to Playwright, from C#
+              to TypeScript to Python, I ship frameworks teams actually want to
+              use — and mentor the engineers who run them.
             </p>
           </motion.div>
 

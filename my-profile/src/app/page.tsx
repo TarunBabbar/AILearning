@@ -1,7 +1,6 @@
 import Hero from "@/components/Hero";
 import Header from "@/components/Header";
 import About from "@/components/About";
-import CurrentlyBuilding from "@/components/CurrentlyBuilding";
 import Projects from "@/components/Projects";
 import Skills from "@/components/Skills";
 import Career from "@/components/Career";
@@ -14,7 +13,6 @@ export default function Home() {
       <Header />
       <Hero />
       <About />
-      <CurrentlyBuilding />
       <Projects />
       <Skills />
       <Career />

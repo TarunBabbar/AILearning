@@ -46,9 +46,14 @@ export default function Contact() {
             Let&apos;s Build Something
           </h2>
           <p className="text-text-secondary mb-10 leading-relaxed">
-            Looking for an architect who understands both test automation and AI?
+            I help organisations make quality an accelerator — taking teams from no
+            automation to full AI-powered quality engineering.
             <br />
-            Open to Lead / Architect roles in AI-powered QA.
+            <strong className="text-text">
+              Open to Lead / Architect roles in AI-powered QA and Test Automation.
+            </strong>
+            <br />
+            Let&apos;s talk about your quality roadmap — reach out below.
           </p>
         </motion.div>
 

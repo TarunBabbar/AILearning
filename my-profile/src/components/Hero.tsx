@@ -13,10 +13,10 @@ const stagger = {
 
 const stats = [
   { num: "18+", label: "Years in QA Engineering" },
-  { num: "6", label: "AI Platforms Built" },
+  { num: "8", label: "AI Platforms Built" },
   { num: "100%", label: "Automation Adoption" },
   { num: "~40%", label: "Prod Defect Reduction" },
-  { num: "3", label: "Enterprise Frameworks Built" },
+  { num: "10", label: "Projects Built" },
 ];
 
 export default function Hero() {
@@ -56,7 +56,7 @@ export default function Hero() {
               className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-700 text-xs font-semibold px-4 py-1.5 rounded-full mb-6 tracking-wide"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Available for opportunities
+              Open to AI / Test Architect roles
             </motion.div>
 
             <motion.h1
@@ -77,7 +77,8 @@ export default function Hero() {
               automation frameworks (Selenium, Playwright, C#.NET, TypeScript)
               across UI, API, database, and E2E. Designed a skills-based AI
               automation framework fusing classical test automation with RAG,
-              MCP, and Vector DBs. Currently architecting an AI Test Copilot.
+              MCP, and Vector DBs. Built 8+ AI platforms and agentic QA systems —
+              from RAG pipelines to multi-agent test copilots.
             </motion.p>
 
             <motion.div variants={fadeUp} className="flex flex-wrap gap-3 items-center">

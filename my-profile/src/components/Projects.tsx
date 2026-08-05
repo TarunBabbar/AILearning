@@ -4,6 +4,27 @@ import { motion } from "framer-motion";
 
 const projects = [
   {
+    title: "QAE2E — Agentic Quality Engineering",
+    desc: "End-to-end agentic QA platform: 6 specialist agents (RI → MT → AS → EX → DO → IQ) turn a requirement into analysis, editable coverage, Playwright automation, Docker-executed evidence, and release-confidence intelligence. Connects Jira, Confluence, Figma, GitHub, Zephyr, TestRail, and ships a real MCP server.",
+    tech: ["Next.js 15", "OpenRouter", "Vercel Postgres", "Pinecone", "MCP", "Docker"],
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qae2e",
+    demo: "https://qae2e.vercel.app",
+  },
+  {
+    title: "QA AI Dashboard",
+    desc: "Unified platform: resume-job matcher (LLM-scored), QA interview prep RAG chat, test case generator from PRDs, AI learning tutor, document Q&A.",
+    tech: ["Next.js 15", "Neon PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qadashboard",
+    demo: "https://qadashboard-lime.vercel.app",
+  },
+  {
+    title: "QA Interview Preparation Kit",
+    desc: "RAG-powered interview prep: PDF/DOCX knowledge base indexed into Pinecone, streaming QA assistant with grounded citations, and topic-organized Q&A browser.",
+    tech: ["Next.js 14", "OpenRouter", "Pinecone", "Tailwind"],
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit",
+    demo: "https://qa-interview-preparation.vercel.app",
+  },
+  {
     title: "QA RAG Platform",
     desc: "Upload documents, ask AI-powered questions with grounded citations. Supports PDF/DOCX/TXT/MD, smart chunking, configurable embeddings, Pinecone vector search.",
     tech: ["Next.js 14", "OpenRouter", "Pinecone", "Mammoth", "Tailwind"],
@@ -11,11 +32,11 @@ const projects = [
     demo: "https://qaragplatform.vercel.app",
   },
   {
-    title: "QA AI Dashboard",
-    desc: "Unified platform: resume-job matcher (LLM-scored), QA interview prep RAG chat, test case generator from PRDs, AI learning tutor, document Q&A.",
-    tech: ["Next.js 15", "Neon PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
-    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qadashboard",
-    demo: null,
+    title: "RAG Explorer",
+    desc: "Transparent 3-panel RAG pipeline visualizer. Ingest PDFs/DOCX, watch chunking → embedding → ChromaDB storage → vector search → LLM answer via SSE.",
+    tech: ["React", "Vite", "ChromaDB", "OpenRouter"],
+    repo: "https://github.com/TarunBabbar/chroma-react-rag-pipeline",
+    demo: "https://rag-explorer.vercel.app",
   },
   {
     title: "AI Test Architect (QA Copilot)",
@@ -29,13 +50,6 @@ const projects = [
     desc: "Full-stack RAG pipeline for QA job seekers. Upload resume → AI profile extraction → multi-source job search → eligibility filtering → LLM-ranked matches.",
     tech: ["React", "Express", "ChromaDB", "OpenRouter"],
     repo: "https://github.com/TarunBabbar/resume-job-rag",
-    demo: null,
-  },
-  {
-    title: "RAG Explorer",
-    desc: "Transparent 3-panel RAG pipeline visualizer. Ingest PDFs/DOCX, watch chunking → embedding → ChromaDB storage → vector search → LLM answer via SSE.",
-    tech: ["React", "Vite", "ChromaDB", "OpenRouter"],
-    repo: "https://github.com/TarunBabbar/chroma-react-rag-pipeline",
     demo: null,
   },
   {
