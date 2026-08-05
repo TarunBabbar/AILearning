@@ -15,6 +15,8 @@ export interface RunRecord {
   startedAt: string;
   finishedAt: string;
   status: "success" | "partial" | "failed" | "stopped";
+  // Owning workspace (personal workspaces → user-scoped history).
+  workspaceId?: string;
   // Per-agent status for the summary.
   agents: Array<{ code: string; name: string; status: "done" | "error" | "skipped" | "running"; index: number; total: number }>;
   counts: {
@@ -110,13 +112,18 @@ export async function saveRun(record: RunRecord, workspaceId = "default"): Promi
   writeFileSync(file, JSON.stringify(runs.slice(0, 50), null, 2), "utf-8");
 }
 
-export async function listRuns(limit = 50, workspaceId?: string): Promise<RunRecord[]> {
+export async function listRuns(limit = 50, workspaceIds?: string[] | string): Promise<RunRecord[]> {
+  const ids = workspaceIds
+    ? (Array.isArray(workspaceIds) ? workspaceIds : [workspaceIds]).filter(Boolean)
+    : [];
   if (pgConfigured()) {
     try {
       await pgRunTable();
       const { sql } = await import("@vercel/postgres");
-      const rows = workspaceId
-        ? await sql`SELECT data FROM qae2e_runs WHERE workspace_id = ${workspaceId} ORDER BY started_at DESC LIMIT ${limit}`
+      // Cast the array to a text[] literal to satisfy the typed sql helper.
+      const idsLit = `{${ids.map((i) => `"${i.replace(/"/g, '\\"')}"`).join(",")}}`;
+      const rows = ids.length
+        ? await sql`SELECT data FROM qae2e_runs WHERE workspace_id = ANY(${idsLit}::text[]) ORDER BY started_at DESC LIMIT ${limit}`
         : await sql`SELECT data FROM qae2e_runs ORDER BY started_at DESC LIMIT ${limit}`;
       return (rows.rows || []).map((r) => r.data as RunRecord);
     } catch {
@@ -127,7 +134,11 @@ export async function listRuns(limit = 50, workspaceId?: string): Promise<RunRec
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
     const runs = JSON.parse(readFileSync(join(process.cwd(), runsFile()), "utf-8"));
-    return Array.isArray(runs) ? runs.slice(0, limit) : [];
+    const arr: RunRecord[] = Array.isArray(runs) ? runs : [];
+    const filtered = ids.length
+      ? arr.filter((r) => ids.includes(String((r as unknown as { workspaceId?: string }).workspaceId || "default")))
+      : arr;
+    return filtered.slice(0, limit);
   } catch {
     return [];
   }

@@ -412,11 +412,17 @@ export function WorkspacePageInner() {
             QAE2E
           </Link>
           <span className="text-sm text-text-muted hidden md:inline">Quality workspace</span>
-          <div className="ml-auto flex items-center gap-2">
-            <Link href="/" className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted hover:text-amber-700 px-2 py-1.5 rounded-md transition-colors">
+          <div className="ml-auto flex items-center gap-2.5">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
+            >
               <Sparkles size={14} /> Home
             </Link>
-            <Link href={`/history?workspaceId=${encodeURIComponent(workspaceId)}`} className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted hover:text-amber-700 px-2 py-1.5 rounded-md transition-colors">
+            <Link
+              href={`/history?workspaceId=${encodeURIComponent(workspaceId)}`}
+              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
+            >
               <History size={14} /> History
             </Link>
             {running ? (

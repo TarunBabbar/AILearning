@@ -453,7 +453,10 @@ async function saveRunRecord(
       events,
       issues,
       testRun,
-    };
+      // Carry the owning workspace on the record so the JSON-fallback filter
+      // (which reads record.workspaceId) is user-scoped too.
+      workspaceId: currentWorkspace(),
+    } as RunRecord;
     await runs.saveRun(record, currentWorkspace());
   } catch (err) {
     console.error("Failed to save run record:", err);

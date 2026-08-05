@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "./SignOutButton";
 import { getSessionUser } from "@/lib/auth/session";
 
+// Single shared header-button look, matching the Sign In button (amber primary).
+const headerBtn =
+  "inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors";
+
 export async function Header() {
   const user = await getSessionUser();
 
@@ -16,17 +20,21 @@ export async function Header() {
           </span>
           QAE2E
         </Link>
-        <nav className="hidden md:flex items-center gap-8 text-sm text-text-secondary">
-          <Link href="/#flow" className="hover:text-amber-700 transition-colors">The flow</Link>
-          <Link href="/#agents" className="hover:text-amber-700 transition-colors">AI agents</Link>
-          <Link href="/#integrations" className="hover:text-amber-700 transition-colors">Integrations</Link>
+        <nav className="hidden md:flex items-center gap-2.5">
+          <Link href="/#flow" className={headerBtn}>The flow</Link>
+          <Link href="/#agents" className={headerBtn}>AI agents</Link>
+          <Link href="/#integrations" className={headerBtn}>Integrations</Link>
           {user && (
-            <Link href="/workspaces" className="hover:text-amber-700 transition-colors">My workspaces</Link>
+            <Link href="/workspaces" className={headerBtn}>My workspaces</Link>
           )}
         </nav>
         {user ? (
-          <div className="flex items-center gap-2">
-            {user.name && <span className="text-sm text-text-secondary hidden sm:inline">{user.name}</span>}
+          <div className="flex items-center gap-2.5">
+            {user.name && (
+              <span className="inline-flex items-center min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm">
+                {user.name}
+              </span>
+            )}
             <SignOutButton />
           </div>
         ) : (

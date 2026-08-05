@@ -30,20 +30,32 @@ Start
  (source)       (RI agent)      (MT agent)      (AS agent)      (EX + DO)      (IQ agent)
 ```
 
-Each step has an agent and a tool. Everything you create is saved locally in `data/artifacts.json`.
+Each step has an agent and a tool. Everything you create is scoped to your **workspace** and saved to
+**Vercel Postgres** (`artifacts` table) when `POSTGRES_*` is configured, else `data/db.json` for dev.
 
 ---
 
-## 3 · Start here: open the workspace
+## 3 · Start here: sign in, then open a workspace
 
 ```
-http://localhost:3001          → Landing page (hero, flow, 6 agent cards, integrations)
+http://localhost:3001            → Landing page (hero, flow, 6 agent cards, integrations)
    │
-   ▼  click "Open the workspace" (header, hero, or CTA panel)
-http://localhost:3001/workspace → The 6-step pipeline screen
+   ▼  click "Get started" / "Sign in"
+http://localhost:3001/signup     → Create an account (auto-login; NO default workspace)
+   │
+   ▼  you land on
+http://localhost:3001/workspaces → Your workspaces dashboard
+   │
+   ├─ "Create workspace" (name it, e.g. "Mobile App QA")
+   │
+   ▼  click "Open" on a workspace
+http://localhost:3001/workspace?workspaceId=<id> → The 6-step pipeline screen
 ```
 
 You are now at **step ① Connect** — the requirement capture card.
+
+> **Run history is user-scoped** — `/history` (and the Run history panel) shows only runs from your own
+> workspaces.
 
 ---
 
@@ -225,7 +237,7 @@ All 8 tools use the **same handlers** as the web UI — call them from the works
 ## 11 · Where everything is saved (recap)
 
 ```
-data/artifacts.json
+Vercel Postgres (artifacts table)  ← when POSTGRES_* configured
 ├── requirements[]   ← step ①  (requirement_save)
 ├── analyses[]       ← step ②  (Requirement Intelligence)
 ├── coverages[]      ← step ③  (coverage_save, editable via UI)
@@ -233,6 +245,9 @@ data/artifacts.json
 ├── cycles[]         ← step ⑤  (cycle_create + execution_record)
 ├── defects[]        ← step ⑤  (defect_create)
 └── releases[]       ← step ⑥  (release_confidence)
+
+Dev fallback (no DB): data/db.json  ·  Runs: qae2e_runs table / data/runs.json
+All rows carry a workspace_id → your data is scoped to your workspaces.
 ```
 
 Every artifact carries the shared `requirementId` — that's the **traceability chain** you see in the
@@ -244,11 +259,12 @@ right rail (Requirement → Analysis → Coverage → Automation → Execution �
 
 | Want | API call |
 |------|----------|
-| All artifacts | `GET /api/artifacts` |
-| One type | `GET /api/artifacts?type=coverage` |
-| One item | `GET /api/artifacts?type=analysis&id=<id>` |
-| One requirement's whole chain | `GET /api/artifacts?requirementId=<id>` |
-| Edit an artifact (e.g. coverage) | `PUT /api/artifacts` `{type, id, payload}` |
+| All artifacts (current workspace) | `GET /api/artifacts?workspaceId=<id>` |
+| One type | `GET /api/artifacts?type=coverage&workspaceId=<id>` |
+| One item | `GET /api/artifacts?type=analysis&id=<id>&workspaceId=<id>` |
+| One requirement's whole chain | `GET /api/artifacts?requirementId=<id>&workspaceId=<id>` |
+| Edit an artifact (e.g. coverage) | `PUT /api/artifacts` `{type, id, payload, workspaceId}` |
+| Your run history | `GET /api/runs` (authenticated; user-scoped) |
 
 ---
 

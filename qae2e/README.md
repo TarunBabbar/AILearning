@@ -148,17 +148,22 @@ The app ships a **real MCP server** (`@modelcontextprotocol/sdk`) over Streamabl
 
 ## Where things are saved
 
-- **Store:** `data/artifacts.json` (gitignored). JSON file per artifact type; in-memory Maps fallback if the
-  filesystem is read-only (e.g. serverless).
-- **Run history:** every pipeline run (events, generated code, test results) is saved to **Vercel
-  Postgres** (`qae2e_runs` table) when `POSTGRES_URL` is set, else `data/runs.json` locally. Downloadable
-  as a ZIP from the Run history panel — retrievable even without a GitHub connection.
+- **Store:** artifacts (requirements, analyses, coverages, scripts, cycles, defects, releases, exports,
+  uploads, extractions) live in **Vercel Postgres** — the `artifacts` table (`workspace_id` + `kind`
+  columns, JSONB bodies) — when `POSTGRES_*` is configured. Without a DB (local dev) they fall back to
+  `data/db.json`.
+- **Users / sessions / workspaces:** `users`, `sessions`, `workspaces` tables (or `data/db.json` in dev).
+- **Connector credentials:** per-workspace in the `workspace_secrets` table (not `.env`).
+- **Run history:** every pipeline run is saved to **Vercel Postgres** (`qae2e_runs` table, `workspace_id`
+  scoped) when `POSTGRES_*` is set, else `data/runs.json` locally. History is **user-scoped** — you only
+  see runs from your own workspaces. Downloadable as a ZIP from the Run history panel.
 - **Traceability:** every artifact stores the shared `requirementId` → requirement → analysis → coverage →
   scripts → cycle/executions → defects → release report.
-- **API:** `GET /api/artifacts` (list by type or by `requirementId`), `PUT /api/artifacts` (edit, e.g. edited
-  coverage).
+- **API:** `GET /api/artifacts?workspaceId=...` (list by type or by `requirementId`), `PUT /api/artifacts`
+  (edit, e.g. edited coverage).
 - **Exports:** `GET /api/export?coverageId=...&format=csv|xlsx` → downloadable file.
-- **Connectors:** `GET /api/connectors` (status), `POST /api/connectors` (test / save credentials to `.env`).
+- **Connectors:** `GET /api/connectors?workspaceId=...` (status), `POST /api/connectors` (test / save
+  credentials per-workspace).
 - **RAG:** Pinecone free-serverless index (upsert/query) + free local embeddings — used only when
   `PINECONE_API_KEY` / `PINECONE_INDEX` are set.
 
@@ -167,17 +172,22 @@ The app ships a **real MCP server** (`@modelcontextprotocol/sdk`) over Streamabl
 **Built so far (~90% of the vision)**
 
 - ✅ Web landing + workspace UI (Claude-like beige theme)
+- ✅ **User accounts + workspaces** — self-contained email/password auth (scrypt + httpOnly session),
+  `/signup` `/login` `/workspaces` dashboard, personal single-owner workspaces, session persisted across
+  all screens
 - ✅ Real OpenRouter agent loop with tool-calling (`:free` models only)
 - ✅ 6-agent orchestrated pipeline (RI → MT → AS → EX → DO → IQ)
-- ✅ Artifact persistence to `data/artifacts.json`, editable coverage, script viewer, release gauge
+- ✅ **Postgres-backed storage** — artifacts, users, sessions, workspaces, runs, and connector secrets in
+  Vercel Postgres (`@vercel/postgres`, JSONB + `CREATE TABLE IF NOT EXISTS`) with a `data/db.json`
+  fallback for dev; workspace-scoped writes via `withWorkspace(ws, fn)` context
 - ✅ Real MCP server exposing 27 tools at `/api/mcp/sse`
 - ✅ Manual paste → AI analysis → editable coverage → **server-side Playwright POM** → Docker run →
   real cycle/defects → release gauge
 - ✅ **Connector layer** — Jira, Confluence, Figma, GitHub, Zephyr, TestRail REST clients (`lib/connectors/`)
 - ✅ **Connector wizard UI** — `ConnectorsPanel` in the workspace right rail; shows configured/missing
-  credentials, tests connections, saves to `.env`
-- ✅ **RAG pipeline** — free local embeddings (transformers.js) + Pinecone free-serverless client; MT
-  agent calls `cases_search` before generating (dedupe)
+  credentials, tests connections, saves per-workspace (`workspace_secrets`)
+- ✅ **User-scoped run history** — `/api/runs` returns only the authenticated user's workspaces' runs;
+  `/history` page with filters, search, and per-run ZIP download
 - ✅ **Export** — CSV/XLSX download from the coverage editor
 - ✅ **Publish tools** — `zephyr_publish`, `testrail_publish` MCP tools
 - ✅ **GitHub check-in flow** — read framework tree (`github_get_tree`), create branch, multi-file commit
@@ -240,10 +250,28 @@ cp .env.example .env   # then add your OPENROUTER_API_KEY (required) and connect
 npm run dev            # http://localhost:3001 (Next.js may pick 3001 if 3000 is taken)
 ```
 
-Open **http://localhost:3001** → landing page → **Open the workspace** → in the **Connectors** panel
-(right rail) configure any external tools → paste a requirement (or connect Jira/Confluence/Figma) →
-**Run the 6-agent pipeline**. Watch the live agent activity stream, edit coverage, export CSV/XLSX,
-publish to Zephyr/TestRail, and see the release-confidence gauge.
+Open **http://localhost:3001** → landing page → **Get started / Sign in** → create an account (signup
+auto-creates a session; no default workspace) → **create a workspace** → open it → paste a requirement
+(or connect Jira/Confluence/Figma) → **Run pipeline**. Watch the live agent activity stream, edit
+coverage, export CSV/XLSX, publish to Zephyr/TestRail, and see the release-confidence gauge. Run history
+is scoped to your account (only runs from your workspaces).
+
+### User accounts & workspaces
+
+- **Auth:** self-contained email + password (scrypt-hashed, httpOnly session cookie). `/signup`, `/login`,
+  `/workspaces` (dashboard), Sign out in the header.
+- **Workspaces:** personal (single-owner). Create as many as you like from the dashboard; every artifact,
+  run, and connector credential is scoped to the workspace you're in.
+- **Persistence:** artifacts/runs/secrets live in **Vercel Postgres** (`@vercel/postgres`) when
+  `POSTGRES_*` is configured; otherwise they fall back to local JSON (`data/db.json`) for dev.
+- **Connector credentials** are saved per-workspace in the DB (`workspace_secrets`), not to `.env`.
+
+### Hosting on Vercel
+
+- Import the repo, set **Root Directory** to `qae2e` (Next.js preset auto-detected).
+- Add `OPENROUTER_API_KEY`; connect **Vercel Postgres** (Storage → Create Database → Postgres →
+  Connect to Project) so `POSTGRES_*` is injected and data persists. Tables are created automatically.
+- Hobby plan caps serverless functions at **300s** — routes already respect this (`maxDuration = 300`).
 
 **MCP smoke test** (requires the dev server running):
 
@@ -285,8 +313,9 @@ npm test                       # 4. run the tests (or: npx playwright test --pro
 |----------|---------|---------|
 | `OPENROUTER_API_KEY` | — | **Required.** OpenRouter key for agent calls. |
 | `LLM_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | **Free model only.** A model without `:free` is refused at runtime. |
-| `DATA_DIR` | `data` | Where artifacts persist (gitignored). |
+| `DATA_DIR` | `data` | Where the dev JSON fallback persists (`data/db.json`). |
 | `NEXT_PUBLIC_APP_NAME` | `QAE2E Agentic Quality Engineering` | App name shown in UI/headers. |
+| `POSTGRES_URL` (or `POSTGRES_*`) | — | **Vercel Postgres** connection. When set, all data lives in Postgres; otherwise dev JSON fallback. |
 | `JIRA_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN` | — | Jira connector (Cloud). |
 | `CONFLUENCE_URL` / `CONFLUENCE_EMAIL` / `CONFLUENCE_API_TOKEN` | — | Confluence connector (Cloud). |
 | `FIGMA_TOKEN` | — | Figma connector (personal access token). |
@@ -307,7 +336,7 @@ npm test                       # 4. run the tests (or: npx playwright test --pro
 > `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`. See `.env.example` for the full annotated list.
 
 > **Credentials are surfaced, never hardcoded:** the Connectors panel shows exactly what each connector
-> needs and lets you test + save to `.env` (gitignored). No secrets in the repo.
+> needs and lets you test + save per-workspace (stored in the DB, not `.env`). No secrets in the repo.
 
 ## Project structure
 
@@ -316,13 +345,18 @@ qae2e/
 ├── understanding.md                 # Canonical state doc (vision, what's built, what remains)
 ├── steps.md                         # Step-by-step walkthrough
 ├── app/
-│   ├── page.tsx                     # Landing page
-│   ├── workspace/page.tsx           # 6-step pipeline workspace (+ ConnectorsPanel in right rail)
+│   ├── page.tsx                     # Landing page (marketing: flow, agents, integrations)
+│   ├── login/page.tsx, signup/page.tsx  # Auth pages
+│   ├── workspaces/page.tsx          # Workspace dashboard (create / list / open)
+│   ├── history/page.tsx             # User-scoped run history
+│   ├── workspace/page.tsx           # Suspense wrapper → WorkspaceClient.tsx (pipeline UI)
 │   └── api/
 │       ├── agents/[agentId]/route.ts  # POST → NDJSON event stream per agent
 │       ├── pipeline/route.ts          # POST → NDJSON full 6-agent run (one-click)
-│       ├── artifacts/route.ts         # GET/PUT artifacts (JSON store)
-│       ├── connectors/route.ts        # GET status / POST test / POST save (.env)
+│       ├── artifacts/route.ts         # GET/PUT artifacts (workspace-scoped)
+│       ├── auth/{signup,login,logout,me}/route.ts  # Session auth
+│       ├── workspaces/route.ts        # GET list / POST create
+│       ├── connectors/route.ts        # GET status / POST test / POST save (per-workspace)
 │       ├── export/route.ts            # GET CSV/XLSX download
 │       ├── github/route.ts            # POST tree/read/create-branch/commit/dispatch
 │       ├── run/route.ts               # POST streaming local Docker test run
@@ -349,13 +383,17 @@ qae2e/
 │   │                                #   tools.ts (10 core), tools.integrations.ts (17 integration),
 │   │                                #   prompts/playwright-pom.ts (AS skill prompt),
 │   │                                #   persist.ts, orchestrator (RI→MT→AS→Docker→EX→DO→IQ)
+│   ├── auth/                        # password.ts (scrypt), session.ts (httpOnly cookie),
+│   │                                #   guard.ts (requireUser)
+│   ├── db.ts                        # Vercel Postgres layer (users/sessions/workspaces/artifacts/
+│   │                                #   secrets/runs) + data/db.json fallback
 │   ├── mcp/server.ts                # McpServer wired to the same tool handlers
-│   ├── store.ts                     # JSON persistence + in-memory fallback
+│   ├── store.ts                     # async workspace-scoped artifact store (withWorkspace context)
 │   ├── types.ts                     # Shared artifact/agent/connector/event types
 │   ├── utils.ts                     # cn() + awaitable readNdjsonStream (Stop stays until done)
 │   └── config.ts                    # Env config (OpenRouter + connectors + RAG + vision + Docker)
 ├── .cursor/skills/playwright-e2e/   # Playwright E2E skill (POM layout AS must follow)
-├── data/                            # gitignored artifacts.json
+├── data/                            # gitignored dev fallback (db.json, runs.json)
 └── scripts/mcp-smoke.mjs            # MCP client smoke test
 ```
 

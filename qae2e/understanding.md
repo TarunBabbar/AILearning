@@ -50,10 +50,17 @@ passing, and triggered in a real DevOps environment (Docker / CI).
 ### Fully working today
 
 - ✅ **Web UI** — landing page + 6-step workspace (`/workspace`), Claude-like beige theme.
+- ✅ **User accounts + workspaces** — email/password auth (scrypt + httpOnly session), `/signup` `/login`
+  `/workspaces` dashboard, personal single-owner workspaces, session persisted across all screens.
+- ✅ **Postgres-backed storage** — artifacts, users, sessions, workspaces, runs, connector secrets in
+  Vercel Postgres (`lib/db.ts`, `@vercel/postgres`, JSONB + `CREATE TABLE IF NOT EXISTS`), with a
+  `data/db.json` fallback for dev. Workspace-scoped writes via `withWorkspace(ws, fn)` context.
+- ✅ **User-scoped run history** — `/api/runs` returns only the authenticated user's workspaces' runs;
+  `/history` page (filters, search, ZIP download).
 - ✅ **Real OpenRouter agent loop** with tool-calling (`tools` + `tool_calls`), **free `:free` models only**
   (hard guard in `lib/llm/openrouter.ts`; refuses any paid model).
 - ✅ **6-agent orchestrated pipeline** — RI → MT → AS → EX → DO → IQ.
-- ✅ **Artifact persistence** — `data/artifacts.json` (gitignored), in-memory fallback.
+- ✅ **Artifact persistence** — workspace-scoped `lib/store.ts` → `artifacts` table (PG) or `data/db.json` (dev).
 - ✅ **Editable coverage** — AI-drafted test cases you can edit before saving (`PUT /api/artifacts`).
 - ✅ **Real MCP server** — Streamable HTTP at `/api/mcp/sse`, exposing **27 tools** (10 core + 17 integration).
 - ✅ **Manual paste flow** — paste a PRD → AI analysis → editable coverage → **server-side Playwright POM** →
@@ -106,6 +113,49 @@ passing, and triggered in a real DevOps environment (Docker / CI).
 |---|---|---|
 | End-to-end validation with real credentials | ⏳ | User creates free accounts / free trials and provides creds; UI already prompts for them |
 | Live pipeline smoke (SauceDemo / own PRD) | ⏳ | Restart dev server; run full pipeline; confirm Docker finds `tests/e2e` specs |
+
+---
+
+## Findings (2026-08-05) — user accounts, workspaces, Postgres storage
+
+### Auth: self-contained email + password
+
+- `lib/auth/password.ts` — scrypt hashing (`scrypt$N$r$p$salt$hash`), no deps.
+- `lib/auth/session.ts` — 32-byte random token in an httpOnly cookie (`qae2e_session`, 30-day),
+  backed by the `sessions` table.
+- `/signup` auto-logs-in and creates **no default workspace** (users create their own); `/login`,
+  `/logout`, `/me`; pages `/signup`, `/login`, `/workspaces`.
+- Login reads both `password_hash` (PG column) and `passwordHash` (JSON fallback key) — a field-name
+  mismatch had broken login in the file-fallback path.
+
+### Workspaces: personal, single-owner
+
+- `workspaces.owner_id` FK; `/api/workspaces` (list + create), `/api/workspaces/[id]`.
+- `/workspaces` dashboard: create / list / open. Every artifact, run, and connector secret is scoped
+  to a workspace via `withWorkspace(ws, fn)` context in `lib/store.ts`.
+
+### Storage: everything on Vercel Postgres (with dev JSON fallback)
+
+- `lib/db.ts` — `@vercel/postgres` + `CREATE TABLE IF NOT EXISTS` + JSONB bodies, mirroring the
+  runs-store pattern. Tables: `users`, `sessions`, `workspaces`, `artifacts` (kind column),
+  `workspace_secrets`, `qae2e_runs` (+ `workspace_id`).
+- `lib/store.ts` rewritten async + workspace-scoped; tool handlers resolve the current workspace
+  from the per-request context (no signature changes).
+- Connector credentials saved per-workspace (`workspace_secrets`) instead of `.env`.
+
+### Run history is user-scoped
+
+- `/api/runs` authenticates, resolves the user's workspace ids, and returns **only their workspaces'
+  runs** (SQL `workspace_id = ANY(...)`; JSON fallback filters on `record.workspaceId`, now written by
+  the orchestrator). A run record carries `workspaceId` so ownership is enforceable in both backends.
+- `/history` page shows only the current user's history.
+
+### Vercel hosting notes
+
+- App lives in `qae2e/` — set **Root Directory** to `qae2e` when importing (there is no `vercel.json`;
+  `rootDirectory` is not a valid field).
+- Hobby plan caps serverless functions at **300s** — `/api/run` was 600 and is now 300.
+- Requires `OPENROUTER_API_KEY`; connect **Vercel Postgres** for persistence (tables auto-create).
 
 ---
 
@@ -353,7 +403,8 @@ pipeline stream was still open. Fixed in `lib/utils.ts`.
 - Tailwind CSS v4, lucide-react, react-markdown + remark-gfm
 - OpenRouter via plain `fetch` (sync + streaming, `tools`/`tool_calls`) — free models only
 - `@modelcontextprotocol/sdk` for the real MCP SSE server (Streamable HTTP)
-- JSON file store (`data/*.json`) — zero external DB; in-memory Maps fallback
+- **Vercel Postgres** (`@vercel/postgres`) — users/sessions/workspaces/artifacts/secrets/runs
+  (JSONB + `CREATE TABLE IF NOT EXISTS`); `data/db.json` JSON fallback for dev
 - `xlsx` (CSV/XLSX export) + `@huggingface/transformers` (free local embeddings)
 - Pinecone free-serverless vector store (optional, user key)
 - Node `child_process` (Docker runner) + free OpenRouter vision model (image extraction)
@@ -364,13 +415,22 @@ pipeline stream was still open. Fixed in `lib/utils.ts`.
 ```
 app/api/agents/[agentId]/route.ts   POST → NDJSON event stream per agent (step-by-step mode)
 app/api/pipeline/route.ts           POST → NDJSON full 6-agent run (one-click mode; abortable)
-app/api/artifacts/route.ts          GET/PUT artifacts (JSON store)
-app/api/connectors/route.ts         GET status / POST test / POST save (.env)
+app/api/artifacts/route.ts          GET/PUT artifacts (workspace-scoped store)
+app/api/auth/{signup,login,logout,me}/route.ts  session auth (scrypt + httpOnly cookie)
+app/api/workspaces/route.ts         GET list / POST create workspaces
+app/api/runs/route.ts               GET user-scoped run history + ZIP download
+app/api/connectors/route.ts         GET status / POST test / POST save (per-workspace secrets)
 app/api/export/route.ts             GET CSV/XLSX download
 app/api/github/route.ts             POST tree/read/create-branch/commit/dispatch
 app/api/run/route.ts                POST streaming local Docker test run (materializes Script)
 app/api/upload/route.ts             POST image upload → vision text extraction
 app/api/mcp/sse/route.ts            Real MCP server (Streamable HTTP)
+lib/db.ts                           Vercel Postgres layer (users/sessions/workspaces/artifacts/
+                                     workspace_secrets/qae2e_runs) + data/db.json fallback
+lib/store.ts                        async workspace-scoped artifact store (withWorkspace context)
+lib/auth/password.ts                scrypt hash/verify
+lib/auth/session.ts                 httpOnly session cookie (qae2e_session, 30-day)
+lib/auth/guard.ts                   requireUser() for API routes
 lib/llm/openrouter.ts               OpenRouter chat + tool-call primitives (free-only guard)
 lib/connectors/index.ts             Connector defs + status (which creds are missing)
 lib/connectors/client.ts            Real REST clients (Jira, Confluence, Figma, GitHub, Zephyr, TestRail)
