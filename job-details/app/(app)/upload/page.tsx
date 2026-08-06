@@ -10,6 +10,8 @@ import {
   X,
   Sparkles,
   Trash2,
+  RefreshCw,
+  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
@@ -21,21 +23,68 @@ type UploadItem = {
   file: File;
   status: FileStatus;
   error?: string;
+  failStatus?: number;
   result?: { added: number; extracted: number; total: number };
 };
 
-const DEFAULT_MODELS = [
-  { id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash (free)" },
-  { id: "google/gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite (free)" },
-  { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B (free)" },
-  { id: "mistralai/mistral-7b-instruct", name: "Mistral 7B (free)" },
-];
+type ModelInfo = {
+  id: string;
+  name: string;
+  context: number | null;
+};
 
 const MAX_FILE_SIZE_MB = 50;
 
+const MODELS_CACHE_KEY = "jobdetails_free_models";
+const MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+type ModelsCache = { at: number; models: ModelInfo[] };
+
+// In-memory cache shared across the whole running app session.
+// Once models are fetched, no further network call happens until the
+// app is reloaded AND the localStorage cache has aged past 24h.
+let sessionCache: ModelsCache | null = null;
+
+function readModelsCache(): ModelsCache | null {
+  try {
+    const raw = localStorage.getItem(MODELS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ModelsCache;
+    if (!Array.isArray(parsed.models)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeModelsCache(models: ModelInfo[]) {
+  try {
+    localStorage.setItem(
+      MODELS_CACHE_KEY,
+      JSON.stringify({ at: Date.now(), models } satisfies ModelsCache)
+    );
+  } catch {
+    // localStorage unavailable — ignore
+  }
+}
+
+function formatContext(ctx: number | null): string {
+  if (!ctx) return "—";
+  if (ctx >= 1_000_000) return `${(ctx / 1_000_000).toFixed(1)}M`;
+  if (ctx >= 1_000) return `${Math.round(ctx / 1_000)}K`;
+  return String(ctx);
+}
+
+function vendorOf(id: string): string {
+  return id.split("/")[0] || id;
+}
+
 export default function UploadPage() {
   const [items, setItems] = useState<UploadItem[]>([]);
-  const [model, setModel] = useState(DEFAULT_MODELS[0].id);
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [model, setModel] = useState("");
   const [customModel, setCustomModel] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean | null>(null);
@@ -44,13 +93,80 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Check key on mount
+  // Check key + load free models on mount
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((d) => setApiKeyConfigured(d.apiKeyConfigured))
+      .then((d) => {
+        setApiKeyConfigured(d.apiKeyConfigured);
+        // Default selection = the env-configured model, if present
+        if (d.llmModel) setModel(d.llmModel);
+      })
       .catch(() => setApiKeyConfigured(false));
   }, []);
+
+  const applyModels = useCallback((list: ModelInfo[]) => {
+    setModels(list);
+    // Ensure a default is selected once models arrive
+    setModel((prev) => {
+      if (prev) return prev;
+      const envDefault = list.find((m) => m.id.includes("nemotron-3-ultra"));
+      return envDefault?.id || list[0]?.id || "";
+    });
+  }, []);
+
+  const loadModels = useCallback(
+    async (force = false) => {
+      // 1) In-memory cache: if the app has already fetched this session,
+      //    never call the network again (regardless of elapsed time).
+      if (!force && sessionCache && sessionCache.models.length) {
+        applyModels(sessionCache.models);
+        setModelsLoading(false);
+        return;
+      }
+
+      // 2) localStorage cache: serve instantly if younger than 24h.
+      const cached = readModelsCache();
+      if (!force && cached && Date.now() - cached.at < MODELS_CACHE_TTL_MS) {
+        if (cached.models.length) {
+          sessionCache = cached;
+          applyModels(cached.models);
+          setModelsLoading(false);
+          return;
+        }
+      }
+
+      // 3) Network fetch (only on first load, when cache is stale/missing,
+      //    or when the user explicitly hits Refresh).
+      setModelsLoading(true);
+      setModelsError(null);
+      try {
+        const res = await fetch("/api/models");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load models");
+        const fresh: ModelsCache = { at: Date.now(), models: data.models };
+        sessionCache = fresh;
+        writeModelsCache(data.models);
+        applyModels(data.models);
+      } catch (e) {
+        // If we have a stale cache, still show it rather than an error
+        if (cached?.models.length) {
+          sessionCache = cached;
+          applyModels(cached.models);
+          setModelsError("Using cached list — live refresh failed.");
+        } else {
+          setModelsError(e instanceof Error ? e.message : "Failed to load models");
+        }
+      } finally {
+        setModelsLoading(false);
+      }
+    },
+    [applyModels]
+  );
+
+  useEffect(() => {
+    loadModels();
+  }, [loadModels]);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const list = Array.from(files);
@@ -93,7 +209,8 @@ export default function UploadPage() {
   const selectedModel = useCustom ? customModel.trim() : model;
 
   const processItem = useCallback(
-    async (item: UploadItem) => {
+    async (item: UploadItem, modelOverride?: string) => {
+      const useModel = modelOverride || selectedModel;
       updateItem(item.id, { status: "extracting" });
       try {
         const text = await extractFileText(item.file);
@@ -112,12 +229,23 @@ export default function UploadPage() {
           body: JSON.stringify({
             fileName: item.file.name,
             text,
-            model: selectedModel || undefined,
+            model: useModel || undefined,
           }),
         });
         const data = await res.json();
         if (!res.ok) {
-          updateItem(item.id, { status: "error", error: data.error || "Failed to parse jobs." });
+          const errMsg =
+            data.error ||
+            (res.status === 401
+              ? "API key rejected. Check OPENROUTER_API_KEY in the environment."
+              : res.status === 402
+                ? "This model requires credits. Pick a different (free) model."
+                : "Failed to parse jobs.");
+          updateItem(item.id, {
+            status: "error",
+            error: errMsg,
+            failStatus: res.status,
+          });
           return;
         }
         updateItem(item.id, {
@@ -223,44 +351,88 @@ export default function UploadPage() {
 
       {/* Model selector */}
       <div className="mt-6 rounded-xl border border-claude-border bg-white p-5">
-        <label className="mb-2 block text-sm font-medium text-claude-text">
-          Parsing model
-        </label>
-        <div className="flex flex-wrap items-center gap-2">
-          {DEFAULT_MODELS.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => {
-                setModel(m.id);
-                setUseCustom(false);
-              }}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-colors",
-                !useCustom && model === m.id
-                  ? "bg-claude-accent-soft text-claude-accent-strong ring-claude-accent"
-                  : "bg-white text-claude-muted ring-claude-border hover:ring-claude-accent/50"
-              )}
-            >
-              {m.name}
-            </button>
-          ))}
+        <div className="mb-3 flex items-center justify-between">
+          <label className="block text-sm font-medium text-claude-text">
+            Parsing model
+          </label>
           <button
-            onClick={() => setUseCustom(true)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-colors",
-              useCustom
-                ? "bg-claude-accent-soft text-claude-accent-strong ring-claude-accent"
-                : "bg-white text-claude-muted ring-claude-border hover:ring-claude-accent/50"
-            )}
+            onClick={() => loadModels(true)}
+            disabled={modelsLoading}
+            className="flex items-center gap-1.5 text-xs text-claude-muted hover:text-claude-text disabled:opacity-50"
+            title="Refresh free model list"
           >
-            Custom…
+            <RefreshCw size={12} className={modelsLoading ? "animate-spin" : ""} />
+            Refresh
           </button>
         </div>
+
+        {modelsLoading ? (
+          <div className="flex items-center gap-2 py-3 text-sm text-claude-muted">
+            <Loader2 size={14} className="animate-spin" />
+            Loading free models from OpenRouter…
+          </div>
+        ) : modelsError ? (
+          <div className="flex items-center justify-between gap-3 py-2 text-sm">
+            <span className="text-[#a04040]">{modelsError}</span>
+            <button
+              onClick={() => loadModels(true)}
+              className="text-claude-accent hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+              {models.map((m) => {
+                const active = !useCustom && model === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setModel(m.id);
+                      setUseCustom(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      active
+                        ? "border-claude-accent bg-claude-accent-soft text-claude-accent-strong"
+                        : "border-claude-border bg-white text-claude-muted hover:border-claude-accent/50 hover:text-claude-text"
+                    )}
+                    title={m.id}
+                  >
+                    <Cpu size={11} className={active ? "text-claude-accent" : ""} />
+                    {m.id.replace(":free", "")}
+                    <span className="rounded bg-claude-beige-deep px-1 py-px text-[10px] text-claude-muted">
+                      {formatContext(m.context)}
+                    </span>
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setUseCustom(true)}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  useCustom
+                    ? "border-claude-accent bg-claude-accent-soft text-claude-accent-strong"
+                    : "border-claude-border bg-white text-claude-muted hover:border-claude-accent/50 hover:text-claude-text"
+                )}
+              >
+                Custom…
+              </button>
+            </div>
+            <p className="text-[11px] text-claude-muted">
+              {models.length} free model(s) available · showing context window
+              (tokens) — larger is better for big files.
+            </p>
+          </>
+        )}
+
         {useCustom && (
           <input
             value={customModel}
             onChange={(e) => setCustomModel(e.target.value)}
-            placeholder="e.g. openrouter/free-model-id"
+            placeholder="e.g. openrouter/free or nvidia/nemotron-3-ultra-550b-a55b:free"
             className="mt-3 w-full rounded-lg border border-claude-border bg-white px-3 py-2 text-sm outline-none focus:border-claude-accent"
           />
         )}
@@ -311,8 +483,29 @@ export default function UploadPage() {
                   <div className="text-xs text-claude-muted">
                     {(item.file.size / 1024 / 1024).toFixed(1)}MB
                   </div>
+                  {item.status === "error" && (
+                    <div className="mt-1 text-xs text-[#a04040]">
+                      {item.error}
+                      {item.failStatus === 402 && (
+                        <span className="text-claude-muted">
+                          {" "}Switch to a different free model above and retry.
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <StatusBadge item={item} />
+                {item.status === "error" && (
+                  <button
+                    onClick={() => processItem(item)}
+                    disabled={busy}
+                    className="flex items-center gap-1 rounded-md border border-claude-border px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:border-claude-accent hover:text-claude-accent disabled:opacity-50"
+                    title="Retry with the currently selected model"
+                  >
+                    <RefreshCw size={11} />
+                    Retry
+                  </button>
+                )}
                 <button
                   onClick={() => removeItem(item.id)}
                   className="text-claude-muted hover:text-claude-text"

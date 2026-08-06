@@ -56,12 +56,9 @@
 - Files over 50MB are flagged and skipped.
 
 ### 🧠 LLM extraction (OpenRouter free models)
-- Choose the parsing model on the Upload page:
-  - `deepseek/deepseek-v4-flash` *(default)*
-  - `google/gemini-3.5-flash-lite`
-  - `meta-llama/llama-3.3-70b-instruct`
-  - `mistralai/mistral-7b-instruct`
-  - Or any custom model id.
+- The Upload page loads the **live list of free OpenRouter models** on page load (`GET /api/models`, cached 6h) and lets you pick any of them — no hardcoded model ids.
+- Each model chip shows its **context window** (larger = handles bigger files in one pass).
+- A **Custom** option accepts any model id you type (e.g. `openrouter/free`).
 - Large documents are split into overlapping chunks so output never exceeds the model's token limit.
 - Results are deduplicated (by title + email + company) against existing rows.
 - Strict-JSON prompting with fallback-safe parsing (handles markdown fences / prose around JSON).
