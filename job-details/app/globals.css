@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --claude-bg: #f5f4ef;
+  --claude-surface: #ffffff;
+  --claude-border: #e8e6df;
+  --claude-text: #2d2a24;
+  --claude-muted: #6b665b;
+  --claude-accent: #d97757;
+  --claude-accent-strong: #c96443;
+  --claude-accent-soft: #f7e9e2;
+  --claude-beige-deep: #e8e4d9;
+}
+
+@theme inline {
+  --color-claude-bg: var(--claude-bg);
+  --color-claude-surface: var(--claude-surface);
+  --color-claude-border: var(--claude-border);
+  --color-claude-text: var(--claude-text);
+  --color-claude-muted: var(--claude-muted);
+  --color-claude-accent: var(--claude-accent);
+  --color-claude-accent-strong: var(--claude-accent-strong);
+  --color-claude-accent-soft: var(--claude-accent-soft);
+  --color-claude-beige-deep: var(--claude-beige-deep);
+}
+
+body {
+  background: var(--claude-bg);
+  color: var(--claude-text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Claude-style subtle scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8d4c8;
+  border-radius: 5px;
+  border: 2px solid var(--claude-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c4bfae;
+}
+
+/* Keep long descriptions readable */
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-6 {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Smooth fade-in for lists */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fadeUp 0.25s ease-out both;
+}

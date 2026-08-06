@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Job {
+  id           String   @id @default(uuid())
+  title        String
+  company      String
+  email        String?
+  location     String?
+  experience   String?
+  description  String?
+  fileName     String?
+  status       String   @default("new")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  companyId    String?
+  companyInfo  Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+model Company {
+  id         String   @id @default(uuid())
+  domain     String   @unique
+  name       String
+  type       String?
+  location   String?
+  website    String?
+  source     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  jobs       Job[]
+}
