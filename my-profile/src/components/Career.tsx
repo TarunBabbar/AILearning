@@ -4,6 +4,29 @@ import { motion } from "framer-motion";
 
 const roles = [
   {
+    date: "Aug 2026 — Present",
+    title: "Solutions Architect",
+    company: "Coforge Limited, Pune · Hybrid",
+    details: [
+      "Stepping into a Solutions Architect role focused on test automation strategy, bringing prior experience leading QA teams and driving quality initiatives",
+      "Applying hands-on leadership background in test planning, team management, and process improvement to enterprise-scale automation architecture",
+      "Designing scalable automation frameworks, integrating continuous testing into CI/CD pipelines, and modernizing tooling across web, API, performance, and mobile",
+      "Committed to quality governance — establishing standards and best practices that scale across cross-functional teams",
+      "Passionate about mentoring engineers and building a strong quality-first culture, now applied at an architectural level",
+    ],
+  },
+  {
+    date: "Jul 2025 — Jul 2026",
+    title: "Career Transition — Solutions Architect (Test Automation)",
+    company: "Self-Directed Learning, Pune",
+    details: [
+      "Spent a focused year diving deep into LLMs, Retrieval-Augmented Generation (RAG), Model Context Protocol (MCP), AI agents, and orchestration tools like n8n and Langflow",
+      "Strengthened skills in LangChain, Playwright, and TypeScript while building AI-augmented test architecture POCs",
+      "Built a POC framework combining AI-driven skills-based prompting with E2E test automation — github.com/TarunBabbar",
+      "Core focus: test architecture & strategy, CI/CD integration & DevOps, tooling & modernization (including AI-native tooling like RAG and agent orchestration), and quality governance",
+    ],
+  },
+  {
     date: "Jan 2018 — Jun 2025",
     title: "Lead Software Engineer in Test | Test Automation Architect",
     company: "Coupa Software, Pune",
@@ -96,7 +119,7 @@ export default function Career() {
               <ul className="space-y-1">
                 {r.details.map((d, j) => (
                   <li key={j} className="text-sm text-text-muted leading-relaxed flex gap-2">
-                    <span className="text-amber-500 mt-1.5 min-w-[5px]">•</span>
+                    <span className="text-amber-500 leading-none mt-[7px] select-none">•</span>
                     <span>{d}</span>
                   </li>
                 ))}

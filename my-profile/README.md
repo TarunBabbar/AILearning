@@ -45,10 +45,48 @@ A stunning, Claude-themed portfolio website built with **Next.js 16**, **Tailwin
 
 ```bash
 cd C:\Tarun\ai-learning\AILearning\my-profile
+npm install
+cp .env.example .env.local   # then fill in OPENROUTER_API_KEY
 npx next dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## Tarun Bot (AI Chatbot)
+
+A floating chat widget on the bottom-right of the page. Visitors can ask anything about Tarun — experience, projects, skills, education, contact — and the bot answers from the profile using **OpenRouter free models**.
+
+### How it works
+
+1. **Free-model fallback chain** — The bot tries the ordered list in `FREE_MODELS_JSON` (`.env`), starting with the **fastest** model first. On any failure (rate limit `429`, a delisted model, network error, timeout, or empty reply) it automatically falls back to the next model in the list until one succeeds.
+2. **Profile-grounded answers** — A system prompt built from `src/lib/profile-knowledge.ts` (mirrors the `About` / `Career` / `Projects` / `Skills` / `Education` / `Contact` sections) lets the bot answer only from known profile facts.
+3. **WhatsApp escalation** — When a question is outside the profile (general chat, unrelated help, anything the bot can't answer), the model returns a summary marker and the widget shows an **Open WhatsApp** button. Tapping it opens a pre-filled `wa.me` chat to Tarun's number with the visitor's summarized query.
+4. **Session memory** — Multi-turn conversation context is kept in the widget for the visitor's session.
+
+### Env variables
+
+| Variable | Purpose |
+|---|---|
+| `OPENROUTER_API_KEY` | OpenRouter API key (**required**). Get one at [openrouter.ai](https://openrouter.ai). |
+| `OPENROUTER_BASE_URL` | OpenRouter base URL (default `https://openrouter.ai/api/v1`). |
+| `FREE_MODELS_JSON` | Ordered JSON array of `{id, name}` free models. **Index 0 = fastest, tried first.** Reorder/add/remove freely. Only `:free` endpoints are allowed. |
+| `WHATSAPP_NUMBER` | WhatsApp number (digits only, country code first) that unanswered queries are forwarded to. |
+| `WHATSAPP_PREFIX` | Display prefix (default `+91`). |
+| `BOT_NAME` / `PROFILE_OWNER` | Bot persona labels. |
+
+### Updating the model chain
+
+Free models churn frequently on OpenRouter. To add, remove, or reorder:
+
+1. Edit `FREE_MODELS_JSON` in `.env.local` (or the Vercel env vars in production).
+2. Keep the first entry as the fastest model you want tried first.
+3. No code changes needed.
+
+Only `:free` model IDs are accepted — the server refuses anything else, so a misconfigured env can't accidentally bill you.
+
+### Production (Vercel)
+
+Set the same env vars in the Vercel project dashboard (Settings → Environment Variables). The `.env.local` file is gitignored and never committed.
 
 ## Build
 

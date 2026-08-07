@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ChatWidget from "@/components/ChatWidget";
 
 export const metadata: Metadata = {
   title: "Tarun Kumar Babbar — Test Automation Architect | AI-Augmented QA",
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body className="min-h-full">
         <header className="sr-only"><h1>Tarun Kumar Babbar — AI QA Architect</h1></header>
         {children}
+        <ChatWidget />
       </body>
     </html>
   );
