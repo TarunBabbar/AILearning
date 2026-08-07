@@ -1,8 +1,12 @@
 import { getConfig } from "./config";
+import { createLogger, ms, type Logger } from "./logger";
 
-const RETRIES = 3;
-const RETRY_DELAY_MS = 1500;
-const DEFAULT_TIMEOUT_MS = 90000;
+const MAX_RETRIES = 4;
+const BASE_RETRY_DELAY_MS = 1500;
+// No hard timeout on the model call itself — OpenRouter responses for large
+// jobs can legitimately take a few minutes. We rely on retries for
+// transient failures (429/5xx/network) instead of aborting mid-generation.
+const ABORT_TIMEOUT_MS = 10 * 60 * 1000; // 10 min safety net only
 
 type CallOptions = {
   model?: string;
@@ -20,14 +24,26 @@ export class OpenRouterError extends Error {
   }
 }
 
+function retryDelayMs(attempt: number): number {
+  // 1.5s, 3s, 6s, 12s — exponential backoff
+  return BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
 /**
  * Call the OpenRouter chat completions API. Resolves with the raw text content.
+ * Emits detailed progress events via the logger for both the server console
+ * and (optionally) the streaming client.
  */
 export async function callOpenRouter(
   prompt: string,
   systemPrompt: string,
   apiKey: string,
-  opts: CallOptions = {}
+  opts: CallOptions = {},
+  log: Logger = createLogger()
 ): Promise<string> {
   const cfg = getConfig();
   const key = apiKey || cfg.openrouterApiKey;
@@ -48,12 +64,17 @@ export async function callOpenRouter(
 
   const maxTokens = opts.maxTokens ?? 8192;
   const temperature = opts.temperature ?? 0.1;
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = opts.timeoutMs ?? ABORT_TIMEOUT_MS;
   const url = `${cfg.openrouterBaseUrl}/chat/completions`;
+  const keyPreview = key.length > 14 ? `${key.slice(0, 11)}…${key.slice(-3)}` : "***";
+
+  log.info("llm", `Calling OpenRouter · model=${model}`, `key=${keyPreview} maxTokens=${maxTokens}`);
 
   let lastError: Error | null = null;
+  const startedAt = Date.now();
 
-  for (let attempt = 0; attempt < RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const attemptStart = Date.now();
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -104,17 +125,53 @@ export async function callOpenRouter(
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || "";
+      const usage = data.usage
+        ? `in:${data.usage.prompt_tokens ?? "?"} out:${data.usage.completion_tokens ?? "?"}`
+        : "usage:n/a";
       if (!content.trim()) throw new Error("Empty response from model");
+
+      log.info(
+        "llm",
+        `OpenRouter responded OK in ${ms(Date.now() - startedAt)} (attempt ${attempt})`,
+        `${content.length} chars · ${usage}`
+      );
       return content;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (err instanceof OpenRouterError) throw err; // don't retry 4xx
+
       if (lastError.name === "AbortError") {
-        lastError = new Error(`Request timed out after ${timeoutMs}ms`);
+        lastError = new Error(`Request aborted after ${ms(timeoutMs)} (safety timeout)`);
       }
-      if (attempt < RETRIES - 1) {
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+
+      const retryable = isRetryableStatus((err as { status?: number })?.status ?? 0);
+      if (retryable && attempt < MAX_RETRIES) {
+        const delay = retryDelayMs(attempt);
+        log.warn(
+          "llm",
+          `Attempt ${attempt}/${MAX_RETRIES} failed (${lastError.message}) — retrying in ${ms(delay)}`,
+          `elapsed ${ms(Date.now() - attemptStart)}`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
       }
+
+      if (attempt < MAX_RETRIES) {
+        const delay = retryDelayMs(attempt);
+        log.warn(
+          "llm",
+          `Attempt ${attempt}/${MAX_RETRIES} failed (${lastError.message}) — retrying in ${ms(delay)}`,
+          `elapsed ${ms(Date.now() - attemptStart)}`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      log.error(
+        "llm",
+        `All ${MAX_RETRIES} attempts failed after ${ms(Date.now() - startedAt)}`,
+        lastError.message
+      );
     }
   }
 

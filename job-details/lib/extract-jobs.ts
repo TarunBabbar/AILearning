@@ -1,5 +1,6 @@
 import { callOpenRouter, extractJsonArray } from "./openrouter";
 import { chunkText } from "./extract";
+import { createLogger, type Logger } from "./logger";
 
 export type ExtractedJob = {
   title: string;
@@ -8,6 +9,15 @@ export type ExtractedJob = {
   location: string;
   experience: string;
   description: string;
+};
+
+/** Progress callback for the extraction pipeline (chunk-level). */
+export type ExtractProgress = {
+  phase: "chunk_start" | "chunk_done" | "chunk_parse_error" | "dedupe";
+  chunk: number;
+  totalChunks: number;
+  foundJobs?: number;
+  message: string;
 };
 
 const FALLBACK_TITLE = "Unknown Position";
@@ -54,25 +64,58 @@ ${text}`;
 export async function extractJobsFromText(
   rawText: string,
   apiKey: string,
-  model: string
+  model: string,
+  opts: { onProgress?: (p: ExtractProgress) => void; log?: Logger } = {}
 ): Promise<ExtractedJob[]> {
+  const log = opts.log ?? createLogger();
   const chunks = chunkText(rawText, 6000, 400);
   const allJobs: ExtractedJob[] = [];
 
+  log.info(
+    "extract",
+    `Starting extraction · ${rawText.length.toLocaleString()} chars split into ${chunks.length} chunk(s)`,
+    `model=${model}`
+  );
+
   for (let c = 0; c < chunks.length; c++) {
-    const prompt = buildExtractionPrompt(chunks[c]);
-    const content = await callOpenRouter(prompt, EXTRACTION_SYSTEM_PROMPT, apiKey, {
-      model,
-      maxTokens: 8192,
-      timeoutMs: 120000,
+    const chunkStart = Date.now();
+    opts.onProgress?.({
+      phase: "chunk_start",
+      chunk: c + 1,
+      totalChunks: chunks.length,
+      message: `Sending chunk ${c + 1}/${chunks.length} to the LLM…`,
     });
+    log.info(
+      "extract",
+      `Chunk ${c + 1}/${chunks.length} → LLM`,
+      `${chunks[c].length} chars`
+    );
+
+    const prompt = buildExtractionPrompt(chunks[c]);
+    const content = await callOpenRouter(
+      prompt,
+      EXTRACTION_SYSTEM_PROMPT,
+      apiKey,
+      { model, maxTokens: 8192, timeoutMs: 120000 },
+      log
+    );
+
     const parsed = extractJsonArray<Partial<ExtractedJob>>(content);
     if (!parsed) {
-      console.error(
-        `[extract] chunk ${c + 1}/${chunks.length} returned no JSON array`
+      log.warn(
+        "extract",
+        `Chunk ${c + 1}/${chunks.length} returned no JSON array — skipping`,
+        `response ${content.length} chars`
       );
+      opts.onProgress?.({
+        phase: "chunk_parse_error",
+        chunk: c + 1,
+        totalChunks: chunks.length,
+        message: `Chunk ${c + 1}/${chunks.length} returned no usable JSON — skipped.`,
+      });
       continue;
     }
+
     for (const j of parsed) {
       allJobs.push({
         title: normalizeTitle(j.title),
@@ -83,6 +126,19 @@ export async function extractJobsFromText(
         description: (j.description || "").trim(),
       });
     }
+
+    log.info(
+      "extract",
+      `Chunk ${c + 1}/${chunks.length} done`,
+      `${parsed.length} job(s) found · ${ms(Date.now() - chunkStart)}`
+    );
+    opts.onProgress?.({
+      phase: "chunk_done",
+      chunk: c + 1,
+      totalChunks: chunks.length,
+      foundJobs: parsed.length,
+      message: `Chunk ${c + 1}/${chunks.length} parsed — ${parsed.length} job(s) found.`,
+    });
   }
 
   // Dedupe by title|email|company
@@ -95,5 +151,28 @@ export async function extractJobsFromText(
     unique.push(j);
   }
 
+  if (allJobs.length !== unique.length) {
+    log.info(
+      "extract",
+      `Deduped ${allJobs.length} → ${unique.length} job(s)`,
+      `${allJobs.length - unique.length} duplicate(s) removed`
+    );
+  } else {
+    log.info("extract", `Extraction complete — ${unique.length} job(s)`, "no duplicates");
+  }
+  opts.onProgress?.({
+    phase: "dedupe",
+    chunk: chunks.length,
+    totalChunks: chunks.length,
+    foundJobs: unique.length,
+    message: `Filtering done — ${unique.length} unique job(s).`,
+  });
+
   return unique;
+}
+
+// Small local helper to keep this file free of extra imports
+function ms(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }

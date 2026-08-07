@@ -6,7 +6,11 @@
  * on the server during prerendering — the module references browser-only
  * globals like DOMMatrix.
  */
-export async function extractPdfText(file: File, maxPages = 50): Promise<string> {
+export async function extractPdfText(
+  file: File,
+  maxPages = 50,
+  onProgress?: (page: number, totalPages: number) => void
+): Promise<string> {
   const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
 
   GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.worker.min.mjs`;
@@ -19,6 +23,7 @@ export async function extractPdfText(file: File, maxPages = 50): Promise<string>
   const parts: string[] = [];
 
   for (let p = 1; p <= pages; p++) {
+    onProgress?.(p, pages);
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
     const strings = content.items
@@ -41,9 +46,12 @@ export async function extractDocxText(file: File): Promise<string> {
   return (result.value || "").trim();
 }
 
-export async function extractFileText(file: File): Promise<string> {
+export async function extractFileText(
+  file: File,
+  onProgress?: (page: number, totalPages: number) => void
+): Promise<string> {
   const name = file.name.toLowerCase();
-  if (name.endsWith(".pdf")) return extractPdfText(file);
+  if (name.endsWith(".pdf")) return extractPdfText(file, 50, onProgress);
   if (name.endsWith(".docx")) return extractDocxText(file);
   if (name.endsWith(".txt") || name.endsWith(".md")) {
     return file.text();
