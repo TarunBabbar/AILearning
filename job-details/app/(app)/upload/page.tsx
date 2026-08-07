@@ -34,7 +34,11 @@ type UploadItem = {
   startedAt?: number;
   elapsedSec?: number;
   progressLabel?: string;
-  result?: { added: number; extracted: number; total: number };
+  chunksDone?: number;
+  chunksTotal?: number;
+  liveNew?: number;
+  liveDup?: number;
+  result?: { added: number; extracted: number; duplicates?: number; total: number };
 };
 
 type ModelInfo = {
@@ -403,11 +407,14 @@ export default function UploadPage() {
         type UploadResult = {
           added: number;
           extracted: number;
+          duplicates?: number;
           total: number;
           message: string;
         };
         let result: UploadResult | null = null;
         let streamError: string | null = null;
+        let itemChunksTotal = 0;
+        let completedRef = { current: 0 };
 
         if (reader) {
           try {
@@ -425,9 +432,39 @@ export default function UploadPage() {
                 } catch {
                   continue;
                 }
-                if (obj.type === "progress") {
+                if (obj.type === "chunks") {
+                  itemChunksTotal = Number(obj.total);
+                  updateItem(item.id, { chunksTotal: itemChunksTotal });
+                } else if (obj.type === "progress") {
                   updateItem(item.id, { progressLabel: String(obj.message) });
                   pushActivity(String(obj.message));
+                  // Live new/duplicate counts: "+3 new job(s), 2 duplicate(s)
+                  // skipped (5 new total)."
+                  const msg = String(obj.message);
+                  const newMatch = msg.match(/\+(\d+)\s+new/);
+                  const dupMatch = msg.match(/(\d+)\s+duplicate/);
+                  if (newMatch || dupMatch) {
+                    updateItem(item.id, {
+                      liveNew: newMatch ? Number(newMatch[1]) : undefined,
+                      liveDup: dupMatch ? Number(dupMatch[1]) : undefined,
+                    });
+                  }
+                  // Count COMPLETED chunks only ("parsed" / "failed with all").
+                  // Chunks finish in parallel and out of order, so we use a
+                  // running counter, not the chunk number — 4 done of 8 = 50%.
+                  if (/chunk\s+\d+\/\d+\s+(?:parsed|failed)/i.test(msg)) {
+                    completedRef.current += 1;
+                    const total = itemChunksTotal;
+                    updateItem(item.id, {
+                      chunksDone: completedRef.current,
+                      chunksTotal: total,
+                    });
+                  } else {
+                    const totalMatch = msg.match(/chunk\s+\d+\/(\d+)/i);
+                    if (totalMatch && !msg.includes("Sending")) {
+                      updateItem(item.id, { chunksTotal: Number(totalMatch[1]) });
+                    }
+                  }
                 } else if (obj.type === "log") {
                   const ev = obj.event as {
                     message?: string;
@@ -480,11 +517,12 @@ export default function UploadPage() {
           result: {
             added: result.added,
             extracted: result.extracted,
+            duplicates: result.duplicates ?? 0,
             total: result.total,
           },
         });
         pushActivity(
-          `[${item.file.name}] Done — +${result.added} new (${result.extracted} extracted).`,
+          `[${item.file.name}] Done — +${result.added} new, ${result.duplicates ?? 0} duplicate(s).`,
           "ok"
         );
       } catch (e) {
@@ -500,12 +538,13 @@ export default function UploadPage() {
     if (!selectedModel && useCustom) return;
     setBusy(true);
     setSummary(null);
-    pushActivity("Starting batch processing…");
-    for (const item of items) {
-      if (item.status === "queued" || item.status === "error") {
-        await processItem(item);
-      }
-    }
+    pushActivity("Starting batch processing — all files in parallel…");
+    // Fire all files at once; each has its own progress bar.
+    await Promise.all(
+      items
+        .filter((i) => i.status === "queued" || i.status === "error")
+        .map((item) => processItem(item))
+    );
     setBusy(false);
     const done = items.filter((i) => i.status === "done").length;
     const failed = items.filter((i) => i.status === "error").length;
@@ -787,16 +826,40 @@ export default function UploadPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-claude-muted">
                         <span>{(item.file.size / 1024 / 1024).toFixed(1)}MB</span>
-                        {item.elapsedSec !== undefined &&
-                          (item.status === "extracting" ||
-                            item.status === "parsing") && (
-                            <span className="flex items-center gap-1">
-                              <Loader2 size={10} className="animate-spin" />
-                              {item.progressLabel ||
-                                `Working… (${item.elapsedSec}s)`}
-                            </span>
-                          )}
+                        {item.status === "extracting" && (
+                          <span className="flex items-center gap-1">
+                            <Loader2 size={10} className="animate-spin" />
+                            Extracting text…
+                          </span>
+                        )}
                       </div>
+
+                      {/* Extraction progress bar — green %, no chunk detail */}
+                      {item.chunksTotal &&
+                        item.chunksTotal > 0 &&
+                        (item.status === "parsing" || item.status === "done") && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-claude-beige-deep">
+                              <div
+                                className="h-full rounded-full bg-[#3d7a3d] transition-all duration-300"
+                                style={{
+                                  width: `${Math.min(100, (item.chunksDone ?? 0) / item.chunksTotal * 100)}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="shrink-0 text-[11px] font-semibold text-[#3d7a3d]">
+                              {Math.min(100, Math.round((item.chunksDone ?? 0) / item.chunksTotal * 100))}%
+                            </span>
+                          </div>
+                        )}
+
+                      {item.status === "done" && item.result && (
+                        <div className="mt-1 text-[11px] font-medium text-[#3d7a3d]">
+                          +{item.result.added} new
+                          {item.result.duplicates ? ` · ${item.result.duplicates} duplicate` : ""}
+                        </div>
+                      )}
+
                       {item.status === "error" && (
                         <div className="mt-1 text-xs text-[#a04040]">
                           {item.error}
@@ -913,16 +976,21 @@ function StatusBadge({ item }: { item: UploadItem }) {
       );
     case "parsing":
       return (
-        <span className="flex items-center gap-1 rounded-full bg-[#f3e8f5] px-2 py-0.5 text-[11px] text-[#7a3d8c]">
-          <Loader2 size={11} className="animate-spin" />
-          Parsing…
+        <span className="flex items-center gap-1.5 rounded-full bg-[#f3e8f5] px-2 py-0.5 text-[11px] text-[#7a3d8c]">
+          <span className="font-semibold">
+            new {item.liveNew ?? 0}
+          </span>
+          <span className="opacity-60">·</span>
+          <span>dup {item.liveDup ?? 0}</span>
         </span>
       );
     case "done":
       return (
         <span className="flex items-center gap-1 rounded-full bg-[#e3efe3] px-2 py-0.5 text-[11px] text-[#3d7a3d]">
           <CheckCircle2 size={11} />
-          {item.result ? `+${item.result.added} new` : "Done"}
+          {item.result
+            ? `+${item.result.added} new${item.result.duplicates ? `, ${item.result.duplicates} dup` : ""}`
+            : "Done"}
         </span>
       );
     case "error":

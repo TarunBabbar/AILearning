@@ -12,6 +12,17 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
+ * Build a normalized duplicate key for a job: lowercase company +
+ * whitespace-collapsed description. This is the strongest "same job
+ * posting" signal (a re-uploaded PDF yields identical company+description).
+ */
+function dupKey(company: string, description: string): string {
+  const c = (company || "").trim().toLowerCase();
+  const d = (description || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return `${c}||${d}`;
+}
+
+/**
  * POST /api/upload
  * Body: { fileName, text } — text is the PDF/doc text extracted in the browser.
  * Runs LLM extraction and persists jobs to the database.
@@ -41,7 +52,26 @@ export async function POST(req: Request) {
         send({ type: "log", event: ev });
       });
 
+      // Heartbeat: keep the stream alive during long LLM calls so the
+      // browser connection never idles out, no matter how long extraction
+      // takes (minutes or hours). Cleared when the stream ends.
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
+      const startHeartbeat = () => {
+        if (heartbeat) return;
+        heartbeat = setInterval(() => {
+          send({ type: "heartbeat", ts: new Date().toISOString() });
+        }, 15000);
+      };
+      const stopHeartbeat = () => {
+        if (heartbeat) {
+          clearInterval(heartbeat);
+          heartbeat = null;
+        }
+      };
+
       try {
+        startHeartbeat();
+
         const admin = await isAdminRequest();
         if (!admin) {
           send({
@@ -85,80 +115,91 @@ export async function POST(req: Request) {
           `Connected — OpenRouter key OK (${source === "env" ? "server env" : "configured"}).`
         );
 
-        // ── LLM extraction with live progress ────────────────
-        const jobs = await extractJobsFromText(text, apiKey, useModel, {
-          log,
-          onProgress: (p) => progress(p.message),
-        });
-
-        if (!jobs.length) {
-          send({
-            type: "error",
-            message:
-              "No jobs could be extracted from this file. It may not contain job listings.",
-          });
-          controller.close();
-          return;
-        }
-
-        log.info("upload", "Extraction complete, saving to database", `${jobs.length} job(s)`);
-        progress(`Extraction complete — ${jobs.length} job(s) found. Saving to database…`);
-
-        // ── Persist (dedupe by title|email|company) ──────────
+        // Dedupe on the strongest signal for "same job posting":
+        // company + normalized description. A re-upload of the same PDF
+        // (or same job appearing twice) yields the same company+description,
+        // so it's counted as a duplicate and NOT re-saved.
         const existing = await prisma.job.findMany({
-          select: { title: true, email: true, company: true },
+          select: { company: true, description: true },
         });
         const existingKeys = new Set(
-          existing.map((j) => `${j.title}|${j.email ?? ""}|${j.company}`.toLowerCase())
+          existing.map((j) =>
+            dupKey(j.company, j.description ?? "")
+          )
         );
-
         let added = 0;
-        const newJobs = jobs
-          .filter((j) => {
-            const key = `${j.title}|${j.email}|${j.company}`.toLowerCase();
-            if (existingKeys.has(key)) return false;
-            existingKeys.add(key);
-            return true;
-          })
-          .slice(0, cfg.maxJobs);
+        let duplicateCount = 0;
 
-        if (newJobs.length) {
-          await prisma.job.createMany({
-            data: newJobs.map((j) => ({
-              title: j.title,
-              company: j.company,
-              email: j.email || null,
-              location: j.location || null,
-              experience: j.experience || null,
-              description: j.description || null,
-              fileName: fileName || null,
-              // Prefer the date the LLM found in the doc; fall back to a
-              // date parsed from the filename (e.g. "6+ Years - 07-Aug.pdf").
-              jobDate: j.jobDate ?? parseJobDate(fileName),
-              status: "new",
-            })),
-          });
-          added = newJobs.length;
-          log.info(
-            "upload",
-            "Saved to database",
-            `${added} new (${jobs.length - added} duplicate(s) skipped)`
-          );
-          progress(`${added} new job(s) saved to the database.`);
-        } else {
-          log.info("upload", "No new jobs to save", "all were duplicates");
-          progress("All jobs already exist — nothing new added.");
-        }
+        const saveJobs = async (jobs: Awaited<ReturnType<typeof extractJobsFromText>>) => {
+          const newJobs: Awaited<ReturnType<typeof extractJobsFromText>> = [];
+          for (const j of jobs) {
+            const key = dupKey(j.company, j.description);
+            if (existingKeys.has(key)) {
+              duplicateCount++;
+              continue;
+            }
+            existingKeys.add(key);
+            newJobs.push(j);
+          }
+
+          const toInsert = newJobs.slice(0, cfg.maxJobs);
+          if (toInsert.length) {
+            await prisma.job.createMany({
+              data: toInsert.map((j) => ({
+                title: j.title,
+                company: j.company,
+                email: j.email || null,
+                location: j.location || null,
+                experience: j.experience || null,
+                description: j.description || null,
+                fileName: fileName || null,
+                jobDate: j.jobDate ?? parseJobDate(fileName),
+                status: "new",
+              })),
+            });
+            added += toInsert.length;
+            log.info(
+              "upload",
+              "Saved to database",
+              `${toInsert.length} new · ${duplicateCount} duplicate(s) so far`
+            );
+            progress(
+              `+${toInsert.length} new job(s), ${duplicateCount} duplicate(s) skipped (${added} new total).`
+            );
+          }
+        };
+
+        // ── Parallel LLM extraction — each chunk is saved to the DB as
+        //    soon as its response lands, no waiting for all chunks. ──
+        let chunksTotalSent = false;
+        const jobs = await extractJobsFromText(text, apiKey, useModel, {
+          log,
+          onProgress: (p) => {
+            progress(p.message);
+            // Send the chunk total up front so the client can render a
+            // progress bar (0% → 100%) from the very start.
+            if (!chunksTotalSent && p.totalChunks > 0) {
+              chunksTotalSent = true;
+              send({ type: "chunks", total: p.totalChunks });
+            }
+          },
+          onChunk: async (chunkJobs) => saveJobs(chunkJobs),
+        });
 
         const total = await prisma.job.count();
-        log.info("upload", "Done", `total jobs in DB: ${total}`);
+        log.info(
+          "upload",
+          "Done",
+          `extracted ${jobs.length}, added ${added}, duplicates ${duplicateCount}, total ${total}`
+        );
 
         send({
           type: "result",
           data: {
-            message: `Extracted ${jobs.length} job(s), added ${added} new. Total jobs: ${total}.`,
+            message: `Extracted ${jobs.length} job(s): ${added} new, ${duplicateCount} duplicate(s). Total jobs: ${total}.`,
             extracted: jobs.length,
             added,
+            duplicates: duplicateCount,
             total,
             apiKeySource: source,
           },
