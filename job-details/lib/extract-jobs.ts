@@ -1,5 +1,5 @@
 import { callOpenRouter, extractJsonArray } from "./openrouter";
-import { chunkText } from "./extract";
+import { chunkText, parseJobDate } from "./extract";
 import { createLogger, type Logger } from "./logger";
 
 export type ExtractedJob = {
@@ -9,6 +9,12 @@ export type ExtractedJob = {
   location: string;
   experience: string;
   description: string;
+  jobDate: Date | null;
+};
+
+/** Raw shape the LLM returns — jobDate comes back as a string (or null). */
+type RawExtractedJob = Omit<ExtractedJob, "jobDate"> & {
+  jobDate?: string | null;
 };
 
 /** Progress callback for the extraction pipeline (chunk-level). */
@@ -53,9 +59,10 @@ For each job, identify:
 - location (city/locations mentioned — e.g. "Pune", "Bangalore", "Remote", etc.)
 - experience (years of experience required, e.g. "2+ years", "5-8 Yrs", "Fresher", etc. Use the exact text found)
 - description (full job description text — include ALL details)
+- jobDate (the posting date if present in the text, e.g. "07-Aug-2025" or "7 August 2025". Use the same format as found. If no date is found use null)
 
 CRITICAL: Respond with ONLY a valid JSON array. NO markdown, NO code blocks, NO explanation, NO text before or after. Just the JSON array:
-[{"company":"...","title":"...","email":"...","location":"...","experience":"...","description":"..."}]
+[{"company":"...","title":"...","email":"...","location":"...","experience":"...","description":"...","jobDate":"..."}]
 
 TEXT:
 ${text}`;
@@ -100,7 +107,7 @@ export async function extractJobsFromText(
       log
     );
 
-    const parsed = extractJsonArray<Partial<ExtractedJob>>(content);
+    const parsed = extractJsonArray<Partial<RawExtractedJob>>(content);
     if (!parsed) {
       log.warn(
         "extract",
@@ -124,6 +131,7 @@ export async function extractJobsFromText(
         location: (j.location || "").trim(),
         experience: (j.experience || "").trim(),
         description: (j.description || "").trim(),
+        jobDate: parseJobDate(j.jobDate),
       });
     }
 

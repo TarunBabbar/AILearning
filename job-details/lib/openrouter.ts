@@ -67,6 +67,7 @@ export async function callOpenRouter(
   const timeoutMs = opts.timeoutMs ?? ABORT_TIMEOUT_MS;
   const url = `${cfg.openrouterBaseUrl}/chat/completions`;
   const keyPreview = key.length > 14 ? `${key.slice(0, 11)}…${key.slice(-3)}` : "***";
+  const referer = cfg.appUrl || "https://openrouter.ai";
 
   log.info("llm", `Calling OpenRouter · model=${model}`, `key=${keyPreview} maxTokens=${maxTokens}`);
 
@@ -85,8 +86,8 @@ export async function callOpenRouter(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${key}`,
-          "HTTP-Referer": "https://job-details.vercel.app",
-          "X-Title": "Job Details",
+          "HTTP-Referer": referer,
+          "X-Title": "QA Job Details",
         },
         body: JSON.stringify({
           model,

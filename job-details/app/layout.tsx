@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Job Details — Parse Job PDFs with AI",
+  title: "QA Job Details — Job Tracking Dashboard",
   description:
-    "Upload job listing PDFs, extract structured job details with OpenRouter free models, and browse companies.",
+    "Browse QA job listings, track companies, and stay on top of opportunities.",
 };
 
 export default function RootLayout({

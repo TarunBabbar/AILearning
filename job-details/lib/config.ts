@@ -18,6 +18,7 @@ function parseModels(raw: string | undefined): ModelOption[] {
 export function getConfig() {
   const maxPdfPages = Number(process.env.MAX_PDF_PAGES);
   const maxJobs = Number(process.env.MAX_JOBS_PER_UPLOAD);
+  const maxFileSizeMb = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE_MB);
 
   return {
     openrouterApiKey: process.env.OPENROUTER_API_KEY || "",
@@ -27,7 +28,14 @@ export function getConfig() {
     llmModels: parseModels(process.env.LLM_MODELS_JSON),
     maxPdfPages: Number.isFinite(maxPdfPages) && maxPdfPages > 0 ? maxPdfPages : 50,
     maxJobs: Number.isFinite(maxJobs) && maxJobs > 0 ? maxJobs : 200,
-    appName: process.env.NEXT_PUBLIC_APP_NAME || "Job Details",
+    maxFileSizeMb:
+      Number.isFinite(maxFileSizeMb) && maxFileSizeMb > 0 ? maxFileSizeMb : 50,
+    genericEmailDomains: (process.env.GENERIC_EMAIL_DOMAINS || "")
+      .split(",")
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean),
+    appUrl: process.env.NEXT_PUBLIC_APP_URL || "",
+    appName: process.env.NEXT_PUBLIC_APP_NAME || "QA Job Details",
     isProduction: process.env.NODE_ENV === "production",
   };
 }

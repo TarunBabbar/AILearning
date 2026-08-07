@@ -1,33 +1,15 @@
 import { callOpenRouter, extractJsonArray } from "./openrouter";
+import { getConfig } from "./config";
 
 /**
- * Email domains we treat as personal/free providers, not companies.
+ * Email domains treated as personal/free providers, not companies.
+ * Driven by the GENERIC_EMAIL_DOMAINS env var (comma-separated).
  * A job whose email uses one of these has no resolvable company domain,
  * so its company info is left null on the dashboard.
  */
-export const GENERIC_DOMAINS = new Set([
-  "gmail.com",
-  "yahoo.com",
-  "hotmail.com",
-  "outlook.com",
-  "rediffmail.com",
-  "ymail.com",
-  "live.com",
-  "google.com",
-  "icloud.com",
-  "aol.com",
-  "protonmail.com",
-  "zoho.com",
-  "mail.com",
-  "msn.com",
-  "qq.com",
-  "163.com",
-  "126.com",
-  "sina.com",
-  "foxmail.com",
-  "hey.com",
-  "gmx.com",
-]);
+export const GENERIC_DOMAINS: Set<string> = new Set(
+  getConfig().genericEmailDomains
+);
 
 export function getEmailDomain(email: string | null | undefined): string | null {
   if (!email || typeof email !== "string") return null;

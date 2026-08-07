@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Job {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   title        String
   company      String
   email        String?
@@ -16,14 +16,16 @@ model Job {
   experience   String?
   description  String?
   fileName     String?
-  status       String   @default("new")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  jobDate      DateTime?
+  status       String    @default("new")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   companyId    String?
-  companyInfo  Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyInfo  Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([createdAt])
+  @@index([jobDate])
 }
 
 model Company {

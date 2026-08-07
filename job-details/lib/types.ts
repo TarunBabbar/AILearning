@@ -19,6 +19,7 @@ export type Job = {
   experience: string | null;
   description: string | null;
   fileName: string | null;
+  jobDate: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { getEmailDomain, isGenericDomain } from "@/lib/company";
 
 /**
  * GET /api/jobs?search=&status=&company=&sort=
@@ -37,12 +38,12 @@ export async function GET(req: Request) {
 
     const orderBy: Prisma.JobOrderByWithRelationInput[] =
       sort === "oldest"
-        ? [{ createdAt: "asc" }]
+        ? [{ jobDate: "asc" }, { createdAt: "asc" }]
         : sort === "company"
-          ? [{ company: "asc" }]
-          : [{ createdAt: "desc" }];
+          ? [{ company: "asc" }, { jobDate: "desc" }]
+          : [{ jobDate: "desc" }, { createdAt: "desc" }];
 
-    const [jobs, total, statusRows] = await Promise.all([
+    const [candidates, total, statusRows] = await Promise.all([
       prisma.job.findMany({
         where,
         include: { companyInfo: true },
@@ -60,9 +61,15 @@ export async function GET(req: Request) {
       counts[s.status] = (counts[s.status] || 0) + 1;
     }
 
+    // Exclude jobs whose email uses a personal/free provider
+    // (gmail.com, google.com, live.com, yahoo.com, outlook.com, …).
+    const jobs = candidates.filter(
+      (j) => !isGenericDomain(getEmailDomain(j.email))
+    );
+
     return NextResponse.json({
       jobs,
-      total,
+      total: jobs.length,
       counts,
       filters: { search, status, company, sort },
     });

@@ -4,10 +4,7 @@ import { cookies } from "next/headers";
 export const ADMIN_COOKIE = "jobdetails_admin";
 
 function hmac(value: string): string {
-  const secret =
-    process.env.ADMIN_PASSWORD ||
-    process.env.OPENROUTER_API_KEY ||
-    "jobdetails-secret";
+  const secret = process.env.ADMIN_PASSWORD || process.env.OPENROUTER_API_KEY || "";
   return createHmac("sha256", secret).update(value).digest("hex");
 }
 
@@ -22,9 +19,9 @@ function safeEqual(a: string, b: string): boolean {
  * Verify a username/password against the env-configured admin credentials.
  */
 export function checkAdminCredentials(username: string, password: string): boolean {
-  const expectedUser = process.env.ADMIN_USERNAME || "admin";
+  const expectedUser = process.env.ADMIN_USERNAME || "";
   const expectedPass = process.env.ADMIN_PASSWORD || "";
-  if (!expectedPass) return false;
+  if (!expectedUser || !expectedPass) return false;
   return safeEqual(username, expectedUser) && safeEqual(password, expectedPass);
 }
 

@@ -50,7 +50,10 @@ type ActivityLine = {
   kind: "info" | "ok" | "warn" | "error";
 };
 
-const MAX_FILE_SIZE_MB = 50;
+const MAX_FILE_SIZE_MB = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE_MB || 50);
+
+// Default model: from env (OPENROUTER_MODEL), or first free model otherwise.
+const DEFAULT_MODEL_ID = process.env.OPENROUTER_MODEL || "";
 
 const MODELS_CACHE_KEY = "jobdetails_free_models";
 const MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -223,8 +226,13 @@ export default function UploadPage() {
     setModels(list);
     setModel((prev) => {
       if (prev) return prev;
-      const envDefault = list.find((m) => m.id.includes("nemotron-3-ultra"));
-      return envDefault?.id || list[0]?.id || "";
+      // Prefer the env-configured default model; fall back to the first
+      // model in the list if it isn't present (e.g. not currently free).
+      if (DEFAULT_MODEL_ID) {
+        const envModel = list.find((m) => m.id === DEFAULT_MODEL_ID);
+        if (envModel) return envModel.id;
+      }
+      return list[0]?.id || "";
     });
   }, []);
 
@@ -723,7 +731,7 @@ export default function UploadPage() {
                 <input
                   value={customModel}
                   onChange={(e) => setCustomModel(e.target.value)}
-                  placeholder="e.g. openrouter/free or nvidia/nemotron-3-ultra-550b-a55b:free"
+                  placeholder="e.g. openrouter/free or a model id from openrouter.ai/models"
                   className="mt-2 w-full rounded-lg border border-claude-border bg-white px-3 py-2 text-sm outline-none focus:border-claude-accent"
                 />
               )}

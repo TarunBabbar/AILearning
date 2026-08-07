@@ -1,5 +1,6 @@
 import { resolveApiKey } from "@/lib/auth";
 import { extractJobsFromText } from "@/lib/extract-jobs";
+import { parseJobDate } from "@/lib/extract";
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db";
 import { isAdminRequest } from "@/lib/admin-auth";
@@ -128,6 +129,9 @@ export async function POST(req: Request) {
               experience: j.experience || null,
               description: j.description || null,
               fileName: fileName || null,
+              // Prefer the date the LLM found in the doc; fall back to a
+              // date parsed from the filename (e.g. "6+ Years - 07-Aug.pdf").
+              jobDate: j.jobDate ?? parseJobDate(fileName),
               status: "new",
             })),
           });
