@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         type: "error",
-        content: "The bot isn't configured yet (missing OPENROUTER_API_KEY). Please contact Tarun directly on WhatsApp.",
+        content: "Sorry, I'm unable to chat right now. Please try again later, or message Tarun directly on WhatsApp.",
         waLink: buildWaLink(userMessage.slice(0, 300)),
       },
       { status: 200 }
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   if (cfg.freeModels.length === 0) {
     return NextResponse.json(
-      { type: "error", content: "No free models configured. Please check FREE_MODELS_JSON." },
+      { type: "error", content: "Sorry, I'm unable to chat right now. Please try again later." },
       { status: 500 }
     );
   }
