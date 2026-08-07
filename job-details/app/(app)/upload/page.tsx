@@ -12,6 +12,11 @@ import {
   Trash2,
   RefreshCw,
   Cpu,
+  Lock,
+  LogOut,
+  ShieldCheck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
@@ -92,6 +97,58 @@ export default function UploadPage() {
   const [summary, setSummary] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Admin auth state
+  const [admin, setAdmin] = useState<boolean | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginBusy, setLoginBusy] = useState(false);
+
+  // Check admin status on mount
+  useEffect(() => {
+    fetch("/api/auth/status")
+      .then((r) => r.json())
+      .then((d) => setAdmin(!!d.admin))
+      .catch(() => setAdmin(false));
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginBusy(true);
+    setLoginError(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginError(
+          data.error ||
+            "Login failed. You don't have admin access — browse the existing jobs instead."
+        );
+        return;
+      }
+      setAdmin(true);
+      setPassword("");
+    } catch {
+      setLoginError("Login failed. Please try again.");
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setAdmin(false);
+    setUsername("");
+    setPassword("");
+    setItems([]);
+    setSummary(null);
+  };
 
   // Check key + load free models on mount
   useEffect(() => {
@@ -285,49 +342,80 @@ export default function UploadPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-claude-text">
-          Upload Job Files
-        </h1>
-        <p className="mt-1 text-sm text-claude-muted">
-          Drop job listing PDFs, DOCX, or text files. Text is extracted in your
-          browser and parsed with an OpenRouter free model.
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-claude-text">
+            Upload Job Files
+          </h1>
+          <p className="mt-1 text-sm text-claude-muted">
+            {admin
+              ? "Drop job listing PDFs, DOCX, or text files. Text is extracted in your browser and parsed with an OpenRouter free model."
+              : "Sign in with admin credentials to upload job PDFs."}
+          </p>
+        </div>
+        {admin && (
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 rounded-lg border border-claude-border bg-white px-3 py-1.5 text-xs font-medium text-claude-muted transition-colors hover:border-claude-accent hover:text-claude-accent"
+          >
+            <LogOut size={13} />
+            Logout
+          </button>
+        )}
       </div>
 
-      {apiKeyConfigured === false && (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-claude-border bg-white p-4 text-sm">
-          <Sparkles size={18} className="text-claude-accent" />
-          <span className="flex-1 text-claude-muted">
-            No OpenRouter API key configured. Set{" "}
-            <code className="rounded bg-claude-beige-deep px-1.5 py-0.5 text-[12px]">
-              OPENROUTER_API_KEY
-            </code>{" "}
-            in the environment to enable extraction.
-          </span>
+      {admin === null ? (
+        <div className="flex items-center justify-center py-24 text-claude-muted">
+          <Loader2 size={20} className="mr-2 animate-spin" />
+          Checking access…
         </div>
-      )}
+      ) : !admin ? (
+        <LoginGate
+          username={username}
+          setUsername={setUsername}
+          password={password}
+          setPassword={setPassword}
+          showPassword={showPassword}
+          setShowPassword={setShowPassword}
+          loginError={loginError}
+          loginBusy={loginBusy}
+          onLogin={handleLogin}
+        />
+      ) : (
+        <>
+          {apiKeyConfigured === false && (
+            <div className="mb-6 flex items-center gap-3 rounded-lg border border-claude-border bg-white p-4 text-sm">
+              <Sparkles size={18} className="text-claude-accent" />
+              <span className="flex-1 text-claude-muted">
+                No OpenRouter API key configured. Set{" "}
+                <code className="rounded bg-claude-beige-deep px-1.5 py-0.5 text-[12px]">
+                  OPENROUTER_API_KEY
+                </code>{" "}
+                in the environment to enable extraction.
+              </span>
+            </div>
+          )}
 
-      {/* Dropzone */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          addFiles(e.dataTransfer.files);
-        }}
-        onClick={() => inputRef.current?.click()}
-        className={cn(
-          "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-14 text-center transition-colors",
-          dragging
-            ? "border-claude-accent bg-claude-accent-soft"
-            : "border-claude-border bg-white hover:border-claude-accent/60"
-        )}
-      >
+          {/* Dropzone */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              addFiles(e.dataTransfer.files);
+            }}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-14 text-center transition-colors",
+              dragging
+                ? "border-claude-accent bg-claude-accent-soft"
+                : "border-claude-border bg-white hover:border-claude-accent/60"
+            )}
+          >
         <UploadCloud size={36} className="mb-3 text-claude-accent" />
         <p className="text-sm font-medium text-claude-text">
           Drag & drop job files here
@@ -525,6 +613,118 @@ export default function UploadPage() {
           {summary}
         </div>
       )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function LoginGate({
+  username,
+  setUsername,
+  password,
+  setPassword,
+  showPassword,
+  setShowPassword,
+  loginError,
+  loginBusy,
+  onLogin,
+}: {
+  username: string;
+  setUsername: (v: string) => void;
+  password: string;
+  setPassword: (v: string) => void;
+  showPassword: boolean;
+  setShowPassword: (v: boolean) => void;
+  loginError: string | null;
+  loginBusy: boolean;
+  onLogin: (e: React.FormEvent) => void;
+}) {
+  return (
+    <div className="mx-auto max-w-md rounded-xl border border-claude-border bg-white p-8">
+      <div className="mb-6 flex flex-col items-center text-center">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-claude-accent-soft text-claude-accent">
+          <Lock size={22} />
+        </div>
+        <h2 className="text-lg font-semibold text-claude-text">
+          Admin access required
+        </h2>
+        <p className="mt-1 text-sm text-claude-muted">
+          Uploading job PDFs is restricted. Enter the admin credentials to
+          continue.
+        </p>
+      </div>
+
+      <form onSubmit={onLogin} className="space-y-4">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-claude-muted">
+            Username
+          </label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username"
+            className="w-full rounded-lg border border-claude-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-claude-accent"
+            required
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-claude-muted">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full rounded-lg border border-claude-border bg-white px-3 py-2 pr-10 text-sm outline-none transition-colors focus:border-claude-accent"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+        </div>
+
+        {loginError && (
+          <div className="rounded-lg bg-[#f5e5e5] p-3 text-xs text-[#a04040]">
+            {loginError}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loginBusy}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-claude-accent px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-claude-accent-strong disabled:opacity-50"
+        >
+          {loginBusy ? (
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              Signing in…
+            </>
+          ) : (
+            <>
+              <ShieldCheck size={15} />
+              Sign in
+            </>
+          )}
+        </button>
+      </form>
+
+      <p className="mt-4 text-center text-xs text-claude-muted">
+        Don&apos;t have admin access? Head back to the{" "}
+        <a href="/" className="text-claude-accent hover:underline">
+          Dashboard
+        </a>{" "}
+        to explore the available jobs.
+      </p>
     </div>
   );
 }

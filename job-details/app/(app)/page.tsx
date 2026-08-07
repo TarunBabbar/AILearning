@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Search,
   Building2,
@@ -9,7 +8,6 @@ import {
   Mail,
   Briefcase,
   Clock,
-  Upload,
   Loader2,
   ChevronDown,
   ChevronRight,
@@ -95,23 +93,14 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-6xl">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-claude-text">
-            Job Dashboard
-          </h1>
-          <p className="mt-1 text-sm text-claude-muted">
-            Browse extracted jobs, search, and see company details resolved from
-            email domains.
-          </p>
-        </div>
-        <Link
-          href="/upload"
-          className="flex items-center gap-2 rounded-lg bg-claude-accent px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-claude-accent-strong"
-        >
-          <Upload size={16} />
-          Upload Jobs
-        </Link>
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-claude-text">
+          Job Dashboard
+        </h1>
+        <p className="mt-1 text-sm text-claude-muted">
+          Browse extracted jobs, search, and see company details resolved from
+          email domains.
+        </p>
       </div>
 
       {/* API key banner */}
@@ -211,17 +200,25 @@ export default function Dashboard() {
       ) : !data || data.jobs.length === 0 ? (
         <div className="rounded-lg border border-claude-border bg-white p-12 text-center">
           <Briefcase size={32} className="mx-auto mb-3 text-claude-muted/50" />
-          <p className="text-sm font-medium text-claude-text">No jobs yet</p>
-          <p className="mt-1 text-sm text-claude-muted">
-            Upload job PDFs to start extracting job details.
-          </p>
-          <Link
-            href="/upload"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-claude-accent px-4 py-2 text-sm font-medium text-white hover:bg-claude-accent-strong"
-          >
-            <Upload size={16} />
-            Go to Upload
-          </Link>
+          {data?.dbError ? (
+            <>
+              <p className="text-sm font-medium text-claude-text">
+                Database not reachable
+              </p>
+              <p className="mt-1 text-sm text-claude-muted">
+                Could not connect to PostgreSQL. Make sure the database server
+                is running and <code className="rounded bg-claude-beige-deep px-1.5 py-0.5 text-[12px]">DATABASE_URL</code> is correct.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-claude-text">No jobs yet</p>
+              <p className="mt-1 text-sm text-claude-muted">
+                Jobs will appear here once uploaded. Use the left navigation to
+                upload job PDFs.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

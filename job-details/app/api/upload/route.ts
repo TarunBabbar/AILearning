@@ -3,14 +3,27 @@ import { resolveApiKey } from "@/lib/auth";
 import { extractJobsFromText } from "@/lib/extract-jobs";
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db";
+import { isAdminRequest } from "@/lib/admin-auth";
 
 /**
  * POST /api/upload
  * Body: { fileName, text } — text is the PDF/doc text extracted in the browser.
  * Runs LLM extraction and persists jobs to the database.
+ * Requires an admin session (credentials from .env).
  */
 export async function POST(req: Request) {
   try {
+    const admin = await isAdminRequest();
+    if (!admin) {
+      return NextResponse.json(
+        {
+          error:
+            "Admin access required to upload jobs. Sign in with the admin credentials from the environment.",
+        },
+        { status: 403 }
+      );
+    }
+
     const { fileName, text, model } = (await req.json()) as {
       fileName?: string;
       text?: string;

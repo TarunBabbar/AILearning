@@ -140,31 +140,55 @@ job-details/
 
 ## 📦 Getting started (local)
 
+### Option A — PostgreSQL via Docker (easiest)
+
 ```bash
 cd job-details
 npm install
 
-# 1. Create .env from the template and fill in your values
-cp .env.example .env
-#    DATABASE_URL        — your Postgres connection string
-#    OPENROUTER_API_KEY  — your OpenRouter key (https://openrouter.ai/keys)
+# 1. Start a Postgres container (matches the default DATABASE_URL in .env)
+docker run -d --name jobdetails-postgres \
+  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=jobdetails \
+  -p 5432:5432 -v jobdetails-pgdata:/var/lib/postgresql/data postgres:16
 
-# 2. Create the database schema
+# 2. Create .env from the template and fill in your values
+cp .env.example .env
+#    DATABASE_URL        — postgresql://postgres:postgres@localhost:5432/jobdetails?schema=public
+#    OPENROUTER_API_KEY  — your OpenRouter key (https://openrouter.ai/keys)
+#    ADMIN_USERNAME      — admin login for the Upload page
+#    ADMIN_PASSWORD      — admin password for the Upload page
+
+# 3. Create the database schema
 npx prisma db push
 
-# 3. Run
+# 4. Run
 npm run dev
 # → http://localhost:3000
 ```
 
+To stop/start the container later: `docker stop jobdetails-postgres` / `docker start jobdetails-postgres`.
+
+### Option B — existing Postgres (local or cloud)
+
+```bash
+cd job-details
+npm install
+cp .env.example .env
+#    set DATABASE_URL to your Postgres connection string (local, Neon, Vercel Postgres)
+npx prisma db push
+npm run dev
+```
+
 ### Environment variables
 
-| Variable             | Required | Description                                                        | Example                                                        |
-| -------------------- | -------- | ------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `DATABASE_URL`       | ✅       | PostgreSQL connection string (used by Prisma CLI **and** runtime)  | `postgresql://user:pass@host:5432/jobdetails?schema=public`    |
-| `OPENROUTER_API_KEY` | ✅       | OpenRouter API key — server-side only, never exposed to the client | `sk-or-v1-…`                                                   |
-| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload                      | `deepseek/deepseek-v4-flash`                                   |
-| `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                       | `Job Details`                                                  |
+| Variable             | Required | Description                                                                  | Example                                                       |
+| -------------------- | -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `DATABASE_URL`       | ✅       | PostgreSQL connection string (used by Prisma CLI **and** runtime)            | `postgresql://user:pass@host:5432/jobdetails?schema=public`  |
+| `OPENROUTER_API_KEY` | ✅       | OpenRouter API key — server-side only, never exposed to the client           | `sk-or-v1-…`                                                  |
+| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload                                | `nvidia/nemotron-3-ultra-550b-a55b:free`                      |
+| `ADMIN_USERNAME`     | ❌       | Username that unlocks the Upload page (defaults to `admin`)                  | `admin`                                                       |
+| `ADMIN_PASSWORD`     | ❌       | Password that unlocks the Upload page — without it, uploads stay locked      | `admin123`                                                    |
+| `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                                | `Job Details`                                                 |
 
 ---
 

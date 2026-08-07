@@ -31,6 +31,7 @@ export type JobsResponse = {
   total: number;
   counts: Record<string, number>;
   filters: { search: string; status: string; company: string; sort: string };
+  dbError?: boolean;
 };
 
 export type CompaniesResponse = {

@@ -30,3 +30,7 @@ next-env.d.ts
 
 # prisma generated client
 /generated
+
+# sqlite artifacts (stray dev.db from ambient DATABASE_URL)
+*.db
+prisma/dev.db
