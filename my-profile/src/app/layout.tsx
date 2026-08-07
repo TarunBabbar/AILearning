@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: "Tarun Kumar Babbar — Test Automation Architect | AI-Augmented QA",
   description:
     "Test Automation Architect with 18+ years building enterprise-grade automation frameworks, AI-augmented QA systems, and multi-agent AI test platforms. Currently building an AI Test Copilot.",
+  icons: {
+    icon: "/tarunfavicon.png",
+    shortcut: "/tarunfavicon.png",
+  },
   openGraph: {
     title: "Tarun Kumar Babbar — Test Automation Architect",
     description:

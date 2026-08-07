@@ -56,7 +56,7 @@ export default function Hero() {
               className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-700 text-xs font-semibold px-4 py-1.5 rounded-full mb-6 tracking-wide"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Open to AI / Test Architect roles
+              Pioneering AI-Native Quality Engineering
             </motion.div>
 
             <motion.h1
