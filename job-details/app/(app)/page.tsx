@@ -117,10 +117,10 @@ export default function Dashboard() {
   }, []);
 
   const stats = useMemo(() => {
-    if (!data) return { total: 0, withCompany: 0, sources: 0 };
-    const withCompany = data.jobs.filter((j) => j.companyInfo).length;
+    if (!data) return { total: 0, companies: 0, sources: 0 };
+    const companies = new Set(data.jobs.map((j) => j.company.trim().toLowerCase()).filter(Boolean)).size;
     const sources = new Set(data.jobs.map((j) => j.fileName).filter(Boolean)).size;
-    return { total: data.total, withCompany, sources };
+    return { total: data.total, companies, sources };
   }, [data]);
 
   // Group jobs by date (jobDate or createdAt fallback)
@@ -180,10 +180,9 @@ export default function Dashboard() {
         />
         <StatCard
           icon={Building2}
-          label="Known Companies"
-          value={stats.withCompany}
+          label="Companies"
+          value={stats.companies}
           accent="bg-[#e6edf5] text-[#4a6d8c]"
-          hint={stats.total > 0 ? `${Math.round((stats.withCompany / stats.total) * 100)}% resolved` : undefined}
         />
         <StatCard
           icon={FileText}
