@@ -185,10 +185,13 @@ npm run dev
 | -------------------- | -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `DATABASE_URL`       | ✅       | PostgreSQL connection string (used by Prisma CLI **and** runtime)            | `postgresql://user:pass@host:5432/jobdetails?schema=public`  |
 | `OPENROUTER_API_KEY` | ✅       | OpenRouter API key — server-side only, never exposed to the client           | `sk-or-v1-…`                                                  |
-| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload                                | `nvidia/nemotron-3-ultra-550b-a55b:free`                      |
+| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload                                | `nvidia/nemotron-nano-9b-v2:free`                             |
+| `GENERIC_EMAIL_DOMAINS` | ❌     | Comma-separated personal-email domains hidden from the dashboard             | `gmail.com,yahoo.com,live.com,…`                              |
 | `ADMIN_USERNAME`     | ❌       | Username that unlocks the Upload page (defaults to `admin`)                  | `admin`                                                       |
 | `ADMIN_PASSWORD`     | ❌       | Password that unlocks the Upload page — without it, uploads stay locked      | `admin123`                                                    |
-| `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                                | `Job Details`                                                 |
+| `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                                | `QA Job Details`                                              |
+| `NEXT_PUBLIC_APP_URL`  | ❌     | Public app URL (sent to OpenRouter as referer)                               | `https://your-app.vercel.app`                                 |
+| `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | ❌ | Max upload size per file shown on the Upload page                          | `50`                                                          |
 
 ---
 
@@ -210,16 +213,45 @@ npm run dev
 
 ---
 
-## ☁️ Deploy to Vercel
+## ☁️ Deploy to Vercel (functional guide)
 
-1. Push this folder to a GitHub repo (the repo root is `job-details/`).
-2. On [vercel.com](https://vercel.com) → **Add New → Project** → import the repo. Vercel auto-detects **Next.js**.
-3. Create a Postgres database — [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres) or [Neon](https://neon.tech) — and copy its connection string.
-4. Add **Environment Variables** (Project → Settings → Environment Variables):
-   - `DATABASE_URL` — the Postgres connection string (use the *direct* URL, not a pooled URL, since Prisma 7 uses a driver adapter).
-   - `OPENROUTER_API_KEY` — your OpenRouter key.
-   - `OPENROUTER_MODEL` — optional, defaults to `deepseek/deepseek-v4-flash`.
-5. Deploy. That's it — `postinstall` runs `prisma generate` during the build.
+The app is fully serverless-ready: PDF text is extracted **in the browser**, so no
+binary uploads hit the server, and all state lives in PostgreSQL. On Vercel you
+just swap the local Docker Postgres for a cloud Postgres (Neon / Vercel Postgres)
+via the `DATABASE_URL` env var — no code changes.
+
+**1. Create a Neon database (free)**
+- Sign up at [neon.tech](https://neon.tech) → **New Project** → name it `jobdetails`
+- Copy the **connection string** from the dashboard, e.g.
+  `postgresql://user:password@ep-xxx.region.aws.neon.tech/jobdetails?sslmode=require`
+
+**2. Push the schema to Neon (run locally)**
+```bash
+cd job-details
+set DATABASE_URL="postgresql://user:password@ep-xxx.region.aws.neon.tech/jobdetails?sslmode=require"
+npx prisma db push
+```
+
+**3. Deploy on Vercel**
+- [vercel.com](https://vercel.com) → **Add New → Project** → import the GitHub repo
+- **Root Directory**: set to **`job-details`** (the repo root contains multiple projects)
+- Framework: **Next.js** (auto-detected)
+- Add **Environment Variables** (Project → Settings → Environment Variables):
+  - `DATABASE_URL` — the Neon connection string
+  - `OPENROUTER_API_KEY` — your OpenRouter key
+  - `OPENROUTER_MODEL` — default `nvidia/nemotron-nano-9b-v2:free`
+  - `GENERIC_EMAIL_DOMAINS` — the comma-separated personal-domain list
+  - `ADMIN_USERNAME` / `ADMIN_PASSWORD` — upload page credentials
+  - `NEXT_PUBLIC_APP_URL` — `https://<your-project>.vercel.app`
+- **Deploy**. The `postinstall` script runs `prisma generate` during the build.
+
+**4. Function duration note**
+The upload + company-resolve routes set `maxDuration = 300` so LLM calls (which
+can take a couple of minutes) aren't cut off. Vercel Hobby allows up to 300s.
+
+**5. First-load note**
+Neon's free tier auto-pauses after ~5 min of inactivity — the first request after
+a pause takes a few seconds to wake the DB. That's normal.
 
 ### Prisma 7 notes for Vercel
 - Prisma 7 uses **driver adapters** (`@prisma/adapter-pg`) at runtime — the `DATABASE_URL` must be a **direct TCP connection string** (not `prisma://`/Accelerate or a pooled connection pooler URL).

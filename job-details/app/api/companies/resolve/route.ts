@@ -4,6 +4,9 @@ import { getEmailDomain, isGenericDomain, resolveCompanyDetails, titleCase } fro
 import { resolveApiKey } from "@/lib/auth";
 import { getConfig } from "@/lib/config";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 /**
  * POST /api/companies/resolve
  * Body: { model?: string }

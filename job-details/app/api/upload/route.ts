@@ -7,6 +7,9 @@ import { isAdminRequest } from "@/lib/admin-auth";
 import { createLogger, type LogEvent } from "@/lib/logger";
 
 export const runtime = "nodejs";
+// LLM extraction can take minutes — allow the max function duration.
+// Vercel Hobby: 300s max · Pro/Enterprise: 800s.
+export const maxDuration = 300;
 
 /**
  * POST /api/upload
