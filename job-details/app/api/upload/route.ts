@@ -13,12 +13,18 @@ export const maxDuration = 300;
 
 /**
  * Build a normalized duplicate key for a job: lowercase company +
- * whitespace-collapsed description. This is the strongest "same job
- * posting" signal (a re-uploaded PDF yields identical company+description).
+ * punctuation-stripped, whitespace-collapsed description. This is the
+ * strongest "same job posting" signal — a re-uploaded PDF (or the same job
+ * extracted by different models) yields the same key even when punctuation
+ * differs (e.g. "Frameworks." vs "Frameworks").
  */
 function dupKey(company: string, description: string): string {
   const c = (company || "").trim().toLowerCase();
-  const d = (description || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const d = (description || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ") // strip punctuation
+    .replace(/\s+/g, " ")
+    .trim();
   return `${c}||${d}`;
 }
 
@@ -163,8 +169,10 @@ export async function POST(req: Request) {
               "Saved to database",
               `${toInsert.length} new · ${duplicateCount} duplicate(s) so far`
             );
+            // Report CUMULATIVE totals (across all chunks so far), not the
+            // per-chunk insert count.
             progress(
-              `+${toInsert.length} new job(s), ${duplicateCount} duplicate(s) skipped (${added} new total).`
+              `Extracted ${added} job(s) so far · ${duplicateCount} duplicate(s) skipped (added ${toInsert.length} in this chunk).`
             );
           }
         };

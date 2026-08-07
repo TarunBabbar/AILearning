@@ -105,3 +105,164 @@ export function titleCase(company: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
 }
+
+/** Common legal/structural suffixes removed when normalizing a company name. */
+const COMPANY_SUFFIXES = [
+  "technologies",
+  "technology",
+  "solutions",
+  "services",
+  "systems",
+  "software",
+  "consulting",
+  "consultants",
+  "group",
+  "global",
+  "international",
+  "inc",
+  "inc.",
+  "ltd",
+  "llc",
+  "pvt",
+  "pvt.",
+  "private",
+  "limited",
+  "corp",
+  "corporation",
+  "co",
+  "co.",
+  "company",
+  "labs",
+  "lab",
+  "tech",
+  "digital",
+  "it solutions",
+  "it services",
+  "infotech",
+  "techno",
+  "solutions inc",
+];
+
+function normalizeToken(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Derive a canonical company identity from a company-name string and/or an
+ * email domain. The two are normalized and compared after removing TLDs and
+ * common suffixes, so "INNOVENTES" + "innoventes.co" (or ".in", ".com", …)
+ * both map to the same key. Returns null when nothing usable is found.
+ */
+export function deriveCompanyKey(
+  companyText: string | null | undefined,
+  email: string | null | undefined
+): string | null {
+  const candidates = new Set<string>();
+
+  // From the email domain: strip TLD (and co.in / co.uk style multi-part TLDs).
+  const domain = getEmailDomain(email);
+  if (domain) {
+    const parts = domain.split(".");
+    // e.g. innoventes.co.in → ["innoventes","co","in"] → drop trailing co.in
+    let label = parts[0];
+    if (parts.length >= 3 && ["co", "com", "ac", "org", "net"].includes(parts[1])) {
+      label = parts[0];
+    }
+    if (label && !isGenericDomain(domain)) {
+      candidates.add(normalizeToken(label));
+    }
+  }
+
+  // From the company text: strip common suffixes and normalize.
+  if (companyText) {
+    let t = normalizeToken(companyText);
+    for (const suffix of COMPANY_SUFFIXES) {
+      const pat = new RegExp(`\\s*${suffix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`);
+      t = t.replace(pat, "").trim();
+    }
+    if (t) candidates.add(t);
+    // Also add the raw normalized text as a fallback (e.g. multi-word names).
+    candidates.add(normalizeToken(companyText));
+  }
+
+  return candidates.size ? [...candidates].sort((a, b) => b.length - a.length)[0] : null;
+}
+
+/**
+ * Normalized duplicate key for a job: lowercase company + punctuation-
+ * stripped, whitespace-collapsed description. Two jobs are the same posting
+ * when both match (modulo punctuation/truncation differences from the LLM).
+ */
+export function jobDuplicateKey(company: string, description: string): string {
+  const c = (company || "").trim().toLowerCase();
+  const d = (description || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${c}||${d}`;
+}
+
+/**
+ * Dedupe a job list in place of display: collapse jobs with the same
+ * company + normalized description, keeping the first occurrence.
+ */
+export function dedupeJobs<T extends { company: string; description: string | null }>(
+  jobs: T[]
+): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const j of jobs) {
+    const key = jobDuplicateKey(j.company, j.description ?? "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(j);
+  }
+  return unique;
+}
+
+/**
+ * Count distinct companies using the SAME label-merge logic as the Company
+ * Jobs view: groups are built by derived key, then groups whose labels
+ * normalize to the same value are merged. Returns the merged count.
+ */
+export function countDistinctCompanies<
+  T extends { company: string; email: string | null }
+>(jobs: T[]): number {
+  const grouped = groupJobsByCompany(jobs);
+  const merged = new Set<string>();
+  for (const { label } of grouped.values()) {
+    merged.add(label.toLowerCase());
+  }
+  return merged.size;
+}
+
+/**
+ * Group jobs into companies. The key is derived from the email domain when
+ * available (most reliable), else from the company text.
+ */
+export function groupJobsByCompany<T extends { company: string; email: string | null }>(
+  jobs: T[]
+): Map<string, { label: string; jobs: T[] }> {
+  const map = new Map<string, { label: string; jobs: T[] }>();
+  for (const j of jobs) {
+    const key = deriveCompanyKey(j.company, j.email);
+    if (!key) continue;
+    let entry = map.get(key);
+    if (!entry) {
+      // Prefer the email-derived label; fall back to the company text.
+      const domain = getEmailDomain(j.email);
+      const label = domain && !isGenericDomain(domain)
+        ? titleCase(domain.split(".")[0])
+        : titleCase(j.company);
+      entry = { label, jobs: [] };
+      map.set(key, entry);
+    }
+    entry.jobs.push(j);
+  }
+  return map;
+}

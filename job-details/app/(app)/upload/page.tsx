@@ -438,14 +438,14 @@ export default function UploadPage() {
                 } else if (obj.type === "progress") {
                   updateItem(item.id, { progressLabel: String(obj.message) });
                   pushActivity(String(obj.message));
-                  // Live new/duplicate counts: "+3 new job(s), 2 duplicate(s)
-                  // skipped (5 new total)."
+                  // Live cumulative totals: "Extracted 12 job(s) so far · 3
+                  // duplicate(s) skipped (added 2 in this chunk)."
                   const msg = String(obj.message);
-                  const newMatch = msg.match(/\+(\d+)\s+new/);
+                  const extractedMatch = msg.match(/Extracted\s+(\d+)\s+job/);
                   const dupMatch = msg.match(/(\d+)\s+duplicate/);
-                  if (newMatch || dupMatch) {
+                  if (extractedMatch || dupMatch) {
                     updateItem(item.id, {
-                      liveNew: newMatch ? Number(newMatch[1]) : undefined,
+                      liveNew: extractedMatch ? Number(extractedMatch[1]) : undefined,
                       liveDup: dupMatch ? Number(dupMatch[1]) : undefined,
                     });
                   }
@@ -560,6 +560,21 @@ export default function UploadPage() {
   const pendingCount = items.filter(
     (i) => i.status === "queued" || i.status === "error"
   ).length;
+
+  // Batch totals across ALL files: live counts while in progress,
+  // final counts once done.
+  const batchExtracted = items.reduce(
+    (sum, i) => sum + (i.status === "done" && i.result ? i.result.added : i.liveNew ?? 0),
+    0
+  );
+  const batchDuplicates = items.reduce(
+    (sum, i) =>
+      sum +
+      (i.status === "done" && i.result
+        ? i.result.duplicates ?? 0
+        : i.liveDup ?? 0),
+    0
+  );
 
   const selectedModelInfo = models.find((m) => m.id === selectedModel);
 
@@ -786,9 +801,20 @@ export default function UploadPage() {
           {items.length > 0 && (
             <div className="mt-4 rounded-xl border border-claude-border bg-white">
               <div className="flex items-center justify-between border-b border-claude-border px-4 py-2.5">
-                <span className="text-sm font-medium text-claude-text">
-                  Files ({items.length})
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-claude-text">
+                    Files ({items.length})
+                  </span>
+                  {(batchExtracted > 0 || batchDuplicates > 0) && (
+                    <span className="flex items-center gap-1.5 rounded-full bg-[#f3e8f5] px-2.5 py-0.5 text-[11px] text-[#7a3d8c]">
+                      <span className="font-semibold">
+                        Total: {batchExtracted} new
+                      </span>
+                      <span className="opacity-60">·</span>
+                      <span>{batchDuplicates} dup</span>
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={clearAll}
@@ -978,10 +1004,10 @@ function StatusBadge({ item }: { item: UploadItem }) {
       return (
         <span className="flex items-center gap-1.5 rounded-full bg-[#f3e8f5] px-2 py-0.5 text-[11px] text-[#7a3d8c]">
           <span className="font-semibold">
-            new {item.liveNew ?? 0}
+            Extracted {item.liveNew ?? 0}
           </span>
           <span className="opacity-60">·</span>
-          <span>dup {item.liveDup ?? 0}</span>
+          <span>Dup {item.liveDup ?? 0}</span>
         </span>
       );
     case "done":

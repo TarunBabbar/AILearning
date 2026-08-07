@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Upload, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LayoutDashboard, Upload, Building2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/companies", label: "Company Jobs", icon: Building2 },
   { href: "/upload", label: "Upload Jobs", icon: Upload },
 ];
 

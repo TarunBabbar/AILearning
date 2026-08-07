@@ -48,22 +48,6 @@ function initials(name: string): string {
     .join("");
 }
 
-function formatDateHeader(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  if (isNaN(d.getTime())) return dateStr;
-  const today = new Date();
-  const todayKey = today.toISOString().slice(0, 10);
-  const yesterday = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
-  if (dateStr === todayKey) return `Today · ${d.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "short" })}`;
-  if (dateStr === yesterday) return `Yesterday · ${d.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "short" })}`;
-  return d.toLocaleDateString("en-US", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 function formatShortDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
@@ -118,7 +102,7 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     if (!data) return { total: 0, companies: 0, sources: 0 };
-    const companies = new Set(data.jobs.map((j) => j.company.trim().toLowerCase()).filter(Boolean)).size;
+    const companies = data.companyCount ?? 0;
     const sources = new Set(data.jobs.map((j) => j.fileName).filter(Boolean)).size;
     return { total: data.total, companies, sources };
   }, [data]);
@@ -278,19 +262,8 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="space-y-8">
-          {grouped.map(({ date, jobs }) => (
-            <div key={date}>
-              {/* Date header */}
-              <div className="mb-3 flex items-center gap-3">
-                <h2 className="text-sm font-semibold text-claude-text">
-                  {formatDateHeader(date)}
-                </h2>
-                <span className="rounded-full bg-claude-accent-soft px-2 py-0.5 text-[11px] font-medium text-claude-accent-strong">
-                  {jobs.length} job{jobs.length === 1 ? "" : "s"}
-                </span>
-                <div className="h-px flex-1 bg-claude-border" />
-              </div>
-
+          {grouped.map(({ jobs }) => (
+            <div key={jobs[0]?.id ?? "group"}>
               <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {jobs.map((job) => (
                   <JobCard

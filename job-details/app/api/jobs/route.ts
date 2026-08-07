@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { isAdminRequest } from "@/lib/admin-auth";
-import { getEmailDomain, isGenericDomain } from "@/lib/company";
+import { getEmailDomain, isGenericDomain, dedupeJobs, countDistinctCompanies } from "@/lib/company";
 
 /**
  * GET /api/jobs?search=&status=&company=&sort=
@@ -14,10 +14,6 @@ export async function GET(req: Request) {
   const status = url.searchParams.get("status")?.trim() || "";
   const company = url.searchParams.get("company")?.trim() || "";
   const sort = url.searchParams.get("sort")?.trim() || "newest";
-  const limit = Math.min(
-    parseInt(url.searchParams.get("limit") || "200", 10) || 200,
-    500
-  );
 
   try {
     const where: Prisma.JobWhereInput = {};
@@ -48,7 +44,6 @@ export async function GET(req: Request) {
         where,
         include: { companyInfo: true },
         orderBy,
-        take: limit,
       }),
       prisma.job.count({ where }),
       prisma.job.findMany({
@@ -63,14 +58,23 @@ export async function GET(req: Request) {
 
     // Exclude jobs whose email uses a personal/free provider
     // (gmail.com, google.com, live.com, yahoo.com, outlook.com, …).
-    const jobs = candidates.filter(
+    const filtered = candidates.filter(
       (j) => !isGenericDomain(getEmailDomain(j.email))
     );
+
+    // Remove duplicates across ALL companies (same company + same
+    // normalized description = same posting).
+    const jobs = dedupeJobs(filtered);
+
+    // Distinct companies using the same label-merge logic as the
+    // Company Jobs view, so the numbers match everywhere.
+    const companyCount = countDistinctCompanies(jobs);
 
     return NextResponse.json({
       jobs,
       total: jobs.length,
       counts,
+      companyCount,
       filters: { search, status, company, sort },
     });
   } catch (e) {
