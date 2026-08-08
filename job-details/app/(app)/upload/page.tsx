@@ -11,14 +11,13 @@ import {
   Sparkles,
   Trash2,
   RefreshCw,
-  Cpu,
   Lock,
   LogOut,
   ShieldCheck,
   Eye,
   EyeOff,
-  ChevronDown,
   Terminal,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
@@ -41,12 +40,6 @@ type UploadItem = {
   result?: { added: number; extracted: number; duplicates?: number; total: number };
 };
 
-type ModelInfo = {
-  id: string;
-  name: string;
-  context: number | null;
-};
-
 type UploadResult = {
   added: number;
   extracted: number;
@@ -64,47 +57,6 @@ type ActivityLine = {
 
 const MAX_FILE_SIZE_MB = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE_MB || 50);
 
-// Default model: from env (OPENROUTER_MODEL), or first free model otherwise.
-const DEFAULT_MODEL_ID = process.env.OPENROUTER_MODEL || "";
-
-const MODELS_CACHE_KEY = "jobdetails_free_models";
-const MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-type ModelsCache = { at: number; models: ModelInfo[] };
-
-// In-memory cache shared across the whole running app session.
-let sessionCache: ModelsCache | null = null;
-
-function readModelsCache(): ModelsCache | null {
-  try {
-    const raw = localStorage.getItem(MODELS_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ModelsCache;
-    if (!Array.isArray(parsed.models)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeModelsCache(models: ModelInfo[]) {
-  try {
-    localStorage.setItem(
-      MODELS_CACHE_KEY,
-      JSON.stringify({ at: Date.now(), models } satisfies ModelsCache)
-    );
-  } catch {
-    // ignore
-  }
-}
-
-function formatContext(ctx: number | null): string {
-  if (!ctx) return "—";
-  if (ctx >= 1_000_000) return `${(ctx / 1_000_000).toFixed(1)}M`;
-  if (ctx >= 1_000) return `${Math.round(ctx / 1_000)}K`;
-  return String(ctx);
-}
-
 function timeLabel(ts: string): string {
   return new Date(ts).toLocaleTimeString("en-US", {
     hour12: false,
@@ -116,22 +68,28 @@ function timeLabel(ts: string): string {
 
 export default function UploadPage() {
   const [items, setItems] = useState<UploadItem[]>([]);
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
-  const [modelsError, setModelsError] = useState<string | null>(null);
   const [model, setModel] = useState("");
-  const [customModel, setCustomModel] = useState("");
-  const [useCustom, setUseCustom] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  const [summary, setSummary] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [activity, setActivity] = useState<ActivityLine[]>([]);
-  const [showActivity, setShowActivity] = useState(true);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const activityRef = useRef<HTMLDivElement>(null);
   const seqRef = useRef(0);
+
+  const copyActivityLog = useCallback(async () => {
+    const text = activity
+      .map((l) => `${timeLabel(l.ts)} ${l.text}`)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable
+    }
+  }, [activity]);
 
   // Admin auth state
   const [admin, setAdmin] = useState<boolean | null>(null);
@@ -219,11 +177,10 @@ export default function UploadPage() {
     setUsername("");
     setPassword("");
     setItems([]);
-    setSummary(null);
     pushActivity("Logged out.");
   };
 
-  // Check key on mount
+  // Check key + default model on mount
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -233,70 +190,6 @@ export default function UploadPage() {
       })
       .catch(() => setApiKeyConfigured(false));
   }, []);
-
-  const applyModels = useCallback((list: ModelInfo[]) => {
-    setModels(list);
-    setModel((prev) => {
-      if (prev) return prev;
-      // Prefer the env-configured default model; fall back to the first
-      // model in the list if it isn't present (e.g. not currently free).
-      if (DEFAULT_MODEL_ID) {
-        const envModel = list.find((m) => m.id === DEFAULT_MODEL_ID);
-        if (envModel) return envModel.id;
-      }
-      return list[0]?.id || "";
-    });
-  }, []);
-
-  const loadModels = useCallback(
-    async (force = false) => {
-      // 1) In-memory cache: no network call while the app is running.
-      if (!force && sessionCache && sessionCache.models.length) {
-        applyModels(sessionCache.models);
-        setModelsLoading(false);
-        return;
-      }
-
-      // 2) localStorage cache: serve instantly if younger than 24h.
-      const cached = readModelsCache();
-      if (!force && cached && Date.now() - cached.at < MODELS_CACHE_TTL_MS) {
-        if (cached.models.length) {
-          sessionCache = cached;
-          applyModels(cached.models);
-          setModelsLoading(false);
-          return;
-        }
-      }
-
-      // 3) Network fetch (only on first load / stale cache / manual refresh).
-      setModelsLoading(true);
-      setModelsError(null);
-      try {
-        const res = await fetch("/api/models");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load models");
-        const fresh: ModelsCache = { at: Date.now(), models: data.models };
-        sessionCache = fresh;
-        writeModelsCache(data.models);
-        applyModels(data.models);
-      } catch (e) {
-        if (cached?.models.length) {
-          sessionCache = cached;
-          applyModels(cached.models);
-          setModelsError("Using cached list — live refresh failed.");
-        } else {
-          setModelsError(e instanceof Error ? e.message : "Failed to load models");
-        }
-      } finally {
-        setModelsLoading(false);
-      }
-    },
-    [applyModels]
-  );
-
-  useEffect(() => {
-    loadModels();
-  }, [loadModels]);
 
   const addFiles = useCallback(
     (files: FileList | File[]) => {
@@ -336,7 +229,6 @@ export default function UploadPage() {
 
   const clearAll = () => {
     setItems([]);
-    setSummary(null);
     setActivity([]);
   };
 
@@ -344,7 +236,7 @@ export default function UploadPage() {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   };
 
-  const selectedModel = useCustom ? customModel.trim() : model;
+  const selectedModel = model;
 
   // Max automatic retries when the server returns an error mid-processing.
   // Completed chunks are already saved (dedupe by company+description), so a
@@ -560,9 +452,8 @@ export default function UploadPage() {
   );
 
   const processAll = async () => {
-    if (!selectedModel && useCustom) return;
+    if (!selectedModel) return;
     setBusy(true);
-    setSummary(null);
     pushActivity("Starting batch processing — all files in parallel…");
     // Fire all files at once; each has its own progress bar.
     await Promise.all(
@@ -573,9 +464,6 @@ export default function UploadPage() {
     setBusy(false);
     const done = items.filter((i) => i.status === "done").length;
     const failed = items.filter((i) => i.status === "error").length;
-    setSummary(
-      `Processed ${items.length} file(s): ${done} succeeded, ${failed} failed.`
-    );
     pushActivity(
       `Batch finished — ${done} succeeded, ${failed} failed.`,
       failed > 0 ? "warn" : "ok"
@@ -600,8 +488,6 @@ export default function UploadPage() {
         : i.liveDup ?? 0),
     0
   );
-
-  const selectedModelInfo = models.find((m) => m.id === selectedModel);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -659,7 +545,7 @@ export default function UploadPage() {
             </div>
           )}
 
-          {/* Upload + model — side by side */}
+          {/* Upload + live activity — side by side */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Dropzone */}
             <div
@@ -702,129 +588,56 @@ export default function UploadPage() {
               />
             </div>
 
-            {/* Model selector — compact dropdown */}
-            <div className="rounded-xl border border-claude-border bg-white p-4">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-claude-text">
-                  Parsing model
-                </label>
+            {/* Live activity — replaces the model section */}
+            <div className="flex flex-col rounded-xl border border-claude-border bg-white">
+              <div className="flex items-center justify-between border-b border-claude-border px-4 py-2.5">
+                <span className="flex items-center gap-2 text-sm font-medium text-claude-text">
+                  <Terminal size={15} className="text-claude-accent" />
+                  Live activity
+                  {busy && <Loader2 size={13} className="animate-spin text-claude-accent" />}
+                </span>
                 <button
-                  onClick={() => loadModels(true)}
-                  disabled={modelsLoading}
-                  className="flex items-center gap-1.5 text-xs text-claude-muted hover:text-claude-text disabled:opacity-50"
-                  title="Refresh free model list"
+                  onClick={copyActivityLog}
+                  disabled={activity.length === 0}
+                  className="flex items-center gap-1.5 rounded-md border border-claude-border px-2 py-1 text-xs text-claude-muted transition-colors hover:border-claude-accent hover:text-claude-accent disabled:opacity-40"
+                  title="Copy logs"
                 >
-                  <RefreshCw size={12} className={modelsLoading ? "animate-spin" : ""} />
-                  Refresh
+                  {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+                  {copied ? "Copied" : "Copy"}
                 </button>
               </div>
-
-              {modelsLoading ? (
-                <div className="mt-2 flex items-center gap-2 py-2 text-sm text-claude-muted">
-                  <Loader2 size={14} className="animate-spin" />
-                  Loading free models…
-                </div>
-              ) : modelsError && !models.length ? (
-                <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                  <span className="text-[#a04040]">{modelsError}</span>
-                  <button
-                    onClick={() => loadModels(true)}
-                    className="text-claude-accent hover:underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : (
-                <div className="relative mt-2">
-                  <button
-                    onClick={() => setModelPickerOpen((o) => !o)}
-                    className="flex w-full items-center justify-between rounded-lg border border-claude-border bg-white px-3 py-2 text-sm text-claude-text transition-colors hover:border-claude-accent"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Cpu size={14} className="text-claude-accent" />
-                      {useCustom ? customModel || "Custom model…" : selectedModel}
-                      {selectedModelInfo?.context && !useCustom && (
-                        <span className="rounded bg-claude-beige-deep px-1.5 py-0.5 text-[10px] text-claude-muted">
-                          ctx {formatContext(selectedModelInfo.context)}
-                        </span>
-                      )}
-                    </span>
-                    <ChevronDown
-                      size={15}
+              <div
+                ref={activityRef}
+                className="max-h-64 flex-1 overflow-y-auto bg-[#faf9f6] px-4 py-2 font-mono text-[11px] leading-relaxed"
+              >
+                {activity.length === 0 ? (
+                  <div className="py-2 text-claude-muted">
+                    No activity yet — add files and start processing.
+                  </div>
+                ) : (
+                  activity.map((line) => (
+                    <div
+                      key={line.id}
                       className={cn(
-                        "text-claude-muted transition-transform",
-                        modelPickerOpen && "rotate-180"
+                        "flex gap-2 py-0.5",
+                        line.kind === "ok" && "text-[#3d7a3d]",
+                        line.kind === "warn" && "text-[#9a7b2d]",
+                        line.kind === "error" && "text-[#a04040]",
+                        line.kind === "info" && "text-claude-muted"
                       )}
-                    />
-                  </button>
-
-                  {modelPickerOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setModelPickerOpen(false)}
-                      />
-                      <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-claude-border bg-white p-1 shadow-lg">
-                        {models.map((m) => {
-                          const active = !useCustom && model === m.id;
-                          return (
-                            <button
-                              key={m.id}
-                              onClick={() => {
-                                setModel(m.id);
-                                setUseCustom(false);
-                                setModelPickerOpen(false);
-                              }}
-                              className={cn(
-                                "flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                                active
-                                  ? "bg-claude-accent-soft text-claude-accent-strong"
-                                  : "text-claude-text hover:bg-claude-bg"
-                              )}
-                            >
-                              <span className="truncate">{m.id.replace(":free", "")}</span>
-                              <span className="shrink-0 rounded bg-claude-beige-deep px-1.5 py-0.5 text-[10px] text-claude-muted">
-                                {formatContext(m.context)}
-                              </span>
-                            </button>
-                          );
-                        })}
-                        <button
-                          onClick={() => setUseCustom(true)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                            useCustom
-                              ? "bg-claude-accent-soft text-claude-accent-strong"
-                              : "text-claude-muted hover:bg-claude-bg"
-                          )}
-                        >
-                          Custom model…
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {useCustom && (
-                <input
-                  value={customModel}
-                  onChange={(e) => setCustomModel(e.target.value)}
-                  placeholder="e.g. openrouter/free or a model id from openrouter.ai/models"
-                  className="mt-2 w-full rounded-lg border border-claude-border bg-white px-3 py-2 text-sm outline-none focus:border-claude-accent"
-                />
-              )}
-
-              <p className="mt-2 text-[11px] text-claude-muted">
-                {models.length} free model(s) available — cached for 24h. Larger
-                context handles bigger files.
-              </p>
+                    >
+                      <span className="shrink-0 opacity-60">{timeLabel(line.ts)}</span>
+                      <span className="break-words">{line.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
-          {/* File list */}
+          {/* File list — scrollable, so the page doesn't scroll */}
           {items.length > 0 && (
-            <div className="mt-4 rounded-xl border border-claude-border bg-white">
+            <div className="mt-4 flex max-h-72 flex-col overflow-hidden rounded-xl border border-claude-border bg-white">
               <div className="flex items-center justify-between border-b border-claude-border px-4 py-2.5">
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-claude-text">
@@ -867,7 +680,7 @@ export default function UploadPage() {
                   </button>
                 </div>
               </div>
-              <ul className="divide-y divide-claude-border">
+              <ul className="min-h-0 flex-1 divide-y divide-claude-border overflow-y-auto">
                 {items.map((item) => (
                   <li key={item.id} className="flex items-center gap-3 px-4 py-2">
                     <FileText size={15} className="shrink-0 text-claude-muted" />
@@ -946,64 +759,6 @@ export default function UploadPage() {
               </ul>
             </div>
           )}
-
-          {/* Summary */}
-          {summary && (
-            <div className="mt-4 rounded-lg border border-claude-border bg-white p-4 text-sm text-claude-muted">
-              {summary}
-            </div>
-          )}
-
-          {/* Live activity log */}
-          <div className="mt-4 rounded-xl border border-claude-border bg-white">
-            <button
-              onClick={() => setShowActivity((s) => !s)}
-              className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-claude-text"
-            >
-              <span className="flex items-center gap-2">
-                <Terminal size={15} className="text-claude-accent" />
-                Live activity
-                {busy && (
-                  <Loader2 size={13} className="animate-spin text-claude-accent" />
-                )}
-              </span>
-              <ChevronDown
-                size={15}
-                className={cn(
-                  "text-claude-muted transition-transform",
-                  showActivity && "rotate-180"
-                )}
-              />
-            </button>
-            {showActivity && (
-              <div
-                ref={activityRef}
-                className="max-h-64 overflow-y-auto border-t border-claude-border bg-[#faf9f6] px-4 py-2 font-mono text-[11px] leading-relaxed"
-              >
-                {activity.length === 0 ? (
-                  <div className="py-2 text-claude-muted">
-                    No activity yet — add files and start processing.
-                  </div>
-                ) : (
-                  activity.map((line) => (
-                    <div
-                      key={line.id}
-                      className={cn(
-                        "flex gap-2 py-0.5",
-                        line.kind === "ok" && "text-[#3d7a3d]",
-                        line.kind === "warn" && "text-[#9a7b2d]",
-                        line.kind === "error" && "text-[#a04040]",
-                        line.kind === "info" && "text-claude-muted"
-                      )}
-                    >
-                      <span className="shrink-0 opacity-60">{timeLabel(line.ts)}</span>
-                      <span className="break-words">{line.text}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
         </>
       )}
     </div>
