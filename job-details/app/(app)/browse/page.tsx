@@ -105,7 +105,7 @@ export default function BrowsePage() {
       const params = new URLSearchParams();
       if (debounced) params.set("search", debounced);
       const [cRes, lRes] = await Promise.all([
-        fetch(`/api/companies/jobs?${params.toString()}&sort=jobs`),
+        fetch(`/api/companies/jobs?${params.toString()}&sort=name`),
         fetch(`/api/locations?${params.toString()}`),
       ]);
       if (!cRes.ok || !lRes.ok) throw new Error("Failed to load");

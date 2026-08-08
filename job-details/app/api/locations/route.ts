@@ -71,7 +71,7 @@ export async function GET(req: Request) {
         })),
         count: jobsInLoc.length,
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => a.location.localeCompare(b.location));
 
     return NextResponse.json({
       totalLocations: locations.length,
