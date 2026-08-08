@@ -47,6 +47,14 @@ type ModelInfo = {
   context: number | null;
 };
 
+type UploadResult = {
+  added: number;
+  extracted: number;
+  duplicates?: number;
+  total: number;
+  message: string;
+};
+
 type ActivityLine = {
   id: number;
   ts: string;
@@ -338,6 +346,11 @@ export default function UploadPage() {
 
   const selectedModel = useCustom ? customModel.trim() : model;
 
+  // Max automatic retries when the server returns an error mid-processing.
+  // Completed chunks are already saved (dedupe by company+description), so a
+  // retry only processes the remaining chunks — no duplicates.
+  const MAX_AUTO_RETRIES = 5;
+
   const processItem = useCallback(
     async (item: UploadItem, modelOverride?: string) => {
       const useModel = modelOverride || selectedModel;
@@ -372,159 +385,171 @@ export default function UploadPage() {
           `[${item.file.name}] Sending to LLM (${useModel || "default"}) — this can take a minute…`
         );
 
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: item.file.name,
-            text,
-            model: useModel || undefined,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          const errMsg =
-            data.error ||
-            (res.status === 401
-              ? "API key rejected. Check OPENROUTER_API_KEY in the environment."
-              : res.status === 402
-                ? "This model requires credits. Pick a different (free) model."
-                : `Failed to parse jobs (HTTP ${res.status}).`);
-          updateItem(item.id, {
-            status: "error",
-            error: errMsg,
-            failStatus: res.status,
+        // ── One full upload attempt. Returns { result } on success, or
+        //    throws / returns { error } for retryable failures. ──
+        const attempt = async (): Promise<{
+          result: UploadResult;
+        } | { error: string }> => {
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: item.file.name,
+              text,
+              model: useModel || undefined,
+            }),
           });
-          pushActivity(`[${item.file.name}] ${errMsg}`, "error");
-          return;
-        }
 
-        // NDJSON stream: live progress events from the server
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        type UploadResult = {
-          added: number;
-          extracted: number;
-          duplicates?: number;
-          total: number;
-          message: string;
-        };
-        let result: UploadResult | null = null;
-        let streamError: string | null = null;
-        let itemChunksTotal = 0;
-        let completedRef = { current: 0 };
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            const errMsg =
+              data.error ||
+              (res.status === 401
+                ? "API key rejected. Check OPENROUTER_API_KEY in the environment."
+                : res.status === 402
+                  ? "This model requires credits. Pick a different (free) model."
+                  : `Failed to parse jobs (HTTP ${res.status}).`);
+            return { error: errMsg };
+          }
 
-        if (reader) {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split("\n");
-              buffer = lines.pop() ?? "";
-              for (const line of lines) {
-                if (!line.trim()) continue;
-                let obj: Record<string, unknown>;
-                try {
-                  obj = JSON.parse(line);
-                } catch {
-                  continue;
-                }
-                if (obj.type === "chunks") {
-                  itemChunksTotal = Number(obj.total);
-                  updateItem(item.id, { chunksTotal: itemChunksTotal });
-                } else if (obj.type === "progress") {
-                  updateItem(item.id, { progressLabel: String(obj.message) });
-                  pushActivity(String(obj.message));
-                  // Live cumulative totals: "Extracted 12 job(s) so far · 3
-                  // duplicate(s) skipped (added 2 in this chunk)."
-                  const msg = String(obj.message);
-                  const extractedMatch = msg.match(/Extracted\s+(\d+)\s+job/);
-                  const dupMatch = msg.match(/(\d+)\s+duplicate/);
-                  if (extractedMatch || dupMatch) {
-                    updateItem(item.id, {
-                      liveNew: extractedMatch ? Number(extractedMatch[1]) : undefined,
-                      liveDup: dupMatch ? Number(dupMatch[1]) : undefined,
-                    });
+          // NDJSON stream: live progress events from the server
+          const reader = res.body?.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let result: UploadResult | null = null;
+          let streamError: string | null = null;
+          let itemChunksTotal = 0;
+          let completedRef = { current: 0 };
+
+          if (reader) {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() ?? "";
+                for (const line of lines) {
+                  if (!line.trim()) continue;
+                  let obj: Record<string, unknown>;
+                  try {
+                    obj = JSON.parse(line);
+                  } catch {
+                    continue;
                   }
-                  // Count COMPLETED chunks only ("parsed" / "failed with all").
-                  // Chunks finish in parallel and out of order, so we use a
-                  // running counter, not the chunk number — 4 done of 8 = 50%.
-                  if (/chunk\s+\d+\/\d+\s+(?:parsed|failed)/i.test(msg)) {
-                    completedRef.current += 1;
-                    const total = itemChunksTotal;
-                    updateItem(item.id, {
-                      chunksDone: completedRef.current,
-                      chunksTotal: total,
-                    });
-                  } else {
-                    const totalMatch = msg.match(/chunk\s+\d+\/(\d+)/i);
-                    if (totalMatch && !msg.includes("Sending")) {
-                      updateItem(item.id, { chunksTotal: Number(totalMatch[1]) });
+                  if (obj.type === "chunks") {
+                    itemChunksTotal = Number(obj.total);
+                    updateItem(item.id, { chunksTotal: itemChunksTotal });
+                  } else if (obj.type === "progress") {
+                    updateItem(item.id, { progressLabel: String(obj.message) });
+                    pushActivity(String(obj.message));
+                    // Live cumulative totals: "Extracted 12 job(s) so far · 3
+                    // duplicate(s) skipped (added 2 in this chunk)."
+                    const msg = String(obj.message);
+                    const extractedMatch = msg.match(/Extracted\s+(\d+)\s+job/);
+                    const dupMatch = msg.match(/(\d+)\s+duplicate/);
+                    if (extractedMatch || dupMatch) {
+                      updateItem(item.id, {
+                        liveNew: extractedMatch ? Number(extractedMatch[1]) : undefined,
+                        liveDup: dupMatch ? Number(dupMatch[1]) : undefined,
+                      });
                     }
+                    // Count COMPLETED chunks only ("parsed" / "failed with all").
+                    // Chunks finish in parallel and out of order, so we use a
+                    // running counter, not the chunk number — 4 done of 8 = 50%.
+                    if (/chunk\s+\d+\/\d+\s+(?:parsed|failed)/i.test(msg)) {
+                      completedRef.current += 1;
+                      const total = itemChunksTotal;
+                      updateItem(item.id, {
+                        chunksDone: completedRef.current,
+                        chunksTotal: total,
+                      });
+                    } else {
+                      const totalMatch = msg.match(/chunk\s+\d+\/(\d+)/i);
+                      if (totalMatch && !msg.includes("Sending")) {
+                        updateItem(item.id, { chunksTotal: Number(totalMatch[1]) });
+                      }
+                    }
+                  } else if (obj.type === "log") {
+                    const ev = obj.event as {
+                      message?: string;
+                      level?: string;
+                      phase?: string;
+                    };
+                    if (ev?.message) {
+                      pushActivity(
+                        `[${ev.phase ?? "llm"}] ${ev.message}`,
+                        ev.level === "error"
+                          ? "error"
+                          : ev.level === "warn"
+                            ? "warn"
+                            : "info"
+                      );
+                    }
+                  } else if (obj.type === "result") {
+                    result = obj.data as UploadResult;
+                  } else if (obj.type === "error") {
+                    streamError = String(obj.message);
                   }
-                } else if (obj.type === "log") {
-                  const ev = obj.event as {
-                    message?: string;
-                    level?: string;
-                    phase?: string;
-                  };
-                  if (ev?.message) {
-                    pushActivity(
-                      `[${ev.phase ?? "llm"}] ${ev.message}`,
-                      ev.level === "error"
-                        ? "error"
-                        : ev.level === "warn"
-                          ? "warn"
-                          : "info"
-                    );
-                  }
-                } else if (obj.type === "result") {
-                  result = obj.data as UploadResult;
-                } else if (obj.type === "error") {
-                  streamError = String(obj.message);
                 }
               }
+            } catch {
+              streamError = "Connection to the server was interrupted.";
             }
-          } catch {
-            streamError = "Connection to the server was interrupted.";
+          }
+
+          if (streamError) return { error: streamError };
+          if (!result) return { error: "Server returned no result." };
+          return { result };
+        };
+
+        // ── Auto-retry loop: up to 5 attempts on server errors. Already-
+        //    saved chunks are skipped server-side (dedupe), so retries never
+        //    create duplicates. ──
+        let lastError = "Unknown error";
+        for (let attemptNo = 1; attemptNo <= MAX_AUTO_RETRIES; attemptNo++) {
+          const out = await attempt().catch((e: unknown) => ({
+            error: e instanceof Error ? e.message : "Failed to process file.",
+          }));
+
+          if ("result" in out) {
+            const result = out.result;
+            updateItem(item.id, {
+              status: "done",
+              result: {
+                added: result.added,
+                extracted: result.extracted,
+                duplicates: result.duplicates ?? 0,
+                total: result.total,
+              },
+            });
+            pushActivity(
+              `[${item.file.name}] Done — +${result.added} new, ${result.duplicates ?? 0} duplicate(s).`,
+              "ok"
+            );
+            return;
+          }
+
+          lastError = out.error;
+          if (attemptNo < MAX_AUTO_RETRIES) {
+            // Only auto-retry on retryable server errors (not auth/credits).
+            const retryable = !/API key|credits|401|402/i.test(lastError);
+            if (!retryable) break;
+            const delay = 2000 * attemptNo; // 2s, 4s, 6s, 8s
+            pushActivity(
+              `[${item.file.name}] Server error — retrying (${attemptNo}/${MAX_AUTO_RETRIES - 1}) in ${delay / 1000}s…`,
+              "warn"
+            );
+            await new Promise((r) => setTimeout(r, delay));
           }
         }
 
-        if (streamError) {
-          updateItem(item.id, {
-            status: "error",
-            error: streamError,
-            failStatus: 500,
-          });
-          pushActivity(`[${item.file.name}] ${streamError}`, "error");
-          return;
-        }
-
-        if (!result) {
-          updateItem(item.id, {
-            status: "error",
-            error: "Server returned no result.",
-          });
-          pushActivity(`[${item.file.name}] Server returned no result.`, "error");
-          return;
-        }
-
         updateItem(item.id, {
-          status: "done",
-          result: {
-            added: result.added,
-            extracted: result.extracted,
-            duplicates: result.duplicates ?? 0,
-            total: result.total,
-          },
+          status: "error",
+          error: lastError,
+          failStatus: 500,
         });
-        pushActivity(
-          `[${item.file.name}] Done — +${result.added} new, ${result.duplicates ?? 0} duplicate(s).`,
-          "ok"
-        );
+        pushActivity(`[${item.file.name}] ${lastError}`, "error");
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to process file.";
         updateItem(item.id, { status: "error", error: msg });
