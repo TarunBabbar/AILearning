@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Upload, Building2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LayoutDashboard, Upload, Building2, PanelLeftClose, PanelLeftOpen, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/companies", label: "Company Jobs", icon: Building2 },
+  { href: "/", label: "All Jobs", icon: LayoutDashboard },
+  { href: "/companies", label: "By Company", icon: Building2 },
   { href: "/upload", label: "Upload Jobs", icon: Upload },
 ];
 
@@ -55,9 +55,9 @@ export default function Sidebar() {
           </div>
           <div>
             <div className="text-sm font-semibold tracking-tight text-claude-text">
-              QA Job Details
+              QA Tracker
             </div>
-            <div className="text-[11px] text-claude-muted">Job Tracker</div>
+            <div className="text-[11px] text-claude-muted">Job Opportunities</div>
           </div>
         </div>
         <button
@@ -97,11 +97,21 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Note — always visible when the sidebar is expanded */}
       {!collapsed && (
-        <div className="border-t border-claude-border px-5 py-4">
-          <div className="text-[11px] text-claude-muted">
-            Powered by OpenRouter free models
+        <div className="border-t border-claude-border px-3 py-3">
+          <div className="rounded-lg border border-[#eadfc2] bg-[#fbf6e9] p-3">
+            <div className="flex items-center gap-1.5">
+              <Info size={13} className="shrink-0 text-[#9a7b2d]" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#7a6120]">
+                Note
+              </span>
+            </div>
+            <p className="mt-1.5 text-[10.5px] leading-relaxed text-[#6b5a2e]">
+              Job details are AI-extracted and may contain mistakes. Verify
+              with the original posting — email the recruiter to confirm the
+              opening is still available.
+            </p>
           </div>
         </div>
       )}

@@ -189,7 +189,7 @@ npm run dev
 | `GENERIC_EMAIL_DOMAINS` | ❌     | Comma-separated personal-email domains hidden from the dashboard             | `gmail.com,yahoo.com,live.com,…`                              |
 | `ADMIN_USERNAME`     | ❌       | Username that unlocks the Upload page (defaults to `admin`)                  | `admin`                                                       |
 | `ADMIN_PASSWORD`     | ❌       | Password that unlocks the Upload page — without it, uploads stay locked      | `admin123`                                                    |
-| `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                                | `QA Job Details`                                              |
+| `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                                | `QA Tracker`                                                  |
 | `NEXT_PUBLIC_APP_URL`  | ❌     | Public app URL (sent to OpenRouter as referer)                               | `https://your-app.vercel.app`                                 |
 | `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | ❌ | Max upload size per file shown on the Upload page                          | `50`                                                          |
 

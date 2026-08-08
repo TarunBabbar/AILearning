@@ -1,5 +1,6 @@
 import { callOpenRouter, extractJsonArray } from "./openrouter";
 import { chunkText, parseJobDate } from "./extract";
+import { stripSpamText } from "./sanitize";
 import { createLogger, type Logger } from "./logger";
 
 export type ExtractedJob = {
@@ -44,36 +45,6 @@ function cleanCompany(company: string): string {
     .replace(/^[:\s]+|[:\s]+$/g, "")
     .trim();
   return cleaned || "Unknown Company";
-}
-
-// Spam / contact boilerplate that gets mixed into job descriptions and
-// should never be stored: WhatsApp numbers, "Software-Testing-Studio"
-// promos, "Interview Prep Kit Download", Telegram groups, newsletters, etc.
-const SPAM_PATTERNS = [
-  /\bwhatsapp\b[^.\n]*/gi,
-  /\b91[- ]?\d{8,10}\b/g, // Indian mobile numbers
-  /\btelegram\b[^.\n]*/gi,
-  /(?:interview\s*prep\s*kit|interview\s*preparation\s*kit|prep\s*kit)[^.\n]*/gi,
-  /\b(?:subscribe|newsletter|download\s*kit|join\s*our\s*telegram|join\s*whatsapp)\b[^.\n]*/gi,
-  /\bsoftware[- ]testing[- ]studio\b[^.\n]*/gi,
-  /\b64,\d{3}\s*\+?\s*tester/gi,
-];
-
-/**
- * Strip spam/contact boilerplate lines from a job description so junk like
- * "WhatsApp Software-Testing-Studio 91-6232667387 Interview Prep Kit
- * Download" is never stored.
- */
-function cleanDescription(description: string): string {
-  let text = description || "";
-  for (const pattern of SPAM_PATTERNS) {
-    text = text.replace(pattern, " ");
-  }
-  // Collapse leftover blank lines / double spaces.
-  return text
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/^\s+|\s+$/g, "");
 }
 
 const EXTRACTION_SYSTEM_PROMPT =
@@ -258,7 +229,7 @@ export async function extractJobsFromText(
             email: (j.email || "").trim(),
             location: (j.location || "").trim(),
             experience: (j.experience || "").trim(),
-            description: cleanDescription(j.description || ""),
+            description: stripSpamText(j.description || ""),
             jobDate: parseJobDate(j.jobDate),
           }));
           opts.onProgress?.({

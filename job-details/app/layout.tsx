@@ -13,7 +13,7 @@ const cfg = getConfig();
 export const metadata: Metadata = {
   title: cfg.appName
     ? `${cfg.appName} — Job Tracking Dashboard`
-    : "QA Job Details — Job Tracking Dashboard",
+    : "QA Tracker — Job Tracking Dashboard",
   description:
     "Browse QA job listings, track companies, and stay on top of opportunities.",
   icons: {

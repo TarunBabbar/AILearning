@@ -95,8 +95,12 @@ export default function CompaniesPage() {
       <div className="mb-6 flex items-end justify-between">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-claude-text">
-            Company Jobs
+            Jobs by Company
           </h1>
+          <p className="mt-1.5 text-sm text-claude-muted">
+            All tracked jobs grouped under each company. Expand a company to
+            see its openings.
+          </p>
         </div>
         <div className="hidden items-center gap-2 text-sm text-claude-muted sm:flex">
           <span className="inline-block h-2 w-2 rounded-full bg-claude-accent" />

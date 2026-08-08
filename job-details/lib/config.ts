@@ -35,7 +35,7 @@ export function getConfig() {
       .map((d) => d.trim().toLowerCase())
       .filter(Boolean),
     appUrl: process.env.NEXT_PUBLIC_APP_URL || "",
-    appName: process.env.NEXT_PUBLIC_APP_NAME || "QA Job Details",
+    appName: process.env.NEXT_PUBLIC_APP_NAME || "QA Tracker",
     isProduction: process.env.NODE_ENV === "production",
   };
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { getEmailDomain, isGenericDomain, dedupeJobs, countDistinctCompanies } from "@/lib/company";
+import { sanitizeJobForDisplay } from "@/lib/sanitize";
 
 /**
  * GET /api/jobs?search=&status=&company=&sort=
@@ -62,9 +63,14 @@ export async function GET(req: Request) {
       (j) => !isGenericDomain(getEmailDomain(j.email))
     );
 
+    // Display-time sanitization — replace junk company names (e.g.
+    // "Software Testing Studio") with the email-derived name and strip
+    // spam boilerplate from title/description. DB is never modified.
+    const sanitized = filtered.map((j) => sanitizeJobForDisplay(j));
+
     // Remove duplicates across ALL companies (same company + same
     // normalized description = same posting).
-    const jobs = dedupeJobs(filtered);
+    const jobs = dedupeJobs(sanitized);
 
     // Distinct companies using the same label-merge logic as the
     // Company Jobs view, so the numbers match everywhere.

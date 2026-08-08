@@ -87,7 +87,7 @@ export async function callOpenRouter(
           "Content-Type": "application/json",
           Authorization: `Bearer ${key}`,
           "HTTP-Referer": referer,
-          "X-Title": "QA Job Details",
+          "X-Title": "QA Tracker",
         },
         body: JSON.stringify({
           model,

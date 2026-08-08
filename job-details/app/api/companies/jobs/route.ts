@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { groupJobsByCompany, dedupeJobs, getEmailDomain, isGenericDomain } from "@/lib/company";
+import { sanitizeJobForDisplay } from "@/lib/sanitize";
 
 export const runtime = "nodejs";
 
@@ -37,9 +38,14 @@ export async function GET(req: Request) {
     // live.com, yahoo.com, outlook.com, …). Filter them out up front.
     const valid = jobs.filter((j) => !isGenericDomain(getEmailDomain(j.email)));
 
+    // Display-time sanitization — replace junk company names (e.g.
+    // "Software Testing Studio") with the email-derived name and strip
+    // spam boilerplate from title/description. DB is never modified.
+    const sanitized = valid.map((j) => sanitizeJobForDisplay(j));
+
     // Remove duplicates across all companies (shared logic with the
     // dashboard — same company + normalized description = same posting).
-    const unique = dedupeJobs(valid);
+    const unique = dedupeJobs(sanitized);
     const grouped = groupJobsByCompany(unique);
 
     // Merge groups that normalize to the same label (e.g. two sources both

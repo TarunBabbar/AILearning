@@ -128,10 +128,11 @@ export default function Dashboard() {
       <div className="mb-6 flex items-end justify-between">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-claude-text">
-            QA Job Details
+            All Jobs
           </h1>
           <p className="mt-1.5 text-sm text-claude-muted">
-            All your tracked QA opportunities, in one place.
+            Every tracked QA opportunity, newest first. Group them by company
+            under “By Company”.
           </p>
         </div>
         <div className="hidden items-center gap-2 text-sm text-claude-muted sm:flex">
