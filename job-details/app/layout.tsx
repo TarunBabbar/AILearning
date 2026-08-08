@@ -8,10 +8,17 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
+const cfg = getConfig();
+
 export const metadata: Metadata = {
-  title: "QA Job Details — Job Tracking Dashboard",
+  title: cfg.appName
+    ? `${cfg.appName} — Job Tracking Dashboard`
+    : "QA Job Details — Job Tracking Dashboard",
   description:
     "Browse QA job listings, track companies, and stay on top of opportunities.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -19,7 +26,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cfg = getConfig();
   return (
     <html lang="en" className={inter.variable}>
       <body className="min-h-screen antialiased">{children}</body>
