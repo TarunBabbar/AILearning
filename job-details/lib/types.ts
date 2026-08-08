@@ -3,6 +3,7 @@ export type CompanyInfo = {
   domain: string;
   name: string;
   type: string | null;
+  description: string | null;
   location: string | null;
   website: string | null;
   source: string | null;

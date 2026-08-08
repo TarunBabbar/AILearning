@@ -29,14 +29,15 @@ model Job {
 }
 
 model Company {
-  id         String   @id @default(uuid())
-  domain     String   @unique
-  name       String
-  type       String?
-  location   String?
-  website    String?
-  source     String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  jobs       Job[]
+  id          String   @id @default(uuid())
+  domain      String   @unique
+  name        String
+  type        String?
+  description String?
+  location    String?
+  website     String?
+  source      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  jobs        Job[]
 }

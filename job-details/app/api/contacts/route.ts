@@ -64,9 +64,13 @@ export async function GET(req: Request) {
     const contacts = [...merged.values()]
       .map(({ label, jobs: j }) => {
         const emails = [...new Set(j.map((x) => x.email).filter(Boolean))] as string[];
+        // Company type/description come from the linked Company row (if any).
+        const info = j.find((x) => x.companyInfo)?.companyInfo;
         return {
           company: titleCase(label),
           emails,
+          type: info?.type ?? null,
+          description: info?.description ?? null,
         };
       })
       .filter((c) => c.emails.length > 0)

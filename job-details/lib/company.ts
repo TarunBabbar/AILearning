@@ -36,6 +36,7 @@ export type CompanyInfo = {
   personName?: string;
   location?: string;
   type?: string;
+  description?: string;
   website?: string;
 };
 
@@ -47,14 +48,39 @@ function buildCompanyPrompt(domains: string[], sampleEmails: Record<string, stri
     const sample = sampleEmails[d];
     return `Domain: ${d}${sample ? " | Sample Email: " + sample : ""}`;
   });
-  return `Given each email domain, return the company name, person name (from email prefix if useful), location, type (Product/Service/Unknown), and website if known.
+  return `Given each email domain, return the company name, person name (from email prefix if useful), location, type (Product/Consulting/Staffing/Service/Unknown), a 1-2 sentence description of what the company does, and website if known.
+
+Type guide:
+- Product → builds its own software/product (e.g. an app, platform, SaaS)
+- Consulting → sells consulting/outsourcing/professional services (e.g. IT services, tech consulting)
+- Staffing → recruiting/staffing/talent placement agencies
+- Service → other service businesses (non-software services)
+- Unknown → cannot tell
+
+If you cannot determine a field's value, leave it EMPTY STRING ("") — never write "Unknown", "N/A", or filler text. In particular: description must be "" when you don't know what the company does.
 
 Respond JSON array only:
-[{"domain":"...","company":"...","personName":"...","location":"...","type":"Product|Service|Unknown","website":"..."}]
+[{"domain":"...","company":"...","personName":"...","location":"...","type":"Product|Consulting|Staffing|Service|Unknown","description":"...","website":"..."}]
 
-Unknown → use "Unknown". No markdown. No text before or after.
+No markdown. No text before or after.
 
 ${lines.join("\n")}`;
+}
+
+/** True when a value is blank or an "unknown"/"n/a"-style placeholder. */
+export function isUnknownValue(value: string | null | undefined): boolean {
+  if (!value) return true;
+  const s = value.trim();
+  if (!s) return true;
+  if (/^(unknown|n\/?a|tbd|none|not\s+available|insufficient\s+information|information\s+is\s+insufficient.*|unknown\s+company.*|unknown\s+business.*|unknown\s+details.*|unknown\s+information.*|a\s+company\s+operating.*|a\s+domain\s+used.*)$/i.test(s)) {
+    return true;
+  }
+  return /unknown|insufficient information|n\/a/i.test(s) && s.length < 80;
+}
+
+/** Normalize an LLM-resolved field: blank/unknown → "" so the UI can show "—". */
+export function cleanCompanyDetail(value: string | null | undefined): string {
+  return isUnknownValue(value) ? "" : value!.trim();
 }
 
 /**
@@ -88,9 +114,10 @@ export async function resolveCompanyDetails(
           domain: entry.domain.toLowerCase(),
           company: entry.company || "Unknown",
           personName: entry.personName || undefined,
-          location: entry.location || undefined,
-          type: entry.type || undefined,
-          website: entry.website || undefined,
+          location: cleanCompanyDetail(entry.location) || undefined,
+          type: cleanCompanyDetail(entry.type) || undefined,
+          description: cleanCompanyDetail(entry.description) || undefined,
+          website: cleanCompanyDetail(entry.website) || undefined,
         });
       }
     }

@@ -246,10 +246,22 @@ npx prisma db push
 - **Deploy**. The `postinstall` script runs `prisma generate` during the build.
 
 **4. Function duration note**
-The upload + company-resolve routes set `maxDuration = 300` so LLM calls (which
-can take a couple of minutes) aren't cut off. Vercel Hobby allows up to 300s.
+The upload route sets `maxDuration = 300` so LLM calls (which can take a couple
+of minutes) aren't cut off. Vercel Hobby allows up to 300s.
 
-**5. First-load note**
+**5. Company details (one-time backfill)**
+Company type + description in the Contacts table are resolved from email
+domains by an LLM and **persisted** in the `Company` table — the UI only reads
+them. After uploading new job PDFs, re-run the one-time script:
+
+```bash
+npm run resolve-companies
+```
+
+When the LLM can't determine a value it's stored as empty (`NULL`) and the UI
+shows `—` instead of "Unknown".
+
+**6. First-load note**
 Neon's free tier auto-pauses after ~5 min of inactivity — the first request after
 a pause takes a few seconds to wake the DB. That's normal.
 
@@ -302,15 +314,16 @@ a pause takes a few seconds to wake the DB. That's normal.
 | `companyId`   | `uuid?`    | FK → `Company` (SetNull on delete)     |
 
 ### `Company`
-| Field      | Type      | Notes                          |
-| ---------- | --------- | ------------------------------ |
-| `id`       | `uuid`    | PK                             |
-| `domain`   | `string`  | Unique email domain            |
-| `name`     | `string`  | Resolved company name          |
-| `type`     | `string?` | `Product` / `Service` / `Unknown` |
-| `location` | `string?` | HQ location (if known)         |
-| `website`  | `string?` | Company website (if known)     |
-| `source`   | `string?` | `llm`                          |
+| Field         | Type      | Notes                                    |
+| ------------- | --------- | ---------------------------------------- |
+| `id`          | `uuid`    | PK                                       |
+| `domain`      | `string`  | Unique email domain                      |
+| `name`        | `string`  | Resolved company name                    |
+| `type`        | `string?` | `Product` / `Consulting` / `Staffing` / `Service` / `Unknown` |
+| `description` | `text?`   | 1-2 sentence summary of what the company does |
+| `location`    | `string?` | HQ location (if known)                   |
+| `website`     | `string?` | Company website (if known)               |
+| `source`      | `string?` | `llm`                                    |
 
 ---
 
@@ -324,7 +337,7 @@ a pause takes a few seconds to wake the DB. That's normal.
 | `DELETE` | `/api/jobs/:id`        | Delete one job                                      | —                                                   |
 | `POST` | `/api/upload`            | Extract + persist jobs from text                    | `{ fileName, text, model? }`                        |
 | `GET`  | `/api/companies`         | List companies with job counts                      | —                                                   |
-| `POST` | `/api/companies/resolve` | Resolve company info for unresolved email domains   | `{ model? }`                                        |
+| `POST` | `/api/companies/resolve` | Resolve/backfill company info (type, description, location, website) for email domains | `{ model? }` |
 | `GET`  | `/api/settings`          | Config status: key configured, source, model, models| —                                                   |
 | `POST` | `/api/extract-preview`   | Word/char count for pasted text                     | `{ text }`                                          |
 
