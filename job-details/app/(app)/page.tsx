@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Search,
   Building2,
@@ -9,6 +9,8 @@ import {
   Briefcase,
   Clock,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   X,
   Calendar,
   FileText,
@@ -16,11 +18,14 @@ import {
   Inbox,
   Database,
   ArrowUpDown,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { JobCardSkeleton } from "@/components/Skeleton";
 import { useListSWR } from "@/lib/use-list-swr";
 import type { JobsResponse, Job } from "@/lib/types";
+
+const PAGE_SIZE = 40;
 
 // Deterministic pastel avatar colors derived from the company name
 const AVATAR_COLORS = [
@@ -59,7 +64,9 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState("newest");
+  const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean | null>(null);
 
   // Debounce search input
@@ -68,13 +75,25 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // Search / sort change → back to page 1
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, sort]);
+
+  // New page → scroll list back to top
+  useEffect(() => {
+    const main = document.querySelector("main");
+    if (main) main.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
+
   const jobsKey = useMemo(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (sort) params.set("sort", sort);
-    const qs = params.toString();
-    return qs ? `/api/jobs?${qs}` : "/api/jobs";
-  }, [debouncedSearch, sort]);
+    params.set("page", String(page));
+    params.set("pageSize", String(PAGE_SIZE));
+    return `/api/jobs?${params.toString()}`;
+  }, [debouncedSearch, sort, page]);
 
   const { data, error: swrError, isLoading } = useListSWR<JobsResponse>(jobsKey);
   const loading = isLoading && !data;
@@ -83,7 +102,7 @@ export default function Dashboard() {
       ? swrError.message
       : "Failed to load jobs"
     : null;
-  // Check if an API key is configured
+
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -93,12 +112,16 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     if (!data) return { total: 0, companies: 0, sources: 0 };
-    const companies = data.companyCount ?? 0;
-    const sources = new Set(data.jobs.map((j) => j.fileName).filter(Boolean)).size;
-    return { total: data.total, companies, sources };
+    return {
+      total: data.total,
+      companies: data.companyCount ?? 0,
+      sources: data.sourceCount ?? 0,
+    };
   }, [data]);
 
-  // Group jobs by date (jobDate or createdAt fallback)
+  const pageCount = data?.pageCount ?? 1;
+
+  // Group current page by date
   const grouped = useMemo(() => {
     if (!data || data.jobs.length === 0) return [];
     const map = new Map<string, Job[]>();
@@ -113,107 +136,101 @@ export default function Dashboard() {
       .map(([date, jobs]) => ({ date, jobs }));
   }, [data]);
 
+  const openJob = useCallback(async (job: Job) => {
+    setSelectedJob(job);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/jobs/${job.id}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const body = (await res.json()) as { job?: Job };
+      if (body.job) setSelectedJob(body.job);
+    } catch {
+      // keep slim card data in the modal
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
   return (
-    <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-claude-text">
+    <div className="mx-auto max-w-7xl">
+      {/* Compact header: title + stats + search/sort */}
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+          <h1 className="text-xl font-semibold tracking-tight text-claude-text">
             All Jobs
           </h1>
-          <p className="mt-1.5 text-sm text-claude-muted">
-            Every tracked QA opportunity, newest first. Group them by company
-            under “By Company”.
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
+            <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
+              <Briefcase size={12} />
+              {stats.total.toLocaleString()} jobs
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
+              <Building2 size={12} />
+              {stats.companies.toLocaleString()} companies
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-[#e3efe3] px-2 py-1 font-medium text-[#3d7a3d]">
+              <FileText size={12} />
+              {stats.sources.toLocaleString()} sources
+            </span>
+          </div>
         </div>
-        <div className="hidden items-center gap-2 text-sm text-claude-muted sm:flex">
-          <span className="inline-block h-2 w-2 rounded-full bg-claude-accent" />
-          {data ? `${data.total} job${data.total === 1 ? "" : "s"} in the database` : "…"}
-        </div>
-      </div>
 
-      {/* API key banner */}
-      {apiKeyConfigured === false && (
-        <div className="mb-5 flex items-center gap-3 rounded-xl border border-claude-border bg-white p-4 text-sm shadow-sm">
-          <Sparkles size={18} className="shrink-0 text-claude-accent" />
-          <span className="flex-1 text-claude-muted">
-            No OpenRouter API key configured. Set{" "}
-            <code className="rounded bg-claude-beige-deep px-1.5 py-0.5 text-[12px]">
-              OPENROUTER_API_KEY
-            </code>{" "}
-            in the environment to enable extraction.
-          </span>
-        </div>
-      )}
-
-      {/* Stat cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={Briefcase}
-          label="Total Jobs"
-          value={stats.total}
-          accent="bg-claude-accent-soft text-claude-accent"
-        />
-        <StatCard
-          icon={Building2}
-          label="Companies"
-          value={stats.companies}
-          accent="bg-[#e6edf5] text-[#4a6d8c]"
-        />
-        <StatCard
-          icon={FileText}
-          label="Source Files"
-          value={stats.sources}
-          accent="bg-[#e3efe3] text-[#3d7a3d]"
-        />
-      </div>
-
-      {/* Filters + status pills */}
-      <div className="mb-4 rounded-xl border border-claude-border bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[220px] flex-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:max-w-xl lg:justify-end">
+          <div className="relative min-w-[180px] flex-1">
             <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-claude-muted"
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
             />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search title, company, location, email…"
-              className="w-full rounded-lg border border-claude-border bg-white py-2 pl-9 pr-8 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+              className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
               >
-                <X size={14} />
+                <X size={13} />
               </button>
             )}
           </div>
-
-          <div className="relative">
+          <div className="relative shrink-0">
             <ArrowUpDown
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-claude-muted"
+              size={12}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
             />
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="rounded-lg border border-claude-border bg-white py-2 pl-8 pr-3 text-sm text-claude-text outline-none transition-colors focus:border-claude-accent"
+              className="rounded-lg border border-claude-border bg-white py-1.5 pl-7 pr-2 text-sm text-claude-text outline-none transition-colors focus:border-claude-accent"
             >
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
-              <option value="company">Company A–Z</option>
             </select>
           </div>
         </div>
       </div>
 
+      {/* API key banner */}
+      {apiKeyConfigured === false && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-claude-border bg-white px-3 py-2 text-xs shadow-sm">
+          <Sparkles size={14} className="shrink-0 text-claude-accent" />
+          <span className="flex-1 text-claude-muted">
+            No OpenRouter API key configured. Set{" "}
+            <code className="rounded bg-claude-beige-deep px-1 py-0.5 text-[11px]">
+              OPENROUTER_API_KEY
+            </code>{" "}
+            to enable extraction.
+          </span>
+        </div>
+      )}
+
       {/* Jobs grid */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 9 }).map((_, i) => (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
             <JobCardSkeleton key={i} />
           ))}
         </div>
@@ -254,69 +271,93 @@ export default function Dashboard() {
           )}
         </div>
       ) : (
-        <div className="space-y-8">
-          {grouped.map(({ jobs }) => (
-            <div key={jobs[0]?.id ?? "group"}>
-              <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {jobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    onOpen={() => setSelectedJob(job)}
-                  />
-                ))}
+        <>
+          <div className="space-y-6">
+            {grouped.map(({ jobs }) => (
+              <div key={jobs[0]?.id ?? "group"}>
+                <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {jobs.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      onOpen={() => openJob(job)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination at page footer */}
+          {pageCount > 1 && (
+            <div className="mt-8 flex justify-center">
+              <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-claude-border bg-white px-2 py-1.5 shadow-sm">
+                <button
+                  type="button"
+                  disabled={page <= 1 || isLoading}
+                  onClick={() => setPage(1)}
+                  title="First page"
+                  className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={12} className="-mr-1" />
+                  <ChevronLeft size={12} />
+                  <span className="ml-0.5">First</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={page <= 1 || isLoading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={14} />
+                  Prev
+                </button>
+                <span className="px-2 text-xs text-claude-muted">
+                  Page{" "}
+                  <span className="font-semibold text-claude-text">{data.page}</span>
+                  {" of "}
+                  <span className="font-semibold text-claude-text">{pageCount}</span>
+                  <span className="ml-1.5 text-claude-muted/70">
+                    · {data.total.toLocaleString()}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= pageCount || isLoading}
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={page >= pageCount || isLoading}
+                  onClick={() => setPage(pageCount)}
+                  title="Last page"
+                  className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span className="mr-0.5">Last</span>
+                  <ChevronRight size={12} />
+                  <ChevronRight size={12} className="-ml-1" />
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* Job detail modal */}
       {selectedJob && (
-        <JobDetailModal job={selectedJob} onClose={() => setSelectedJob(null)} />
+        <JobDetailModal
+          job={selectedJob}
+          loading={detailLoading}
+          onClose={() => {
+            setSelectedJob(null);
+            setDetailLoading(false);
+          }}
+        />
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  accent,
-  hint,
-}: {
-  icon: typeof Briefcase;
-  label: string;
-  value: number;
-  accent: string;
-  hint?: string;
-}) {
-  return (
-    <div className="group relative overflow-hidden rounded-xl border border-claude-border bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
-      <div
-        className={cn(
-          "pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-[0.06] transition-transform group-hover:scale-125",
-          accent
-        )}
-      />
-      <div className="flex items-center gap-4">
-        <div
-          className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-            accent
-          )}
-        >
-          <Icon size={20} />
-        </div>
-        <div className="min-w-0">
-          <div className="text-[26px] font-semibold leading-tight text-claude-text">
-            {value}
-          </div>
-          <div className="text-xs text-claude-muted">{label}</div>
-          {hint && <div className="mt-0.5 text-[11px] text-claude-accent">{hint}</div>}
-        </div>
-      </div>
     </div>
   );
 }
@@ -332,28 +373,26 @@ function JobCard({
 
   return (
     <div
-      className="fade-up group flex h-full flex-col overflow-hidden rounded-xl border border-claude-border bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="fade-up group flex h-full flex-col overflow-hidden rounded-lg border border-claude-border bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
-      {/* Top accent bar */}
-      <div className={cn("h-1 w-full", color.split(" ")[0])} />
+      <div className={cn("h-0.5 w-full", color.split(" ")[0])} />
 
-      {/* Card body */}
-      <button onClick={onOpen} className="flex flex-1 flex-col p-5 text-left">
-        <div className="flex items-start gap-3">
+      <button onClick={onOpen} className="flex flex-1 flex-col p-3.5 text-left">
+        <div className="flex items-start gap-2.5">
           <div
             className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold",
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold",
               color
             )}
           >
             {initials(job.company)}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 min-h-[40px] text-[15px] font-semibold leading-snug text-claude-text">
+            <h3 className="line-clamp-2 min-h-[36px] text-[13px] font-semibold leading-snug text-claude-text">
               {job.title}
             </h3>
-            <div className="mt-0.5 flex items-center gap-1.5 text-sm text-claude-muted">
-              <Building2 size={13} className="shrink-0 text-claude-accent/70" />
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-claude-muted">
+              <Building2 size={11} className="shrink-0 text-claude-accent/70" />
               <span className="truncate font-medium text-claude-text/80">
                 {job.company}
               </span>
@@ -361,41 +400,28 @@ function JobCard({
           </div>
         </div>
 
-        {/* Meta chips */}
-        <div className="mt-4 flex flex-wrap gap-1.5">
+        <div className="mt-2.5 flex flex-wrap gap-1">
           {job.location && (
-            <MetaChip icon={<MapPin size={11} />} text={job.location} />
+            <MetaChip icon={<MapPin size={10} />} text={job.location} />
           )}
           {job.experience && (
-            <MetaChip icon={<Clock size={11} />} text={job.experience} />
-          )}
-          {job.email && (
-            <MetaChip icon={<Mail size={11} />} text={job.email} />
+            <MetaChip icon={<Clock size={10} />} text={job.experience} />
           )}
         </div>
 
-        {/* Description preview — fixed 2-line height keeps cards even */}
         {job.description ? (
-          <p className="mt-3 line-clamp-2 min-h-[32px] text-xs leading-relaxed text-claude-muted">
+          <p className="mt-2 line-clamp-2 min-h-[28px] text-[11px] leading-relaxed text-claude-muted">
             {job.description}
           </p>
         ) : (
-          <div className="mt-3 min-h-[32px]" />
+          <div className="mt-2 min-h-[28px]" />
         )}
 
-        {/* Footer */}
-        <div className="mt-auto flex items-center justify-between pt-4 text-xs text-claude-muted">
-          <span className="flex items-center gap-1.5">
-            {job.location && (
-              <span className="flex items-center gap-1">
-                <MapPin size={11} />
-                {job.location}
-              </span>
-            )}
-          </span>
-          <span className="flex shrink-0 items-center gap-1">
+        <div className="mt-auto flex items-center justify-between pt-2.5 text-[11px] text-claude-muted">
+          <span className="truncate pr-2">{job.email ?? ""}</span>
+          <span className="flex shrink-0 items-center gap-0.5">
             {job.jobDate ? formatShortDate(job.jobDate) : ""}
-            <ChevronDown size={14} />
+            <ChevronDown size={12} />
           </span>
         </div>
       </button>
@@ -403,10 +429,17 @@ function JobCard({
   );
 }
 
-function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
+function JobDetailModal({
+  job,
+  loading,
+  onClose,
+}: {
+  job: Job;
+  loading: boolean;
+  onClose: () => void;
+}) {
   const color = avatarColor(job.company);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -424,7 +457,6 @@ function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
         className="fade-up relative w-full max-w-2xl overflow-hidden rounded-2xl border border-claude-border bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className={cn("h-1.5 w-full", color.split(" ")[0])} />
         <div className="flex items-start gap-4 border-b border-claude-border p-6">
           <div
@@ -475,9 +507,13 @@ function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
           </button>
         </div>
 
-        {/* Description */}
         <div className="max-h-[50vh] overflow-y-auto p-6">
-          {job.description ? (
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-claude-muted">
+              <Loader2 size={16} className="animate-spin" />
+              Loading full description…
+            </div>
+          ) : job.description ? (
             <>
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-claude-muted/70">
                 Full description
@@ -497,7 +533,7 @@ function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
 
 function MetaChip({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <span className="flex max-w-full items-center gap-1 rounded-md bg-claude-bg px-2 py-1 text-[11px] text-claude-muted">
+    <span className="flex max-w-full items-center gap-0.5 rounded bg-claude-bg px-1.5 py-0.5 text-[10px] text-claude-muted">
       <span className="shrink-0 text-claude-accent/70">{icon}</span>
       <span className="truncate">{text}</span>
     </span>

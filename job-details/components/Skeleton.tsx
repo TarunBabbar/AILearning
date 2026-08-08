@@ -15,24 +15,23 @@ export function Skeleton({ className }: { className?: string }) {
 /** Skeleton grid of job cards (All Jobs page). */
 export function JobCardSkeleton() {
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-claude-border bg-white p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-claude-border bg-white p-3.5 shadow-sm">
+      <div className="flex items-start gap-2.5">
+        <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
         <div className="min-w-0 flex-1">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="mt-2 h-3 w-1/2" />
+          <Skeleton className="h-3.5 w-3/4" />
+          <Skeleton className="mt-1.5 h-2.5 w-1/2" />
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        <Skeleton className="h-5 w-20 rounded-md" />
-        <Skeleton className="h-5 w-24 rounded-md" />
-        <Skeleton className="h-5 w-28 rounded-md" />
+      <div className="mt-2.5 flex flex-wrap gap-1">
+        <Skeleton className="h-4 w-16 rounded" />
+        <Skeleton className="h-4 w-20 rounded" />
       </div>
-      <Skeleton className="mt-3 h-3 w-full" />
-      <Skeleton className="mt-1.5 h-3 w-5/6" />
-      <div className="mt-auto flex items-center justify-between pt-4">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-3 w-16" />
+      <Skeleton className="mt-2 h-2.5 w-full" />
+      <Skeleton className="mt-1 h-2.5 w-5/6" />
+      <div className="mt-auto flex items-center justify-between pt-2.5">
+        <Skeleton className="h-2.5 w-20" />
+        <Skeleton className="h-2.5 w-14" />
       </div>
     </div>
   );
