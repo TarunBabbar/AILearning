@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { groupJobsByCompany, dedupeJobs, getEmailDomain, isGenericDomain } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
+import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
 
 export const runtime = "nodejs";
 
@@ -69,11 +70,18 @@ export async function GET(req: Request) {
       }))
       .sort((a, b) => (sort === "name" ? a.company.localeCompare(b.company) : b.count - a.count));
 
-    return NextResponse.json({
-      totalCompanies: companies.length,
-      totalJobs: companies.reduce((s, c) => s + c.jobs.length, 0),
-      companies,
-    });
+    return NextResponse.json(
+      {
+        totalCompanies: companies.length,
+        totalJobs: companies.reduce((s, c) => s + c.jobs.length, 0),
+        companies,
+      },
+      {
+        headers: {
+          "Cache-Control": CACHE_CONTROL_LIST,
+        },
+      }
+    );
   } catch (e) {
     console.error("[companies/jobs] error:", e);
     return NextResponse.json(

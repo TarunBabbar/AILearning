@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { dedupeJobs, getEmailDomain, isGenericDomain, titleCase } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
+import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
 
 export const runtime = "nodejs";
 
@@ -73,11 +74,18 @@ export async function GET(req: Request) {
       }))
       .sort((a, b) => a.location.localeCompare(b.location));
 
-    return NextResponse.json({
-      totalLocations: locations.length,
-      totalJobs: locations.reduce((s, l) => s + l.count, 0),
-      locations,
-    });
+    return NextResponse.json(
+      {
+        totalLocations: locations.length,
+        totalJobs: locations.reduce((s, l) => s + l.count, 0),
+        locations,
+      },
+      {
+        headers: {
+          "Cache-Control": CACHE_CONTROL_LIST,
+        },
+      }
+    );
   } catch (e) {
     console.error("[locations] error:", e);
     return NextResponse.json({ error: "Failed to load locations." }, { status: 500 });

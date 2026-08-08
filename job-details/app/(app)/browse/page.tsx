@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   MapPin,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GroupListSkeleton } from "@/components/Skeleton";
+import { useListSWR } from "@/lib/use-list-swr";
 import type { Job } from "@/lib/types";
 
 type CompanyGroup = {
@@ -78,18 +79,20 @@ function formatShortDate(iso: string | null): string {
   });
 }
 
+type CompaniesResponse = {
+  totalCompanies: number;
+  totalJobs: number;
+  companies: CompanyGroup[];
+};
+
+type LocationsResponse = {
+  totalLocations: number;
+  totalJobs: number;
+  locations: LocationGroup[];
+};
+
 export default function BrowsePage() {
   const [view, setView] = useState<View>("company");
-  const [companies, setCompanies] = useState<CompanyGroup[]>([]);
-  const [locations, setLocations] = useState<LocationGroup[]>([]);
-  const [totals, setTotals] = useState<{
-    companies: number;
-    companyJobs: number;
-    locations: number;
-    locationJobs: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -99,37 +102,51 @@ export default function BrowsePage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (debounced) params.set("search", debounced);
-      const [cRes, lRes] = await Promise.all([
-        fetch(`/api/companies/jobs?${params.toString()}&sort=name`),
-        fetch(`/api/locations?${params.toString()}`),
-      ]);
-      if (!cRes.ok || !lRes.ok) throw new Error("Failed to load");
-      const cData = await cRes.json();
-      const lData = await lRes.json();
-      setCompanies(cData.companies ?? []);
-      setLocations(lData.locations ?? []);
-      setTotals({
-        companies: cData.totalCompanies ?? 0,
-        companyJobs: cData.totalJobs ?? 0,
-        locations: lData.totalLocations ?? 0,
-        locationJobs: lData.totalJobs ?? 0,
-      });
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
+  const { companiesKey, locationsKey } = useMemo(() => {
+    const params = new URLSearchParams();
+    if (debounced) params.set("search", debounced);
+    params.set("sort", "name");
+    const companiesKey = `/api/companies/jobs?${params.toString()}`;
+    const locParams = new URLSearchParams();
+    if (debounced) locParams.set("search", debounced);
+    const locQs = locParams.toString();
+    return {
+      companiesKey,
+      locationsKey: locQs ? `/api/locations?${locQs}` : "/api/locations",
+    };
   }, [debounced]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const {
+    data: cData,
+    error: cError,
+    isLoading: cLoading,
+  } = useListSWR<CompaniesResponse>(companiesKey);
+  const {
+    data: lData,
+    error: lError,
+    isLoading: lLoading,
+  } = useListSWR<LocationsResponse>(locationsKey);
+
+  const companies = cData?.companies ?? [];
+  const locations = lData?.locations ?? [];
+  const totals =
+    cData || lData
+      ? {
+          companies: cData?.totalCompanies ?? 0,
+          companyJobs: cData?.totalJobs ?? 0,
+          locations: lData?.totalLocations ?? 0,
+          locationJobs: lData?.totalJobs ?? 0,
+        }
+      : null;
+  const loading = (cLoading && !cData) || (lLoading && !lData);
+  const error =
+    cError || lError
+      ? cError instanceof Error
+        ? cError.message
+        : lError instanceof Error
+          ? lError.message
+          : "Failed to load"
+      : null;
 
   const groups = view === "company" ? companies : locations;
   const groupLabel = view === "company" ? "companies" : "locations";

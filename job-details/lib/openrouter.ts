@@ -1,7 +1,7 @@
 import { getConfig } from "./config";
 import { createLogger, ms, type Logger } from "./logger";
 
-const MAX_RETRIES = 4;
+const MAX_RETRIES = 6;
 const BASE_RETRY_DELAY_MS = 1500;
 // No hard timeout on the model call itself — OpenRouter responses for large
 // jobs can legitimately take a few minutes. We rely on retries for
@@ -24,7 +24,12 @@ export class OpenRouterError extends Error {
   }
 }
 
-function retryDelayMs(attempt: number): number {
+function retryDelayMs(attempt: number, status?: number): number {
+  // Rate limits need much longer waits (free shared pools).
+  if (status === 429) {
+    // 20s, 40s, 80s, 120s…
+    return Math.min(120_000, 20_000 * Math.pow(2, attempt - 1));
+  }
   // 1.5s, 3s, 6s, 12s — exponential backoff
   return BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
 }
@@ -139,26 +144,22 @@ export async function callOpenRouter(
       return content;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (err instanceof OpenRouterError) throw err; // don't retry 4xx
 
-      if (lastError.name === "AbortError") {
-        lastError = new Error(`Request aborted after ${ms(timeoutMs)} (safety timeout)`);
-      }
+      const status =
+        err instanceof OpenRouterError
+          ? err.status
+          : ((err as { status?: number })?.status ?? 0);
 
-      const retryable = isRetryableStatus((err as { status?: number })?.status ?? 0);
-      if (retryable && attempt < MAX_RETRIES) {
-        const delay = retryDelayMs(attempt);
-        log.warn(
-          "llm",
-          `Attempt ${attempt}/${MAX_RETRIES} failed (${lastError.message}) — retrying in ${ms(delay)}`,
-          `elapsed ${ms(Date.now() - attemptStart)}`
-        );
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
+      // Retry 429 / 408 / 5xx. Do not retry auth/payment (401/402) or other 4xx.
+      const retryable =
+        err instanceof OpenRouterError
+          ? isRetryableStatus(status)
+          : true; // network / abort / empty — retry
+
+      if (!retryable) throw err;
 
       if (attempt < MAX_RETRIES) {
-        const delay = retryDelayMs(attempt);
+        const delay = retryDelayMs(attempt, status);
         log.warn(
           "llm",
           `Attempt ${attempt}/${MAX_RETRIES} failed (${lastError.message}) — retrying in ${ms(delay)}`,

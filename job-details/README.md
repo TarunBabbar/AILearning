@@ -80,6 +80,12 @@
 - The OpenRouter key is read **only** from `OPENROUTER_API_KEY` (`.env` locally, Vercel env vars in production).
 - No settings page, no UI entry, no cookies — the key never reaches the browser.
 
+### ⚡ Client + edge caching (Jobs / Browse / Contacts)
+- List pages use **[SWR](https://swr.vercel.app)** so switching tabs reuses in-memory data instead of hitting Neon on every navigation.
+- Soft TTL of **~5 minutes**: within that window, remounting a tab shows cached data with **no network/DB round-trip**.
+- After a successful upload, caches for jobs / companies / locations / contacts are **invalidated** so the next visit refetches fresh rows.
+- List GET APIs send `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` so Vercel’s edge can serve short-lived responses too (same behavior on localhost and production).
+
 ---
 
 ## 🛠 Tech stack
@@ -89,6 +95,7 @@
 | Framework  | [Next.js 16](https://nextjs.org) (App Router) + React 19          |
 | Language   | TypeScript (strict)                                               |
 | Database   | PostgreSQL via [Prisma ORM 7](https://www.prisma.io)              |
+| Client cache | [SWR](https://swr.vercel.app) (~5 min TTL for list pages)       |
 | PDF text   | pdfjs-dist 6 — extracted **in the browser**                       |
 | DOCX text  | mammoth — extracted **in the browser**                            |
 | Styling    | Tailwind CSS 4, Claude-style beige palette                        |
@@ -102,24 +109,32 @@
 ```
 job-details/
 ├─ app/
-│  ├─ (app)/                    # sidebar-wrapped pages
-│  │  ├─ page.tsx               # Dashboard (default) — jobs + company info
+│  ├─ (app)/                    # sidebar-wrapped pages (SWRProvider)
+│  │  ├─ page.tsx               # Dashboard — jobs list (SWR-cached)
+│  │  ├─ browse/                # By company / location (SWR-cached)
+│  │  ├─ contacts/              # Recruiter emails by company (SWR-cached)
 │  │  └─ upload/                # multi-file upload + extraction
 │  ├─ api/
 │  │  ├─ upload/                # POST — extract + persist jobs
-│  │  ├─ jobs/                  # GET (list/search) · DELETE (clear all)
+│  │  ├─ jobs/                  # GET (list/search, Cache-Control) · DELETE
 │  │  ├─ jobs/[id]/             # GET · DELETE single job
 │  │  ├─ companies/             # GET list
+│  │  ├─ companies/jobs/        # GET jobs grouped by company (Cache-Control)
 │  │  ├─ companies/resolve/     # POST — resolve company info from emails
+│  │  ├─ locations/             # GET jobs grouped by location (Cache-Control)
+│  │  ├─ contacts/              # GET emails by company (Cache-Control)
 │  │  ├─ settings/              # GET — config status (key configured, model)
 │  │  └─ extract-preview/       # POST — word count for pasted text
 │  ├─ layout.tsx                # root layout (font, metadata)
 │  ├─ not-found.tsx
 │  └─ globals.css               # Claude beige theme tokens
 ├─ components/
-│  └─ Sidebar.tsx               # left navigation
+│  ├─ Sidebar.tsx               # left navigation
+│  └─ SWRProvider.tsx           # shared SWRConfig for list pages
 ├─ lib/
 │  ├─ client/pdf.ts             # browser-side PDF/DOCX text extraction
+│  ├─ use-list-swr.ts           # SWR hook + ~5 min TTL + upload invalidate
+│  ├─ swr-fetcher.ts            # shared fetcher + Cache-Control constant
 │  ├─ openrouter.ts             # OpenRouter client (retries, JSON parsing)
 │  ├─ extract-jobs.ts           # LLM job extraction + dedupe
 │  ├─ company.ts                # email-domain → company resolution
@@ -249,13 +264,28 @@ npx prisma db push
 The upload route sets `maxDuration = 300` so LLM calls (which can take a couple
 of minutes) aren't cut off. Vercel Hobby allows up to 300s.
 
-**5. Company details (one-time backfill)**
+**5. Company details (batched resolve)**
 Company type + description in the Contacts table are resolved from email
 domains by an LLM and **persisted** in the `Company` table — the UI only reads
-them. After uploading new job PDFs, re-run the one-time script:
+them.
 
+**Do not** resolve hundreds of domains in one Vercel request — it will hit
+`FUNCTION_INVOCATION_TIMEOUT`. Prefer one of:
+
+**A. Local script against Neon (best for a full backfill)**
 ```bash
+# PowerShell — use your Neon connection string
+$env:DATABASE_URL="postgresql://…@….neon.tech/jobdetails?sslmode=require"
 npm run resolve-companies
+```
+
+**B. Batched HTTP calls on Vercel** (after deploy). Each call resolves ~10 domains:
+```powershell
+do {
+  $r = Invoke-RestMethod -Uri "https://qajobs.vercel.app/api/companies/resolve" `
+    -Method Post -ContentType "application/json" -Body '{"limit":10}'
+  $r | ConvertTo-Json -Compress
+} while (-not $r.done)
 ```
 
 When the LLM can't determine a value it's stored as empty (`NULL`) and the UI
@@ -289,6 +319,9 @@ a pause takes a few seconds to wake the DB. That's normal.
          │                         │                           │                       │
          │  Dashboard (GET /api/jobs)  ◀── jobs + companyInfo ──┤                       │
          │                         │                           │                       │
+         │  Tab switch within ~5 min → SWR memory cache (no Neon hit)                  │
+         │  After upload → invalidateListCaches() → next visit refetches               │
+         │                         │                           │                       │
          │  POST /api/companies/resolve                        │                       │
          │                         │                           │  domain blocklist    │
          │                         │                           │  LLM → Company rows  │
@@ -296,6 +329,7 @@ a pause takes a few seconds to wake the DB. That's normal.
 ```
 
 ---
+
 
 ## 📐 Data model
 
@@ -331,15 +365,20 @@ a pause takes a few seconds to wake the DB. That's normal.
 
 | Method | Endpoint                 | Description                                        | Query / Body                                        |
 | ------ | ------------------------ | -------------------------------------------------- | --------------------------------------------------- |
-| `GET`  | `/api/jobs`              | List jobs with company info                         | `search`, `status`, `company`, `sort`, `limit`      |
+| `GET`  | `/api/jobs`              | List jobs with company info (edge-cached 60s)       | `search`, `status`, `company`, `sort`               |
 | `GET`  | `/api/jobs/:id`          | Single job + company info                           | —                                                   |
 | `DELETE` | `/api/jobs`            | Clear all jobs                                      | —                                                   |
 | `DELETE` | `/api/jobs/:id`        | Delete one job                                      | —                                                   |
 | `POST` | `/api/upload`            | Extract + persist jobs from text                    | `{ fileName, text, model? }`                        |
 | `GET`  | `/api/companies`         | List companies with job counts                      | —                                                   |
-| `POST` | `/api/companies/resolve` | Resolve/backfill company info (type, description, location, website) for email domains | `{ model? }` |
+| `GET`  | `/api/companies/jobs`    | Jobs grouped by company (edge-cached 60s)           | `search`, `sort`                                    |
+| `GET`  | `/api/locations`         | Jobs grouped by location (edge-cached 60s)          | `search`                                            |
+| `GET`  | `/api/contacts`          | Recruiter emails by company (edge-cached 60s)       | `search`                                            |
+| `POST` | `/api/companies/resolve` | Resolve/backfill company info in batches (~10 domains/call). Repeat until `remaining` is 0. | `{ model?, limit? }` |
 | `GET`  | `/api/settings`          | Config status: key configured, source, model, models| —                                                   |
 | `POST` | `/api/extract-preview`   | Word/char count for pasted text                     | `{ text }`                                          |
+
+> List GET routes that say **edge-cached** return `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. The browser client still uses `cache: "no-store"` so SWR owns freshness after uploads.
 
 ---
 

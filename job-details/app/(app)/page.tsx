@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Building2,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { JobCardSkeleton } from "@/components/Skeleton";
+import { useListSWR } from "@/lib/use-list-swr";
 import type { JobsResponse, Job } from "@/lib/types";
 
 // Deterministic pastel avatar colors derived from the company name
@@ -55,10 +56,6 @@ function formatShortDate(iso: string): string {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState<JobsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState("newest");
@@ -71,27 +68,21 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const fetchJobs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      if (sort) params.set("sort", sort);
-      const res = await fetch(`/api/jobs?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to load jobs");
-      setData(await res.json());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load jobs");
-    } finally {
-      setLoading(false);
-    }
+  const jobsKey = useMemo(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (sort) params.set("sort", sort);
+    const qs = params.toString();
+    return qs ? `/api/jobs?${qs}` : "/api/jobs";
   }, [debouncedSearch, sort]);
 
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
-
+  const { data, error: swrError, isLoading } = useListSWR<JobsResponse>(jobsKey);
+  const loading = isLoading && !data;
+  const error = swrError
+    ? swrError instanceof Error
+      ? swrError.message
+      : "Failed to load jobs"
+    : null;
   // Check if an API key is configured
   useEffect(() => {
     fetch("/api/settings")

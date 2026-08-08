@@ -97,9 +97,9 @@ export async function resolveCompanyDetails(
   if (!valid.length) return [];
 
   const results: CompanyInfo[] = [];
-  // Batch to keep each call small
-  for (let i = 0; i < valid.length; i += 10) {
-    const batch = valid.slice(i, i + 10);
+  // Batch to keep each call manageable (aligned with resolve-companies LLM_BATCH)
+  for (let i = 0; i < valid.length; i += 25) {
+    const batch = valid.slice(i, i + 25);
     const prompt = buildCompanyPrompt(batch, {});
     const content = await callOpenRouter(prompt, COMPANY_SYSTEM_PROMPT, apiKey, {
       model,

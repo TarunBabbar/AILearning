@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
+import { invalidateListCaches } from "@/lib/use-list-swr";
 
 type FileStatus = "queued" | "extracting" | "parsing" | "done" | "error";
 
@@ -419,6 +420,7 @@ export default function UploadPage() {
               `[${item.file.name}] Done — +${result.added} new, ${result.duplicates ?? 0} duplicate(s).`,
               "ok"
             );
+            void invalidateListCaches();
             return;
           }
 

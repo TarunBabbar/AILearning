@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Mail, Search, Copy, Check, Inbox, X, Building2 } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
+import { useListSWR } from "@/lib/use-list-swr";
 
 type Contact = {
   company: string;
@@ -17,9 +18,6 @@ type Response = {
 };
 
 export default function ContactsPage() {
-  const [data, setData] = useState<Response | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
@@ -29,25 +27,20 @@ export default function ContactsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (debounced) params.set("search", debounced);
-      const res = await fetch(`/api/contacts?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to load");
-      setData(await res.json());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
+  const contactsKey = useMemo(() => {
+    const params = new URLSearchParams();
+    if (debounced) params.set("search", debounced);
+    const qs = params.toString();
+    return qs ? `/api/contacts?${qs}` : "/api/contacts";
   }, [debounced]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data, error: swrError, isLoading } = useListSWR<Response>(contactsKey);
+  const loading = isLoading && !data;
+  const error = swrError
+    ? swrError instanceof Error
+      ? swrError.message
+      : "Failed to load"
+    : null;
 
   const copyEmail = useCallback(async (email: string) => {
     try {

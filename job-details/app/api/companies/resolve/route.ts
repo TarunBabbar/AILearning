@@ -6,40 +6,63 @@ import { resolveAndStoreCompanyDetails } from "@/lib/resolve-companies";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+/** Domains per request — keeps under Vercel Hobby / Pro time limits. */
+const DEFAULT_LIMIT = 25;
+const MAX_LIMIT = 40;
+
 /**
  * POST /api/companies/resolve
- * Body: { model?: string }
- * Resolves company details (name, type, description, location, website) for
- * email domains found on jobs, stores them in the Company table, and links
- * jobs → companyInfo. Can be re-run safely: existing fields are preserved and
- * only missing ones are backfilled.
+ * Body: { model?: string, limit?: number }
+ *
+ * Resolves company details for a **batch** of unresolved email domains
+ * (default 10). Call repeatedly until `remaining` is 0. A single call that
+ * tries hundreds of domains will hit FUNCTION_INVOCATION_TIMEOUT on Vercel.
  */
 export async function POST(req: Request) {
   try {
-    const { model } = (await req.json()) as { model?: string };
+    const body = (await req.json().catch(() => ({}))) as {
+      model?: string;
+      limit?: number;
+    };
 
     const { apiKey } = resolveApiKey();
     if (!apiKey) {
       return NextResponse.json(
-        { error: "No OpenRouter API key configured. Set OPENROUTER_API_KEY in the environment." },
+        {
+          error:
+            "No OpenRouter API key configured. Set OPENROUTER_API_KEY in the environment.",
+        },
         { status: 400 }
       );
     }
 
+    const rawLimit =
+      typeof body.limit === "number" && Number.isFinite(body.limit)
+        ? Math.floor(body.limit)
+        : DEFAULT_LIMIT;
+    const limit = Math.min(MAX_LIMIT, Math.max(1, rawLimit));
+
     const cfg = getConfig();
-    const { resolved, created, total } = await resolveAndStoreCompanyDetails(
+    const result = await resolveAndStoreCompanyDetails(
       apiKey,
-      model || cfg.llmModel
+      body.model || cfg.llmModel,
+      limit
     );
 
     return NextResponse.json({
-      message: `Resolved ${resolved} company domain(s), created ${created} new.`,
-      companies: resolved,
-      created,
-      total,
+      message: `Resolved ${result.resolved} of ${result.attempted} domain(s) this batch; ${result.remaining} remaining.`,
+      companies: result.resolved,
+      created: result.created,
+      total: result.total,
+      attempted: result.attempted,
+      remaining: result.remaining,
+      done: result.remaining === 0,
     });
   } catch (e) {
     console.error("[companies/resolve] error:", e);
-    return NextResponse.json({ error: "Failed to resolve companies." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to resolve companies." },
+      { status: 500 }
+    );
   }
 }

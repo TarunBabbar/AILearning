@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { groupJobsByCompany, dedupeJobs, getEmailDomain, isGenericDomain, titleCase } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
+import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
 
 export const runtime = "nodejs";
 
@@ -76,10 +77,17 @@ export async function GET(req: Request) {
       .filter((c) => c.emails.length > 0)
       .sort((a, b) => a.company.localeCompare(b.company));
 
-    return NextResponse.json({
-      totalCompanies: contacts.length,
-      contacts,
-    });
+    return NextResponse.json(
+      {
+        totalCompanies: contacts.length,
+        contacts,
+      },
+      {
+        headers: {
+          "Cache-Control": CACHE_CONTROL_LIST,
+        },
+      }
+    );
   } catch (e) {
     console.error("[contacts] error:", e);
     return NextResponse.json({ error: "Failed to load contacts." }, { status: 500 });

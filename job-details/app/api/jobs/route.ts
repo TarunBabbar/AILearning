@@ -4,6 +4,7 @@ import { Prisma } from "@prisma-generated/client";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { getEmailDomain, isGenericDomain, dedupeJobs, countDistinctCompanies } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
+import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
 
 /**
  * GET /api/jobs?search=&status=&company=&sort=
@@ -76,13 +77,20 @@ export async function GET(req: Request) {
     // Company Jobs view, so the numbers match everywhere.
     const companyCount = countDistinctCompanies(jobs);
 
-    return NextResponse.json({
-      jobs,
-      total: jobs.length,
-      counts,
-      companyCount,
-      filters: { search, status, company, sort },
-    });
+    return NextResponse.json(
+      {
+        jobs,
+        total: jobs.length,
+        counts,
+        companyCount,
+        filters: { search, status, company, sort },
+      },
+      {
+        headers: {
+          "Cache-Control": CACHE_CONTROL_LIST,
+        },
+      }
+    );
   } catch (e) {
     console.error("[jobs] error:", e);
     // Database unreachable (e.g. no Postgres running) or query failure —

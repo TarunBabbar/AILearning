@@ -10,7 +10,11 @@
  * The UI never triggers this — it only reads the persisted Company rows.
  */
 import { config as loadEnv } from "dotenv";
-loadEnv({ override: true, path: ".env" });
+// Load .env for API key / model, but never override an externally-set
+// DATABASE_URL, so the same script can target a remote DB (e.g. the Neon prod
+// DB):
+//   set DATABASE_URL=<neon-url>&& npm run resolve-companies
+loadEnv({ override: false, path: ".env" });
 
 // Dynamic import so the modules below see the env vars loaded above.
 // (ESM imports are hoisted, so a static import would evaluate lib/db before
@@ -38,17 +42,19 @@ async function main() {
   }
 
   console.log(
-    `Resolving company details with model "${cfg.llmModel}"… (this can take a few minutes)`
+    `Resolving company details with model "${cfg.llmModel}"…\n` +
+      `  · Saves after each batch of 25\n` +
+      `  · Auto-retries on 429 (rate limit) with long backoff\n` +
+      `  · Safe to re-run if interrupted — already-resolved domains are skipped`
   );
 
-  const { resolved, created, total } = await resolveAndStoreCompanyDetails(
-    apiKey,
-    cfg.llmModel
-  );
+  // No limit — process every unresolved domain (local / CI, not Vercel).
+  const { resolved, created, total, remaining } =
+    await resolveAndStoreCompanyDetails(apiKey, cfg.llmModel, 0);
 
   console.log(
     `Done. Resolved ${resolved} domain(s), created ${created} new company row(s). ` +
-      `Total companies in DB: ${total}.`
+      `Total companies in DB: ${total}. Remaining unresolved: ${remaining}.`
   );
   process.exit(0);
 }
