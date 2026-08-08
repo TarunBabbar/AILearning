@@ -386,16 +386,10 @@ function JobCard({
         {/* Footer */}
         <div className="mt-auto flex items-center justify-between pt-4 text-xs text-claude-muted">
           <span className="flex items-center gap-1.5">
-            {job.companyInfo && (
-              <span className="flex items-center gap-1 text-claude-text/70">
-                <Building2 size={11} className="text-[#4a6d8c]" />
-                {job.companyInfo.name}
-              </span>
-            )}
-            {job.companyInfo?.location && (
+            {job.location && (
               <span className="flex items-center gap-1">
                 <MapPin size={11} />
-                {job.companyInfo.location}
+                {job.location}
               </span>
             )}
           </span>
@@ -480,37 +474,6 @@ function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
             <X size={18} />
           </button>
         </div>
-
-        {/* Company info */}
-        {job.companyInfo && (
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-claude-border bg-claude-bg/50 px-6 py-3 text-sm text-claude-muted">
-            <span className="flex items-center gap-1.5 font-medium text-claude-text">
-              <Building2 size={14} className="text-[#4a6d8c]" />
-              {job.companyInfo.name}
-            </span>
-            {job.companyInfo.type && (
-              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] ring-1 ring-claude-border">
-                {job.companyInfo.type}
-              </span>
-            )}
-            {job.companyInfo.location && (
-              <span className="flex items-center gap-1">
-                <MapPin size={12} />
-                {job.companyInfo.location}
-              </span>
-            )}
-            {job.companyInfo.website && (
-              <a
-                href={job.companyInfo.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-claude-accent hover:underline"
-              >
-                {job.companyInfo.website.replace(/^https?:\/\//, "")}
-              </a>
-            )}
-          </div>
-        )}
 
         {/* Description */}
         <div className="max-h-[50vh] overflow-y-auto p-6">

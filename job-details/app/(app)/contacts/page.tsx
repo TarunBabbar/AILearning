@@ -1,15 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Mail, Search, Copy, Check, Inbox, X, Building2 } from "lucide-react";
+import { Mail, Search, Copy, Check, Inbox, X } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 import { useListSWR } from "@/lib/use-list-swr";
 
 type Contact = {
   company: string;
   emails: string[];
-  type: string | null;
-  description: string | null;
 };
 
 type Response = {
@@ -123,7 +121,6 @@ export default function ContactsPage() {
             <thead>
               <tr className="border-b border-claude-border bg-claude-bg/50 text-xs uppercase tracking-wide text-claude-muted">
                 <th className="px-5 py-3 font-semibold">Company</th>
-                <th className="px-5 py-3 font-semibold">Company Details</th>
                 <th className="px-5 py-3 font-semibold">Email</th>
               </tr>
             </thead>
@@ -138,27 +135,6 @@ export default function ContactsPage() {
                     <div className="font-medium text-claude-text">
                       {contact.company}
                     </div>
-                  </td>
-
-                  {/* Company Details */}
-                  <td className="max-w-[340px] px-5 py-3.5 align-top">
-                    {contact.type || contact.description ? (
-                      <div className="flex flex-col gap-1.5">
-                        {contact.type && (
-                          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-claude-bg px-2.5 py-0.5 text-[11px] font-medium text-claude-text ring-1 ring-claude-border">
-                            <Building2 size={11} className="text-claude-accent/70" />
-                            {contact.type}
-                          </span>
-                        )}
-                        {contact.description && (
-                          <p className="line-clamp-2 text-xs leading-relaxed text-claude-muted">
-                            {contact.description}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-claude-muted/60">—</span>
-                    )}
                   </td>
 
                   {/* Emails */}
