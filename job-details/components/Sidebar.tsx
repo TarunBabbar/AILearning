@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Upload, Building2, PanelLeftClose, PanelLeftOpen, Info, Contact } from "lucide-react";
+import { LayoutDashboard, Building2, PanelLeftClose, PanelLeftOpen, Info, Contact } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "All Jobs", icon: LayoutDashboard },
   { href: "/browse", label: "Browse Jobs", icon: Building2 },
   { href: "/contacts", label: "Recruiter Contacts", icon: Contact },
-  { href: "/upload", label: "Upload Jobs", icon: Upload },
 ];
 
 const COLLAPSE_KEY = "jobdetails_sidebar_collapsed";
