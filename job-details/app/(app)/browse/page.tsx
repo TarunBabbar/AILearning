@@ -278,15 +278,6 @@ export default function BrowsePage() {
                             {group.count} job{group.count === 1 ? "" : "s"}
                           </span>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-claude-muted">
-                          <MapPin size={12} className="shrink-0 text-claude-accent/70" />
-                          {group.jobs
-                            .map((j) => j.location)
-                            .filter(Boolean)
-                            .filter((v, i, a) => a.indexOf(v) === i)
-                            .slice(0, 2)
-                            .join(" · ") || "—"}
-                        </div>
                       </div>
                       <ChevronDown
                         size={16}
@@ -334,7 +325,7 @@ export default function BrowsePage() {
                                 )}
                               </div>
                               {job.description && (
-                                <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-claude-muted">
+                                <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-claude-muted">
                                   {job.description}
                                 </p>
                               )}
@@ -374,13 +365,6 @@ export default function BrowsePage() {
                           <span className="rounded-full bg-claude-accent-soft px-2 py-0.5 text-[11px] font-medium text-claude-accent-strong">
                             {group.count} job{group.count === 1 ? "" : "s"}
                           </span>
-                        </div>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-claude-muted">
-                          <Building2
-                            size={12}
-                            className="shrink-0 text-claude-accent/70"
-                          />
-                          {group.jobs[0]?.company || "—"}
                         </div>
                       </div>
                       <ChevronDown
@@ -432,7 +416,7 @@ export default function BrowsePage() {
                                 )}
                               </div>
                               {job.description && (
-                                <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-claude-muted">
+                                <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-claude-muted">
                                   {job.description}
                                 </p>
                               )}
