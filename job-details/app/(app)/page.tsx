@@ -8,7 +8,6 @@ import {
   Mail,
   Briefcase,
   Clock,
-  Loader2,
   ChevronDown,
   X,
   Calendar,
@@ -19,6 +18,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { JobCardSkeleton } from "@/components/Skeleton";
 import type { JobsResponse, Job } from "@/lib/types";
 
 // Deterministic pastel avatar colors derived from the company name
@@ -221,9 +221,10 @@ export default function Dashboard() {
 
       {/* Jobs grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-24 text-claude-muted">
-          <Loader2 size={20} className="mr-2 animate-spin" />
-          Loading jobs…
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <JobCardSkeleton key={i} />
+          ))}
         </div>
       ) : error ? (
         <div className="rounded-xl border border-claude-border bg-white p-8 text-center text-sm text-claude-muted shadow-sm">

@@ -1,15 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Mail,
-  Search,
-  Loader2,
-  Copy,
-  Check,
-  Inbox,
-  X,
-} from "lucide-react";
+import { Mail, Search, Copy, Check, Inbox, X } from "lucide-react";
+import { TableSkeleton } from "@/components/Skeleton";
 
 type Contact = {
   company: string;
@@ -112,10 +105,7 @@ export default function ContactsPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-24 text-claude-muted">
-          <Loader2 size={20} className="mr-2 animate-spin" />
-          Loading contacts…
-        </div>
+        <TableSkeleton />
       ) : error ? (
         <div className="rounded-xl border border-claude-border bg-white p-8 text-center text-sm text-claude-muted shadow-sm">
           {error}

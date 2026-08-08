@@ -5,7 +5,6 @@ import {
   Building2,
   MapPin,
   Search,
-  Loader2,
   ChevronDown,
   Mail,
   Briefcase,
@@ -14,6 +13,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GroupListSkeleton } from "@/components/Skeleton";
 import type { Job } from "@/lib/types";
 
 type CompanyGroup = {
@@ -220,10 +220,7 @@ export default function BrowsePage() {
 
       {/* List */}
       {loading ? (
-        <div className="flex items-center justify-center py-24 text-claude-muted">
-          <Loader2 size={20} className="mr-2 animate-spin" />
-          Loading…
-        </div>
+        <GroupListSkeleton />
       ) : error ? (
         <div className="rounded-xl border border-claude-border bg-white p-8 text-center text-sm text-claude-muted shadow-sm">
           {error}
