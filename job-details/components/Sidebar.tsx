@@ -97,6 +97,25 @@ export default function Sidebar() {
         })}
       </nav>
 
+      {/* Built by credit */}
+      {!collapsed && (
+        <div className="border-t border-claude-border px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-claude-accent text-[10px] font-bold text-white">
+              TK
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[11px] font-semibold text-claude-text">
+                Built by Tarun Kumar Babbar
+              </div>
+              <div className="text-[10px] text-claude-muted">
+                Solutions Architect
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Note — always visible when the sidebar is expanded */}
       {!collapsed && (
         <div className="border-t border-claude-border px-3 py-3">
