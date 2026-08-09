@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Job {
-  id           String    @id @default(uuid())
+  id           String     @id @default(uuid())
   title        String
   company      String
   email        String?
@@ -17,11 +17,12 @@ model Job {
   description  String?
   fileName     String?
   jobDate      DateTime?
-  status       String    @default("new")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  status       String     @default("new")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   companyId    String?
-  companyInfo  Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyInfo  Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  scores       JobScore[]
 
   @@index([companyId])
   @@index([createdAt])
@@ -40,4 +41,44 @@ model Company {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   jobs        Job[]
+}
+
+/// End-user account for Match Jobs (separate from admin upload login).
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  resume       Resume?
+  scores       JobScore[]
+}
+
+/// One resume per user — extracted plain text only (no binary).
+model Resume {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String
+  content   String
+  mimeType  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Per-user job match scores against the shared Job corpus.
+model JobScore {
+  id        String   @id @default(uuid())
+  userId    String
+  jobId     String
+  score     Int
+  strengths String?
+  gaps      String?
+  scoredAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId, score])
 }
