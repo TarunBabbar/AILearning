@@ -151,87 +151,98 @@ export default function BrowsePage() {
   const groups = view === "company" ? companies : locations;
   const groupLabel = view === "company" ? "companies" : "locations";
 
-  const headerStats = useMemo(() => {
-    if (!totals) return "";
-    return view === "company"
-      ? `${totals.companies} companies · ${totals.companyJobs} jobs`
-      : `${totals.locations} locations · ${totals.locationJobs} jobs`;
-  }, [totals, view]);
-
   return (
     <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-claude-text">
+      {/* One compact row: title + chips + toggle + search (All Jobs style) */}
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 className="text-xl font-semibold tracking-tight text-claude-text">
             Browse Jobs
           </h1>
-          <p className="mt-1.5 text-sm text-claude-muted">
-            Group openings by company or location, and filter by either.
-          </p>
-        </div>
-        <div className="hidden items-center gap-2 text-sm text-claude-muted sm:flex">
-          <span className="inline-block h-2 w-2 rounded-full bg-claude-accent" />
-          {totals ? headerStats : "…"}
-        </div>
-      </div>
-
-      {/* Filters: toggle + one search */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-claude-border bg-white p-4 shadow-sm">
-        {/* Group by toggle */}
-        <div className="flex items-center rounded-lg bg-claude-bg p-1">
-          <button
-            onClick={() => {
-              setView("company");
-              setExpanded(null);
-            }}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              view === "company"
-                ? "bg-white text-claude-text shadow-sm ring-1 ring-claude-border"
-                : "text-claude-muted hover:text-claude-text"
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
+            {view === "company" ? (
+              <>
+                <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
+                  <Building2 size={12} />
+                  {(totals?.companies ?? 0).toLocaleString()} companies
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
+                  <Briefcase size={12} />
+                  {(totals?.companyJobs ?? 0).toLocaleString()} jobs
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1 rounded-md bg-[#e3efe3] px-2 py-1 font-medium text-[#3d7a3d]">
+                  <MapPin size={12} />
+                  {(totals?.locations ?? 0).toLocaleString()} locations
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
+                  <Briefcase size={12} />
+                  {(totals?.locationJobs ?? 0).toLocaleString()} jobs
+                </span>
+              </>
             )}
-          >
-            <Building2 size={14} />
-            By Company
-          </button>
-          <button
-            onClick={() => {
-              setView("location");
-              setExpanded(null);
-            }}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              view === "location"
-                ? "bg-white text-claude-text shadow-sm ring-1 ring-claude-border"
-                : "text-claude-muted hover:text-claude-text"
-            )}
-          >
-            <MapPin size={14} />
-            By Location
-          </button>
+          </div>
         </div>
 
-        {/* One search — filters by company OR location in both views */}
-        <div className="relative min-w-[220px] flex-1">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-claude-muted"
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Type a company or location…"
-            className="w-full rounded-lg border border-claude-border bg-white py-2 pl-9 pr-8 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
-          />
-          {search && (
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:max-w-xl lg:justify-end">
+          <div className="inline-flex shrink-0 rounded-md bg-claude-bg p-0.5">
             <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+              type="button"
+              onClick={() => {
+                setView("company");
+                setExpanded(null);
+              }}
+              className={cn(
+                "inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium",
+                view === "company"
+                  ? "bg-white text-claude-text shadow-sm"
+                  : "text-claude-muted hover:text-claude-text"
+              )}
             >
-              <X size={14} />
+              <Building2 size={12} />
+              Company
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => {
+                setView("location");
+                setExpanded(null);
+              }}
+              className={cn(
+                "inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium",
+                view === "location"
+                  ? "bg-white text-claude-text shadow-sm"
+                  : "text-claude-muted hover:text-claude-text"
+              )}
+            >
+              <MapPin size={12} />
+              Location
+            </button>
+          </div>
+
+          <div className="relative min-w-[180px] flex-1">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Company or location…"
+              className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

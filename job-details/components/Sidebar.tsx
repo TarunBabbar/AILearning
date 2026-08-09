@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/", label: "All Jobs", icon: LayoutDashboard },
   { href: "/browse", label: "Browse Jobs", icon: Building2 },
   { href: "/contacts", label: "Recruiter Contacts", icon: Contact },
-  { href: "/match", label: "Match Jobs", icon: Target },
+  { href: "/score", label: "Match by Resume", icon: Target },
 ];
 
 const COLLAPSE_KEY = "jobdetails_sidebar_collapsed";

@@ -2,12 +2,33 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/user-auth";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
+import type { Prisma } from "@prisma-generated/client";
 
 export const runtime = "nodejs";
 
+const REMOTE_LOCATION_PATTERNS = [
+  "remote",
+  "wfh",
+  "work from home",
+  "work-from-home",
+  "home based",
+  "home-based",
+  "hybrid",
+  "anywhere",
+];
+
 /**
- * GET /api/user/matches?minScore=&search=
- * Returns this user's scored jobs, highest score first.
+ * GET /api/user/matches
+ * Query:
+ *   minScore=0|50|70|…
+ *   search=   (title/company/location)
+ *   company=
+ *   location=
+ *   remote=1  (location looks like remote / WFH / hybrid / home)
+ *   sort=score|company|location  (default score)
+ *   order=asc|desc              (default desc for score, asc for text)
+ *   page=1
+ *   pageSize=40
  */
 export async function GET(req: Request) {
   try {
@@ -19,30 +40,78 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const minScore = Math.max(
       0,
-      parseInt(url.searchParams.get("minScore") || "0", 10) || 0
+      Math.min(100, parseInt(url.searchParams.get("minScore") || "0", 10) || 0)
     );
     const search = url.searchParams.get("search")?.trim() || "";
+    const company = url.searchParams.get("company")?.trim() || "";
+    const location = url.searchParams.get("location")?.trim() || "";
+    const remoteOnly =
+      url.searchParams.get("remote") === "1" ||
+      url.searchParams.get("remote") === "true";
+    const sortRaw = (url.searchParams.get("sort") || "score").toLowerCase();
+    const sort =
+      sortRaw === "company" || sortRaw === "location" ? sortRaw : "score";
+    const orderRaw = (url.searchParams.get("order") || "").toLowerCase();
+    const order: "asc" | "desc" =
+      orderRaw === "asc" || orderRaw === "desc"
+        ? orderRaw
+        : sort === "score"
+          ? "desc"
+          : "asc";
+
+    const pageSize = Math.min(
+      100,
+      Math.max(1, parseInt(url.searchParams.get("pageSize") || "40", 10) || 40)
+    );
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+
+    const jobAnd: Prisma.JobWhereInput[] = [];
+    if (search) {
+      jobAnd.push({
+        OR: [
+          { title: { contains: search, mode: "insensitive" } },
+          { company: { contains: search, mode: "insensitive" } },
+          { location: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+    if (company) {
+      jobAnd.push({ company: { contains: company, mode: "insensitive" } });
+    }
+    if (location) {
+      jobAnd.push({ location: { contains: location, mode: "insensitive" } });
+    }
+    if (remoteOnly) {
+      jobAnd.push({
+        OR: REMOTE_LOCATION_PATTERNS.map((p) => ({
+          location: { contains: p, mode: "insensitive" as const },
+        })),
+      });
+    }
+
+    const where: Prisma.JobScoreWhereInput = {
+      userId,
+      score: { gte: minScore },
+      ...(jobAnd.length ? { job: { AND: jobAnd } } : {}),
+    };
+
+    const orderBy: Prisma.JobScoreOrderByWithRelationInput[] =
+      sort === "company"
+        ? [{ job: { company: order } }, { score: "desc" }]
+        : sort === "location"
+          ? [{ job: { location: order } }, { score: "desc" }]
+          : [{ score: order }, { scoredAt: "desc" }];
+
+    const total = await prisma.jobScore.count({ where });
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, pageCount);
 
     const rows = await prisma.jobScore.findMany({
-      where: {
-        userId,
-        score: { gte: minScore },
-        ...(search
-          ? {
-              job: {
-                OR: [
-                  { title: { contains: search, mode: "insensitive" } },
-                  { company: { contains: search, mode: "insensitive" } },
-                  { location: { contains: search, mode: "insensitive" } },
-                ],
-              },
-            }
-          : {}),
-      },
-      orderBy: [{ score: "desc" }, { scoredAt: "desc" }],
-      include: {
-        job: true,
-      },
+      where,
+      orderBy,
+      include: { job: true },
+      skip: (safePage - 1) * pageSize,
+      take: pageSize,
     });
 
     const matches = rows.map((r) => {
@@ -68,8 +137,20 @@ export async function GET(req: Request) {
 
     return NextResponse.json(
       {
-        total: matches.length,
+        total,
+        page: safePage,
+        pageSize,
+        pageCount,
         matches,
+        filters: {
+          minScore,
+          search,
+          company,
+          location,
+          remote: remoteOnly,
+          sort,
+          order,
+        },
       },
       {
         headers: { "Cache-Control": "private, no-store" },

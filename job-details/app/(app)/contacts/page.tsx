@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Mail, Search, Copy, Check, Inbox, X } from "lucide-react";
+import { Mail, Search, Copy, Check, Inbox, X, Building2 } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 import { useListSWR } from "@/lib/use-list-swr";
 
@@ -54,45 +54,46 @@ export default function ContactsPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      {/* Header */}
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-claude-text">
+      {/* One compact row: title + chips + search (All Jobs style) */}
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 className="text-xl font-semibold tracking-tight text-claude-text">
             Recruiter Contacts
           </h1>
-          <p className="mt-1.5 text-sm text-claude-muted">
-            Email addresses from job postings, grouped by company.
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
+            <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
+              <Building2 size={12} />
+              {(data?.totalCompanies ?? 0).toLocaleString()} companies
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
+              <Mail size={12} />
+              {emailCount.toLocaleString()} emails
+            </span>
+          </div>
         </div>
-        <div className="hidden items-center gap-2 text-sm text-claude-muted sm:flex">
-          <span className="inline-block h-2 w-2 rounded-full bg-claude-accent" />
-          {data
-            ? `${data.totalCompanies} companies · ${emailCount} emails`
-            : "…"}
-        </div>
-      </div>
 
-      {/* Search */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-claude-border bg-white p-4 shadow-sm">
-        <div className="relative min-w-[220px] flex-1">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-claude-muted"
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter by company or email…"
-            className="w-full rounded-lg border border-claude-border bg-white py-2 pl-9 pr-8 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
-            >
-              <X size={14} />
-            </button>
-          )}
+        <div className="flex min-w-0 flex-1 lg:max-w-xl lg:justify-end">
+          <div className="relative w-full min-w-[180px] lg:max-w-md">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter by company or email…"
+              className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -43,7 +43,7 @@ model Company {
   jobs        Job[]
 }
 
-/// End-user account for Match Jobs (separate from admin upload login).
+/// End-user account for Score Jobs (separate from admin upload login).
 model User {
   id           String     @id @default(uuid())
   email        String     @unique

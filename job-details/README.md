@@ -86,14 +86,16 @@
 - After a successful upload, caches for jobs / companies / locations / contacts are **invalidated** so the next visit refetches fresh rows.
 - List GET APIs send `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` so Vercel’s edge can serve short-lived responses too (same behavior on localhost and production).
 
-### 🎯 Match Jobs (per-user resume scoring)
-- New **Match Jobs** tab: users register/login with their own account (separate from admin upload login).
+### 🎯 Match Jobs by Resume (per-user scoring)
+- Nav: **Match by Resume**. Upload a resume and score shared board jobs against it.
+- Users register/login with their own account (separate from admin upload login).
 - Upload a resume (PDF/DOCX) — text is extracted in the browser and stored per user in Postgres.
 - Score shared board jobs against that resume via OpenRouter. Each wave lists free `:free` models, then fires **one parallel request per model** with **10 jobs** each (e.g. 10 models → 100 jobs/wave). Results upsert to `JobScore` as each chunk returns.
 - Per-model: up to **2 tries**, then blacklist that model for the run and reassign the chunk to another working free model.
 - Scores keyed by `(userId, jobId)` so users never see each other’s results.
 - Large runs (≥100 jobs) show a time warning before starting; scoring can be resumed (unscored-only).
-- Results table sorted by match % with strengths/gaps.
+- Results table sorted by fit % with strengths/gaps.
+- Admin list of accounts: `GET /api/users` — requires non-empty `USERS_ADMIN_API_KEY` in `.env`, passed as `x-api-key` or `Authorization: Bearer …` (Postman/curl). No session cookie. Returns id/email/name/dates/resume meta/scoreCount (never password hashes).
 
 ---
 
