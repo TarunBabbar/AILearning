@@ -38,22 +38,17 @@ export function JobCardSkeleton() {
 }
 
 /** Skeleton group header + job rows (Browse page). */
-export function GroupListSkeleton({ count = 4 }: { count?: number }) {
+export function GroupListSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="overflow-hidden rounded-xl border border-claude-border bg-white shadow-sm"
+          className="flex items-center gap-2.5 rounded-lg border border-claude-border bg-white px-3.5 py-2.5 shadow-sm"
         >
-          <div className="flex items-center gap-3 px-5 py-4">
-            <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
-            <div className="min-w-0 flex-1">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="mt-2 h-3 w-24" />
-            </div>
-            <Skeleton className="h-4 w-4" />
-          </div>
+          <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
+          <Skeleton className="h-3.5 max-w-[12rem] flex-1" />
+          <Skeleton className="h-4 w-6 rounded" />
         </div>
       ))}
     </div>
@@ -63,18 +58,18 @@ export function GroupListSkeleton({ count = 4 }: { count?: number }) {
 /** Skeleton table rows (Contacts page). */
 export function TableSkeleton({ rows = 8 }: { rows?: number }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-claude-border bg-white shadow-sm">
-      <div className="flex items-center gap-4 border-b border-claude-border bg-claude-bg/50 px-5 py-3">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-3 w-32" />
+    <div className="overflow-hidden rounded-lg border border-claude-border bg-white shadow-sm">
+      <div className="flex items-center gap-3 border-b border-claude-border bg-claude-bg/40 px-3.5 py-2">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-3 w-12" />
       </div>
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 border-b border-claude-border px-5 py-3.5 last:border-b-0"
+          className="flex items-center gap-3 border-b border-claude-border px-3.5 py-2.5 last:border-b-0"
         >
-          <Skeleton className="h-3 w-32" />
-          <Skeleton className="h-3 w-48" />
+          <Skeleton className="h-3.5 w-28" />
+          <Skeleton className="h-3.5 w-44" />
         </div>
       ))}
     </div>

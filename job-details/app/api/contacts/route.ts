@@ -61,7 +61,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const contacts = [...merged.values()]
+    const contactsAll = [...merged.values()]
       .map(({ label, jobs: j }) => {
         const emails = [...new Set(j.map((x) => x.email).filter(Boolean))] as string[];
         return {
@@ -72,9 +72,28 @@ export async function GET(req: Request) {
       .filter((c) => c.emails.length > 0)
       .sort((a, b) => a.company.localeCompare(b.company));
 
+    const totalEmails = contactsAll.reduce((s, c) => s + c.emails.length, 0);
+
+    const pageSizeRaw = Number(url.searchParams.get("pageSize"));
+    const pageRaw = Number(url.searchParams.get("page"));
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : 40)
+    );
+    const pageCount = Math.max(1, Math.ceil(contactsAll.length / pageSize));
+    const page = Math.min(
+      pageCount,
+      Math.max(1, Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1)
+    );
+    const contacts = contactsAll.slice((page - 1) * pageSize, page * pageSize);
+
     return NextResponse.json(
       {
-        totalCompanies: contacts.length,
+        totalCompanies: contactsAll.length,
+        totalEmails,
+        page,
+        pageSize,
+        pageCount,
         contacts,
       },
       {

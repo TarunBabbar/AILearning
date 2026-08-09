@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   LogIn,
   UserPlus,
@@ -17,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
 import { Skeleton, TableSkeleton } from "@/components/Skeleton";
+import PageChrome from "@/components/PageChrome";
 
 type MeResponse = {
   user: { id: string; email: string; name: string | null } | null;
@@ -421,7 +423,7 @@ export default function ScoreJobsPage() {
 
   if (loadingMe) {
     return (
-      <div className="mx-auto flex max-w-6xl flex-col gap-3">
+      <div className="mx-auto flex h-full min-h-0 max-w-6xl flex-col gap-2 overflow-y-auto">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <Skeleton className="h-6 w-28" />
@@ -542,146 +544,152 @@ export default function ScoreJobsPage() {
 
   // ── Logged-in workspace ────────────────────────────────
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-            <h1 className="shrink-0 text-xl font-semibold tracking-tight text-claude-text">
-              Match Jobs by Resume
-            </h1>
-            {(me.scoreCount != null || stats) && (
-              <span className="truncate text-xs">
-                {me.scoreCount != null && (
-                  <span className="font-medium text-[#3d7a3d]">
-                    {me.scoreCount.toLocaleString()} scored
-                  </span>
+    <PageChrome
+      maxWidthClass="max-w-7xl"
+      hideHeader={!!selected}
+      header={
+        <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <h1 className="shrink-0 text-sm font-semibold tracking-tight text-claude-text">
+                Match Jobs by Resume
+              </h1>
+
+              {(me.scoreCount != null || stats) && (
+                <span className="shrink-0 text-[11px] text-claude-muted">
+                  {me.scoreCount != null && (
+                    <span className="font-medium text-[#3d7a3d]">
+                      {me.scoreCount.toLocaleString()} scored
+                    </span>
+                  )}
+                  {me.scoreCount != null && stats && (
+                    <span className="text-claude-border"> · </span>
+                  )}
+                  {stats && (
+                    <span className="font-medium text-[#9a7b2d]">
+                      {pendingCount.toLocaleString()} left
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+              <label
+                className={cn(
+                  "inline-flex h-7 max-w-[10rem] cursor-pointer items-center gap-1 truncate rounded-md border border-claude-border bg-white px-1.5 text-[11px] hover:bg-claude-bg/50",
+                  me.resume ? "text-claude-text" : "text-claude-muted"
                 )}
-                {me.scoreCount != null && stats && (
-                  <span className="text-claude-border"> · </span>
+                title={me.resume?.filename || "Upload resume"}
+              >
+                {resumeBusy ? (
+                  <Loader2
+                    size={11}
+                    className="shrink-0 animate-spin text-claude-accent"
+                  />
+                ) : (
+                  <Upload size={11} className="shrink-0 text-claude-accent" />
                 )}
-                {stats && (
-                  <span className="font-medium text-[#9a7b2d]">
-                    {pendingCount.toLocaleString()} left
-                  </span>
+                <span className="truncate">
+                  {resumeBusy
+                    ? resumeProgress || "…"
+                    : me.resume
+                      ? me.resume.filename
+                      : "Upload resume"}
+                </span>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  disabled={resumeBusy}
+                  onChange={(e) => handleResumeFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              <div className="inline-flex h-7 rounded-md border border-claude-border bg-claude-bg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setScope("unscored")}
+                  className={cn(
+                    "rounded px-1.5 text-[11px] font-medium",
+                    scope === "unscored"
+                      ? "bg-white text-claude-text shadow-sm"
+                      : "text-claude-muted"
+                  )}
+                >
+                  Unscored
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScope("all")}
+                  className={cn(
+                    "rounded px-1.5 text-[11px] font-medium",
+                    scope === "all"
+                      ? "bg-white text-claude-text shadow-sm"
+                      : "text-claude-muted"
+                  )}
+                >
+                  Rescore
+                </button>
+              </div>
+
+              <button
+                type="button"
+                disabled={!me.resume || scoring || pendingCount === 0}
+                onClick={() => runScoring(false)}
+                className="inline-flex h-7 items-center gap-1 rounded-md bg-claude-accent px-2 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-40"
+              >
+                {scoring ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={11} />
                 )}
-              </span>
-            )}
+                {scoring && scorePct != null
+                  ? `${scorePct}%`
+                  : `Score${pendingCount ? ` ${pendingCount.toLocaleString()}` : ""}`}
+              </button>
+
+              {scoring && scorePct != null && (
+                <div className="flex h-7 w-20 items-center">
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-claude-border/60">
+                    <div
+                      className="h-full rounded-full bg-claude-accent transition-[width] duration-300 ease-out"
+                      style={{ width: `${scorePct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div
+                className="flex h-7 max-w-[7.5rem] items-center gap-1 rounded-md border border-claude-border bg-white px-1.5"
+                title={me.user.email}
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-claude-accent text-[9px] font-semibold text-white">
+                  {userInitials(me.user.name, me.user.email)}
+                </span>
+                <span className="min-w-0 truncate text-[11px] font-medium text-claude-text">
+                  {me.user.name || me.user.email}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Log out"
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-claude-border bg-white px-1.5 text-[11px] text-claude-muted hover:bg-claude-bg hover:text-claude-text"
+              >
+                <LogOut size={11} />
+                <span className="hidden sm:inline">Log out</span>
+              </button>
+            </div>
           </div>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-claude-muted">
+
+          <p className="text-[11px] leading-snug text-claude-muted">
             Score shared board jobs against your resume. Results show fit % with
             strengths and gaps — private to your account.
           </p>
         </div>
-        <div className="flex min-w-0 shrink-0 items-center gap-2">
-          <div
-            className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-claude-border bg-white px-2.5"
-            title={me.user.email}
-          >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-claude-accent text-[10px] font-semibold tracking-wide text-white">
-              {userInitials(me.user.name, me.user.email)}
-            </span>
-            <span className="min-w-0 truncate text-xs font-medium text-claude-text">
-              {me.user.name || me.user.email}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-claude-border bg-white px-2.5 text-xs text-claude-muted hover:bg-claude-bg hover:text-claude-text"
-          >
-            <LogOut size={12} />
-            Log out
-          </button>
-        </div>
-      </div>
-
-      {/* Score actions only */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-claude-border bg-white px-3 py-2.5">
-        <label
-          className={cn(
-            "inline-flex h-9 max-w-[14rem] cursor-pointer items-center gap-1.5 truncate rounded-md border border-claude-border px-2.5 text-xs hover:bg-claude-bg/50",
-            me.resume ? "text-claude-text" : "text-claude-muted"
-          )}
-          title={me.resume?.filename || "Upload resume"}
-        >
-          {resumeBusy ? (
-            <Loader2 size={14} className="shrink-0 animate-spin text-claude-accent" />
-          ) : (
-            <Upload size={14} className="shrink-0 text-claude-accent" />
-          )}
-          <span className="truncate">
-            {resumeBusy
-              ? resumeProgress || "…"
-              : me.resume
-                ? me.resume.filename
-                : "Upload resume"}
-          </span>
-          <input
-            type="file"
-            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="hidden"
-            disabled={resumeBusy}
-            onChange={(e) => handleResumeFile(e.target.files?.[0] ?? null)}
-          />
-        </label>
-
-        <div className="inline-flex h-9 rounded-md border border-claude-border bg-claude-bg p-0.5">
-          <button
-            type="button"
-            onClick={() => setScope("unscored")}
-            className={cn(
-              "rounded px-2.5 text-xs font-medium",
-              scope === "unscored"
-                ? "bg-white text-claude-text shadow-sm"
-                : "text-claude-muted"
-            )}
-          >
-            Unscored
-          </button>
-          <button
-            type="button"
-            onClick={() => setScope("all")}
-            className={cn(
-              "rounded px-2.5 text-xs font-medium",
-              scope === "all"
-                ? "bg-white text-claude-text shadow-sm"
-                : "text-claude-muted"
-            )}
-          >
-            Rescore
-          </button>
-        </div>
-
-        <button
-          type="button"
-          disabled={!me.resume || scoring || pendingCount === 0}
-          onClick={() => runScoring(false)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-md bg-claude-accent px-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40"
-        >
-          {scoring ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <RefreshCw size={13} />
-          )}
-          {scoring && scorePct != null
-            ? `${scorePct}%`
-            : `Score${pendingCount ? ` ${pendingCount.toLocaleString()}` : ""}`}
-        </button>
-
-        {scoring && scorePct != null && (
-          <div className="flex min-w-[10rem] flex-1 items-center gap-2 sm:max-w-xs">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-claude-border/60">
-              <div
-                className="h-full rounded-full bg-claude-accent transition-[width] duration-300 ease-out"
-                style={{ width: `${scorePct}%` }}
-              />
-            </div>
-            <span className="shrink-0 text-[11px] tabular-nums text-claude-muted">
-              {scoreProgress}
-            </span>
-          </div>
-        )}
-      </div>
+      }
+    >
 
       {(resumeError || scoreError || confirmLarge || (!me.resume && !resumeBusy)) && (
         <div className="space-y-1 text-[11px]">
@@ -712,9 +720,9 @@ export default function ScoreJobsPage() {
         </div>
       )}
 
-      {/* Results card: filters live with the table */}
+      {/* Results table — filters live inside the same card */}
       <div className="overflow-hidden rounded-lg border border-claude-border bg-white">
-        <div className="flex flex-wrap items-center gap-2 border-b border-claude-border bg-claude-bg/30 px-3 py-2.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-claude-border bg-white px-3 py-2">
           <select
             value={minScore}
             onChange={(e) => {
@@ -724,7 +732,7 @@ export default function ScoreJobsPage() {
               loadMatches({ minScore: v, page: 1 });
             }}
             title="Minimum fit score"
-            className="h-8 rounded-md border border-claude-border bg-white px-2 text-xs text-claude-text outline-none focus:border-claude-accent"
+            className="h-7 rounded-md border border-claude-border bg-white px-1.5 text-[11px] text-claude-text outline-none focus:border-claude-accent"
           >
             <option value={0}>Any score</option>
             <option value={30}>≥ 30%</option>
@@ -742,8 +750,8 @@ export default function ScoreJobsPage() {
                 loadMatches({ company: companyFilter, page: 1 });
               }
             }}
-            placeholder="Company (Enter)"
-            className="h-8 w-[8rem] rounded-md border border-claude-border bg-white px-2 text-xs outline-none focus:border-claude-accent"
+            placeholder="Company"
+            className="h-7 w-[7rem] rounded-md border border-claude-border bg-white px-1.5 text-[11px] outline-none focus:border-claude-accent"
           />
 
           <input
@@ -755,8 +763,8 @@ export default function ScoreJobsPage() {
                 loadMatches({ location: locationFilter, page: 1 });
               }
             }}
-            placeholder="Location (Enter)"
-            className="h-8 w-[8rem] rounded-md border border-claude-border bg-white px-2 text-xs outline-none focus:border-claude-accent"
+            placeholder="Location"
+            className="h-7 w-[7rem] rounded-md border border-claude-border bg-white px-1.5 text-[11px] outline-none focus:border-claude-accent"
           />
 
           <button
@@ -768,39 +776,33 @@ export default function ScoreJobsPage() {
               loadMatches({ remote: next, page: 1 });
             }}
             className={cn(
-              "inline-flex h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium",
+              "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium",
               remoteOnly
                 ? "border-claude-accent bg-claude-accent text-white"
-                : "border-claude-border bg-white text-claude-muted hover:bg-white hover:text-claude-text"
+                : "border-claude-border bg-white text-claude-muted hover:text-claude-text"
             )}
             title="Remote / work-from-home / hybrid"
           >
-            <Home size={12} />
+            <Home size={11} />
             Remote
           </button>
 
-          <select
-            value={`${sortBy}:${sortOrder}`}
-            onChange={(e) => {
-              const [s, o] = e.target.value.split(":") as [
-                "score" | "company" | "location",
-                "asc" | "desc",
-              ];
-              setSortBy(s);
-              setSortOrder(o);
-              setPage(1);
-              loadMatches({ sort: s, order: o, page: 1 });
-            }}
-            title="Sort results"
-            className="ml-auto h-8 rounded-md border border-claude-border bg-white px-2 text-xs text-claude-text outline-none focus:border-claude-accent"
-          >
-            <option value="score:desc">Score ↓</option>
-            <option value="score:asc">Score ↑</option>
-            <option value="company:asc">Company A–Z</option>
-            <option value="company:desc">Company Z–A</option>
-            <option value="location:asc">Location A–Z</option>
-            <option value="location:desc">Location Z–A</option>
-          </select>
+          {matchesTotal > 0 && (
+            <span className="ml-auto text-[11px] text-claude-muted">
+              Showing{" "}
+              <span className="font-medium text-claude-text">
+                {matches.length === 0
+                  ? "0"
+                  : `${(page - 1) * MATCH_PAGE_SIZE + 1}–${
+                      (page - 1) * MATCH_PAGE_SIZE + matches.length
+                    }`}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-claude-text">
+                {matchesTotal.toLocaleString()}
+              </span>
+            </span>
+          )}
         </div>
 
         {matchesLoading ? (
@@ -818,7 +820,7 @@ export default function ScoreJobsPage() {
             ))}
           </div>
         ) : matches.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
             <Briefcase size={18} className="mb-2 text-claude-accent" />
             <p className="text-sm text-claude-text">
               {minScore || companyFilter || locationFilter || remoteOnly
@@ -827,148 +829,135 @@ export default function ScoreJobsPage() {
             </p>
             <p className="mt-0.5 text-[11px] text-claude-muted">
               {minScore || companyFilter || locationFilter || remoteOnly
-                ? "Clear or loosen filters above, or score more jobs."
+                ? "Clear or loosen filters, or score more jobs."
                 : "Upload a resume and run Score to fill this table."}
             </p>
           </div>
         ) : (
-          <>
-            <div className="border-b border-claude-border px-3 py-1.5 text-[11px] text-claude-muted">
-              Showing{" "}
-              <span className="font-medium text-claude-text">
-                {matches.length.toLocaleString()}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-claude-text">
-                {matchesTotal.toLocaleString()}
-              </span>{" "}
-              scored job{matchesTotal === 1 ? "" : "s"}
-            </div>
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-claude-border bg-claude-bg/50 text-[10px] uppercase tracking-wide text-claude-muted">
-                  <th className="px-3 py-2 font-semibold">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 hover:text-claude-text"
-                      onClick={() => {
-                        const nextOrder =
-                          sortBy === "score" && sortOrder === "desc"
-                            ? "asc"
-                            : "desc";
-                        setSortBy("score");
-                        setSortOrder(nextOrder);
-                        setPage(1);
-                        loadMatches({
-                          sort: "score",
-                          order: nextOrder,
-                          page: 1,
-                        });
-                      }}
-                    >
-                      Score
-                      {sortBy === "score"
-                        ? sortOrder === "desc"
-                          ? " ↓"
-                          : " ↑"
-                        : ""}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-semibold">Title</th>
-                  <th className="px-3 py-2 font-semibold">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 hover:text-claude-text"
-                      onClick={() => {
-                        const nextOrder =
-                          sortBy === "company" && sortOrder === "asc"
-                            ? "desc"
-                            : "asc";
-                        setSortBy("company");
-                        setSortOrder(nextOrder);
-                        setPage(1);
-                        loadMatches({
-                          sort: "company",
-                          order: nextOrder,
-                          page: 1,
-                        });
-                      }}
-                    >
-                      Company
-                      {sortBy === "company"
-                        ? sortOrder === "asc"
-                          ? " ↑"
-                          : " ↓"
-                        : ""}
-                    </button>
-                  </th>
-                  <th className="px-3 py-2 font-semibold">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 hover:text-claude-text"
-                      onClick={() => {
-                        const nextOrder =
-                          sortBy === "location" && sortOrder === "asc"
-                            ? "desc"
-                            : "asc";
-                        setSortBy("location");
-                        setSortOrder(nextOrder);
-                        setPage(1);
-                        loadMatches({
-                          sort: "location",
-                          order: nextOrder,
-                          page: 1,
-                        });
-                      }}
-                    >
-                      Location
-                      {sortBy === "location"
-                        ? sortOrder === "asc"
-                          ? " ↑"
-                          : " ↓"
-                        : ""}
-                    </button>
-                  </th>
-                  <th className="hidden px-3 py-2 font-semibold lg:table-cell">
-                    Strengths
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-claude-border">
-                {matches.map((m) => (
-                  <tr
-                    key={m.id}
-                    className="cursor-pointer transition-colors hover:bg-claude-bg/40"
-                    onClick={() => setSelected(m)}
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-[5]">
+              <tr className="border-b border-claude-border bg-white text-[10px] uppercase tracking-wide text-claude-muted shadow-[0_1px_0_0_var(--claude-border)]">
+                <th className="bg-white px-3 py-2 font-semibold">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 hover:text-claude-text"
+                    onClick={() => {
+                      const nextOrder =
+                        sortBy === "score" && sortOrder === "desc"
+                          ? "asc"
+                          : "desc";
+                      setSortBy("score");
+                      setSortOrder(nextOrder);
+                      setPage(1);
+                      loadMatches({
+                        sort: "score",
+                        order: nextOrder,
+                        page: 1,
+                      });
+                    }}
                   >
-                    <td className="px-3 py-2">
-                      <span
-                        className={cn(
-                          "inline-flex min-w-[2.75rem] justify-center rounded px-1.5 py-0.5 text-xs font-bold",
-                          scoreBg(m.score),
-                          scoreColor(m.score)
-                        )}
-                      >
-                        {m.score}%
-                      </span>
-                    </td>
-                    <td className="max-w-[220px] truncate px-3 py-2 font-medium text-claude-text">
-                      {m.job.title}
-                    </td>
-                    <td className="max-w-[160px] truncate px-3 py-2 text-claude-muted">
-                      {m.job.company}
-                    </td>
-                    <td className="max-w-[140px] truncate px-3 py-2 text-claude-muted">
-                      {m.job.location || "—"}
-                    </td>
-                    <td className="hidden max-w-[240px] truncate px-3 py-2 text-xs text-claude-muted lg:table-cell">
-                      {m.strengths || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
+                    Score
+                    {sortBy === "score"
+                      ? sortOrder === "desc"
+                        ? " ↓"
+                        : " ↑"
+                      : ""}
+                  </button>
+                </th>
+                <th className="bg-white px-3 py-2 font-semibold">Title</th>
+                <th className="bg-white px-3 py-2 font-semibold">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 hover:text-claude-text"
+                    onClick={() => {
+                      const nextOrder =
+                        sortBy === "company" && sortOrder === "asc"
+                          ? "desc"
+                          : "asc";
+                      setSortBy("company");
+                      setSortOrder(nextOrder);
+                      setPage(1);
+                      loadMatches({
+                        sort: "company",
+                        order: nextOrder,
+                        page: 1,
+                      });
+                    }}
+                  >
+                    Company
+                    {sortBy === "company"
+                      ? sortOrder === "asc"
+                        ? " ↑"
+                        : " ↓"
+                      : ""}
+                  </button>
+                </th>
+                <th className="bg-white px-3 py-2 font-semibold">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 hover:text-claude-text"
+                    onClick={() => {
+                      const nextOrder =
+                        sortBy === "location" && sortOrder === "asc"
+                          ? "desc"
+                          : "asc";
+                      setSortBy("location");
+                      setSortOrder(nextOrder);
+                      setPage(1);
+                      loadMatches({
+                        sort: "location",
+                        order: nextOrder,
+                        page: 1,
+                      });
+                    }}
+                  >
+                    Location
+                    {sortBy === "location"
+                      ? sortOrder === "asc"
+                        ? " ↑"
+                        : " ↓"
+                      : ""}
+                  </button>
+                </th>
+                <th className="hidden bg-white px-3 py-2 font-semibold lg:table-cell">
+                  Strengths
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-claude-border">
+              {matches.map((m) => (
+                <tr
+                  key={m.id}
+                  className="cursor-pointer transition-colors hover:bg-claude-bg/40"
+                  onClick={() => setSelected(m)}
+                >
+                  <td className="px-3 py-2">
+                    <span
+                      className={cn(
+                        "inline-flex min-w-[2.75rem] justify-center rounded px-1.5 py-0.5 text-xs font-bold",
+                        scoreBg(m.score),
+                        scoreColor(m.score)
+                      )}
+                    >
+                      {m.score}%
+                    </span>
+                  </td>
+                  <td className="max-w-[220px] truncate px-3 py-2 font-medium text-claude-text">
+                    {m.job.title}
+                  </td>
+                  <td className="max-w-[160px] truncate px-3 py-2 text-claude-muted">
+                    {m.job.company}
+                  </td>
+                  <td className="max-w-[140px] truncate px-3 py-2 text-claude-muted">
+                    {m.job.location || "—"}
+                  </td>
+                  <td className="hidden max-w-[240px] truncate px-3 py-2 text-xs text-claude-muted lg:table-cell">
+                    {m.strengths || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -1044,73 +1033,76 @@ export default function ScoreJobsPage() {
         </div>
       )}
 
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:p-8"
-          onClick={() => setSelected(null)}
-        >
+      {selected &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            className="fade-up w-full max-w-2xl overflow-hidden rounded-2xl border border-claude-border bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm sm:p-8"
+            onClick={() => setSelected(null)}
           >
-            <div className="flex items-start justify-between border-b border-claude-border p-5">
-              <div>
-                <div
-                  className={cn(
-                    "mb-2 inline-flex rounded-md px-2.5 py-1 text-sm font-bold",
-                    scoreBg(selected.score),
-                    scoreColor(selected.score)
-                  )}
-                >
-                  {selected.score}% score
-                </div>
-                <h3 className="text-lg font-semibold text-claude-text">
-                  {selected.job.title}
-                </h3>
-                <p className="mt-1 text-sm text-claude-muted">
-                  {selected.job.company}
-                  {selected.job.location ? ` · ${selected.job.location}` : ""}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                className="rounded-lg p-1.5 text-claude-muted hover:bg-claude-bg"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-4 p-5 text-sm">
-              {selected.strengths && (
+            <div
+              className="fade-up max-h-[min(90vh,56rem)] w-full max-w-2xl overflow-hidden rounded-2xl border border-claude-border bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between border-b border-claude-border p-5">
                 <div>
-                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
-                    Strengths
+                  <div
+                    className={cn(
+                      "mb-2 inline-flex rounded-md px-2.5 py-1 text-sm font-bold",
+                      scoreBg(selected.score),
+                      scoreColor(selected.score)
+                    )}
+                  >
+                    {selected.score}% score
                   </div>
-                  <p className="text-claude-text">{selected.strengths}</p>
-                </div>
-              )}
-              {selected.gaps && (
-                <div>
-                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
-                    Gaps
-                  </div>
-                  <p className="text-claude-text">{selected.gaps}</p>
-                </div>
-              )}
-              {selected.job.description && (
-                <div>
-                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
-                    Description
-                  </div>
-                  <p className="max-h-64 overflow-y-auto whitespace-pre-wrap text-claude-muted">
-                    {selected.job.description}
+                  <h3 className="text-lg font-semibold text-claude-text">
+                    {selected.job.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-claude-muted">
+                    {selected.job.company}
+                    {selected.job.location ? ` · ${selected.job.location}` : ""}
                   </p>
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="rounded-lg p-1.5 text-claude-muted hover:bg-claude-bg"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="max-h-[min(60vh,32rem)] space-y-4 overflow-y-auto p-5 text-sm">
+                {selected.strengths && (
+                  <div>
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
+                      Strengths
+                    </div>
+                    <p className="text-claude-text">{selected.strengths}</p>
+                  </div>
+                )}
+                {selected.gaps && (
+                  <div>
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
+                      Gaps
+                    </div>
+                    <p className="text-claude-text">{selected.gaps}</p>
+                  </div>
+                )}
+                {selected.job.description && (
+                  <div>
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
+                      Description
+                    </div>
+                    <p className="whitespace-pre-wrap text-claude-muted">
+                      {selected.job.description}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </div>,
+          document.body
+        )}
+    </PageChrome>
   );
 }

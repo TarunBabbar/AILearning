@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   Building2,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { JobCardSkeleton } from "@/components/Skeleton";
+import PageChrome from "@/components/PageChrome";
 import { useListSWR } from "@/lib/use-list-swr";
 import type { JobsResponse, Job } from "@/lib/types";
 
@@ -82,8 +84,7 @@ export default function Dashboard() {
 
   // New page → scroll list back to top
   useEffect(() => {
-    const main = document.querySelector("main");
-    if (main) main.scrollTo({ top: 0, behavior: "smooth" });
+    document.getElementById("page-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
   }, [page]);
 
   const jobsKey = useMemo(() => {
@@ -152,67 +153,69 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-7xl">
-      {/* Compact header: title + stats + search/sort */}
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="text-xl font-semibold tracking-tight text-claude-text">
-            All Jobs
-          </h1>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
-            <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
-              <Briefcase size={12} />
-              {stats.total.toLocaleString()} jobs
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
-              <Building2 size={12} />
-              {stats.companies.toLocaleString()} companies
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md bg-[#e3efe3] px-2 py-1 font-medium text-[#3d7a3d]">
-              <FileText size={12} />
-              {stats.sources.toLocaleString()} sources
-            </span>
+    <PageChrome
+      hideHeader={!!selectedJob}
+      header={
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="text-lg font-semibold tracking-tight text-claude-text">
+              All Jobs
+            </h1>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
+              <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
+                <Briefcase size={12} />
+                {stats.total.toLocaleString()} jobs
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
+                <Building2 size={12} />
+                {stats.companies.toLocaleString()} companies
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-[#e3efe3] px-2 py-1 font-medium text-[#3d7a3d]">
+                <FileText size={12} />
+                {stats.sources.toLocaleString()} sources
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:max-w-xl lg:justify-end">
-          <div className="relative min-w-[180px] flex-1">
-            <Search
-              size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title, company, location, email…"
-              className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:max-w-xl lg:justify-end">
+            <div className="relative min-w-[180px] flex-1">
+              <Search
+                size={14}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search title, company, location, email…"
+                className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+            <div className="relative shrink-0">
+              <ArrowUpDown
+                size={12}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
+              />
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                className="rounded-lg border border-claude-border bg-white py-1.5 pl-7 pr-2 text-sm text-claude-text outline-none transition-colors focus:border-claude-accent"
               >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-          <div className="relative shrink-0">
-            <ArrowUpDown
-              size={12}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
-            />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="rounded-lg border border-claude-border bg-white py-1.5 pl-7 pr-2 text-sm text-claude-text outline-none transition-colors focus:border-claude-accent"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-            </select>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
-
+      }
+    >
       {/* API key banner */}
       {apiKeyConfigured === false && (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-claude-border bg-white px-3 py-2 text-xs shadow-sm">
@@ -358,7 +361,7 @@ export default function Dashboard() {
           }}
         />
       )}
-    </div>
+    </PageChrome>
   );
 }
 
@@ -373,7 +376,7 @@ function JobCard({
 
   return (
     <div
-      className="fade-up group flex h-full flex-col overflow-hidden rounded-lg border border-claude-border bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="group flex h-full flex-col overflow-hidden rounded-lg border border-claude-border bg-white shadow-sm transition-shadow hover:shadow-md"
     >
       <div className={cn("h-0.5 w-full", color.split(" ")[0])} />
 
@@ -445,16 +448,23 @@ function JobDetailModal({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:p-8"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm sm:p-8"
       onClick={onClose}
     >
       <div
-        className="fade-up relative w-full max-w-2xl overflow-hidden rounded-2xl border border-claude-border bg-white shadow-2xl"
+        className="fade-up relative max-h-[min(90vh,56rem)] w-full max-w-2xl overflow-hidden rounded-2xl border border-claude-border bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className={cn("h-1.5 w-full", color.split(" ")[0])} />
@@ -507,7 +517,7 @@ function JobDetailModal({
           </button>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto p-6">
+        <div className="max-h-[min(50vh,28rem)] overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-claude-muted">
               <Loader2 size={16} className="animate-spin" />
@@ -527,7 +537,8 @@ function JobDetailModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

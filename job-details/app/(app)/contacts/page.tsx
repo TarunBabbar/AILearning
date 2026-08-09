@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Mail, Search, Copy, Check, Inbox, X, Building2 } from "lucide-react";
+import { Mail, Search, Copy, Check, X, Building2 } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
+import ListPagination from "@/components/ListPagination";
+import ShowingRange from "@/components/ShowingRange";
+import PageChrome from "@/components/PageChrome";
 import { useListSWR } from "@/lib/use-list-swr";
+
+const PAGE_SIZE = 40;
 
 type Contact = {
   company: string;
@@ -12,6 +17,9 @@ type Contact = {
 
 type Response = {
   totalCompanies: number;
+  totalEmails: number;
+  page: number;
+  pageCount: number;
   contacts: Contact[];
 };
 
@@ -19,18 +27,28 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [debounced]);
+
+  useEffect(() => {
+    document.getElementById("page-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
+
   const contactsKey = useMemo(() => {
     const params = new URLSearchParams();
     if (debounced) params.set("search", debounced);
-    const qs = params.toString();
-    return qs ? `/api/contacts?${qs}` : "/api/contacts";
-  }, [debounced]);
+    params.set("page", String(page));
+    params.set("pageSize", String(PAGE_SIZE));
+    return `/api/contacts?${params.toString()}`;
+  }, [debounced, page]);
 
   const { data, error: swrError, isLoading } = useListSWR<Response>(contactsKey);
   const loading = isLoading && !data;
@@ -50,131 +68,135 @@ export default function ContactsPage() {
     }
   }, []);
 
-  const emailCount = data?.contacts.reduce((s, c) => s + c.emails.length, 0) ?? 0;
+  const pageCount = data?.pageCount ?? 1;
+  const currentPage = data?.page ?? page;
 
   return (
-    <div className="mx-auto max-w-6xl">
-      {/* One compact row: title + chips + search (All Jobs style) */}
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-xl font-semibold tracking-tight text-claude-text">
-            Recruiter Contacts
-          </h1>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
-            <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
-              <Building2 size={12} />
-              {(data?.totalCompanies ?? 0).toLocaleString()} companies
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
-              <Mail size={12} />
-              {emailCount.toLocaleString()} emails
-            </span>
+    <PageChrome
+      header={
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="text-lg font-semibold tracking-tight text-claude-text">
+              Recruiter Contacts
+            </h1>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
+              <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-1.5 py-0.5 font-medium text-[#4a6d8c]">
+                <Building2 size={11} />
+                {(data?.totalCompanies ?? 0).toLocaleString()} companies
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-1.5 py-0.5 font-medium text-claude-accent">
+                <Mail size={11} />
+                {(data?.totalEmails ?? 0).toLocaleString()} emails
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex min-w-0 flex-1 lg:max-w-xl lg:justify-end">
-          <div className="relative w-full min-w-[180px] lg:max-w-md">
+          <div className="relative w-full sm:w-[14rem]">
             <Search
-              size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
+              size={13}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-claude-muted"
             />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter by company or email…"
-              className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+              placeholder="Filter company or email…"
+              className="w-full rounded-md border border-claude-border bg-white py-1 pl-7 pr-6 text-xs outline-none placeholder:text-claude-muted focus:border-claude-accent"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
               >
-                <X size={13} />
+                <X size={12} />
               </button>
             )}
           </div>
         </div>
-      </div>
-
-      {/* Table */}
+      }
+    >
       {loading ? (
         <TableSkeleton />
       ) : error ? (
-        <div className="rounded-xl border border-claude-border bg-white p-8 text-center text-sm text-claude-muted shadow-sm">
-          {error}
-        </div>
+        <p className="py-6 text-center text-sm text-claude-muted">{error}</p>
       ) : !data || data.contacts.length === 0 ? (
-        <div className="rounded-xl border border-claude-border bg-white p-16 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-claude-accent-soft text-claude-accent">
-            <Inbox size={24} />
-          </div>
-          <p className="text-base font-semibold text-claude-text">
-            No contacts found
-          </p>
-          <p className="mt-2 text-sm text-claude-muted">
-            Upload job PDFs with company emails to see recruiter contacts here.
+        <div className="rounded-lg border border-claude-border bg-white px-4 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-claude-text">No contacts found</p>
+          <p className="mt-0.5 text-xs text-claude-muted">
+            Upload job PDFs with company emails to see contacts here.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-claude-border bg-white shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-claude-border bg-claude-bg/50 text-xs uppercase tracking-wide text-claude-muted">
-                <th className="px-5 py-3 font-semibold">Company</th>
-                <th className="px-5 py-3 font-semibold">Email</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-claude-border">
+        <>
+          <div className="overflow-hidden rounded-lg border border-claude-border bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-2 border-b border-claude-border bg-white px-3.5 py-2">
+              <div className="grid min-w-0 flex-1 grid-cols-[minmax(9rem,14rem)_1fr] gap-x-3 text-[11px] font-medium uppercase tracking-wide text-claude-muted">
+                <span>Company</span>
+                <span>Email</span>
+              </div>
+              <ShowingRange
+                page={currentPage}
+                pageSize={PAGE_SIZE}
+                itemCount={data.contacts.length}
+                total={data.totalCompanies}
+                className="shrink-0 normal-case tracking-normal"
+              />
+            </div>
+            <div className="divide-y divide-claude-border">
               {data.contacts.map((contact) => (
-                <tr
+                <div
                   key={`${contact.company}|${contact.emails[0] ?? ""}`}
-                  className="transition-colors hover:bg-claude-bg/40"
+                  className="grid grid-cols-[minmax(9rem,14rem)_1fr] gap-x-3 px-3.5 py-2.5 hover:bg-claude-bg/30"
                 >
-                  {/* Company */}
-                  <td className="px-5 py-3.5 align-top">
-                    <div className="font-medium text-claude-text">
-                      {contact.company}
-                    </div>
-                  </td>
-
-                  {/* Emails */}
-                  <td className="px-5 py-3.5">
-                    <div className="flex flex-col gap-1.5">
-                      {contact.emails.map((email) => (
-                        <div key={email} className="group flex items-center gap-2">
-                          <Mail
-                            size={13}
-                            className="shrink-0 text-claude-accent/70"
-                          />
-                          <a
-                            href={`mailto:${email}`}
-                            className="truncate text-claude-text hover:text-claude-accent hover:underline"
-                            title={`Email ${email}`}
-                          >
-                            {email}
-                          </a>
-                          <button
-                            onClick={() => copyEmail(email)}
-                            className="shrink-0 rounded p-1 text-claude-muted opacity-0 transition-opacity hover:bg-claude-bg hover:text-claude-accent group-hover:opacity-100"
-                            title="Copy email"
-                          >
-                            {copied === email ? (
-                              <Check size={13} className="text-[#3d7a3d]" />
-                            ) : (
-                              <Copy size={13} />
-                            )}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
+                  <div className="truncate text-[13px] font-semibold text-claude-text">
+                    {contact.company}
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    {contact.emails.map((email) => (
+                      <div
+                        key={email}
+                        className="group flex min-w-0 items-center gap-1.5"
+                      >
+                        <Mail
+                          size={12}
+                          className="shrink-0 text-claude-accent/70"
+                        />
+                        <a
+                          href={`mailto:${email}`}
+                          className="truncate text-[13px] text-claude-text hover:text-claude-accent hover:underline"
+                          title={`Email ${email}`}
+                        >
+                          {email}
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => copyEmail(email)}
+                          className="shrink-0 text-claude-muted opacity-0 transition-opacity hover:text-claude-accent group-hover:opacity-100"
+                          title="Copy email"
+                        >
+                          {copied === email ? (
+                            <Check size={12} className="text-[#3d7a3d]" />
+                          ) : (
+                            <Copy size={12} />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </div>
+
+          <ListPagination
+            page={currentPage}
+            pageCount={pageCount}
+            total={data.totalCompanies}
+            loading={isLoading}
+            onPageChange={setPage}
+          />
+        </>
       )}
-    </div>
+    </PageChrome>
   );
 }

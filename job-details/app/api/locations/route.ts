@@ -57,7 +57,7 @@ export async function GET(req: Request) {
       byLocation.set(key, arr);
     }
 
-    const locations = [...byLocation.entries()]
+    const locationsAll = [...byLocation.entries()]
       .map(([key, jobsInLoc]) => ({
         location: jobsInLoc[0]?.location || titleCase(key),
         jobs: jobsInLoc.map((j) => ({
@@ -74,10 +74,26 @@ export async function GET(req: Request) {
       }))
       .sort((a, b) => a.location.localeCompare(b.location));
 
+    const pageSizeRaw = Number(url.searchParams.get("pageSize"));
+    const pageRaw = Number(url.searchParams.get("page"));
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : 40)
+    );
+    const pageCount = Math.max(1, Math.ceil(locationsAll.length / pageSize));
+    const page = Math.min(
+      pageCount,
+      Math.max(1, Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1)
+    );
+    const locations = locationsAll.slice((page - 1) * pageSize, page * pageSize);
+
     return NextResponse.json(
       {
-        totalLocations: locations.length,
-        totalJobs: locations.reduce((s, l) => s + l.count, 0),
+        totalLocations: locationsAll.length,
+        totalJobs: locationsAll.reduce((s, l) => s + l.count, 0),
+        page,
+        pageSize,
+        pageCount,
         locations,
       },
       {

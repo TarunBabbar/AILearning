@@ -492,7 +492,7 @@ export default function UploadPage() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto h-full min-h-0 max-w-4xl overflow-y-auto">
       <div className="mb-5 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-claude-text">

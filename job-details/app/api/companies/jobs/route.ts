@@ -62,7 +62,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const companies = [...merged.values()]
+    const companiesAll = [...merged.values()]
       .map(({ label, jobs: j }) => ({
         company: label,
         count: j.length,
@@ -70,10 +70,26 @@ export async function GET(req: Request) {
       }))
       .sort((a, b) => (sort === "name" ? a.company.localeCompare(b.company) : b.count - a.count));
 
+    const pageSizeRaw = Number(url.searchParams.get("pageSize"));
+    const pageRaw = Number(url.searchParams.get("page"));
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : 40)
+    );
+    const pageCount = Math.max(1, Math.ceil(companiesAll.length / pageSize));
+    const page = Math.min(
+      pageCount,
+      Math.max(1, Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1)
+    );
+    const companies = companiesAll.slice((page - 1) * pageSize, page * pageSize);
+
     return NextResponse.json(
       {
-        totalCompanies: companies.length,
-        totalJobs: companies.reduce((s, c) => s + c.jobs.length, 0),
+        totalCompanies: companiesAll.length,
+        totalJobs: companiesAll.reduce((s, c) => s + c.jobs.length, 0),
+        page,
+        pageSize,
+        pageCount,
         companies,
       },
       {

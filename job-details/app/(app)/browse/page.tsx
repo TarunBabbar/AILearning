@@ -10,12 +10,16 @@ import {
   Briefcase,
   Clock,
   X,
-  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GroupListSkeleton } from "@/components/Skeleton";
+import ListPagination from "@/components/ListPagination";
+import ShowingRange from "@/components/ShowingRange";
+import PageChrome from "@/components/PageChrome";
 import { useListSWR } from "@/lib/use-list-swr";
 import type { Job } from "@/lib/types";
+
+const PAGE_SIZE = 40;
 
 type CompanyGroup = {
   company: string;
@@ -82,12 +86,16 @@ function formatShortDate(iso: string | null): string {
 type CompaniesResponse = {
   totalCompanies: number;
   totalJobs: number;
+  page: number;
+  pageCount: number;
   companies: CompanyGroup[];
 };
 
 type LocationsResponse = {
   totalLocations: number;
   totalJobs: number;
+  page: number;
+  pageCount: number;
   locations: LocationGroup[];
 };
 
@@ -96,177 +104,182 @@ export default function BrowsePage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  const { companiesKey, locationsKey } = useMemo(() => {
+  useEffect(() => {
+    setPage(1);
+    setExpanded(null);
+  }, [debounced, view]);
+
+  useEffect(() => {
+    setExpanded(null);
+    document.getElementById("page-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
+
+  const listKey = useMemo(() => {
     const params = new URLSearchParams();
     if (debounced) params.set("search", debounced);
-    params.set("sort", "name");
-    const companiesKey = `/api/companies/jobs?${params.toString()}`;
-    const locParams = new URLSearchParams();
-    if (debounced) locParams.set("search", debounced);
-    const locQs = locParams.toString();
-    return {
-      companiesKey,
-      locationsKey: locQs ? `/api/locations?${locQs}` : "/api/locations",
-    };
-  }, [debounced]);
+    params.set("page", String(page));
+    params.set("pageSize", String(PAGE_SIZE));
+    if (view === "company") {
+      params.set("sort", "name");
+      return `/api/companies/jobs?${params.toString()}`;
+    }
+    return `/api/locations?${params.toString()}`;
+  }, [debounced, page, view]);
 
-  const {
-    data: cData,
-    error: cError,
-    isLoading: cLoading,
-  } = useListSWR<CompaniesResponse>(companiesKey);
-  const {
-    data: lData,
-    error: lError,
-    isLoading: lLoading,
-  } = useListSWR<LocationsResponse>(locationsKey);
+  const { data, error: swrError, isLoading } = useListSWR<
+    CompaniesResponse | LocationsResponse
+  >(listKey);
 
-  const companies = cData?.companies ?? [];
-  const locations = lData?.locations ?? [];
-  const totals =
-    cData || lData
+  const companies =
+    view === "company" && data && "companies" in data ? data.companies : [];
+  const locations =
+    view === "location" && data && "locations" in data ? data.locations : [];
+  const totals = data
+    ? view === "company" && "totalCompanies" in data
       ? {
-          companies: cData?.totalCompanies ?? 0,
-          companyJobs: cData?.totalJobs ?? 0,
-          locations: lData?.totalLocations ?? 0,
-          locationJobs: lData?.totalJobs ?? 0,
+          groups: data.totalCompanies,
+          jobs: data.totalJobs,
         }
-      : null;
-  const loading = (cLoading && !cData) || (lLoading && !lData);
-  const error =
-    cError || lError
-      ? cError instanceof Error
-        ? cError.message
-        : lError instanceof Error
-          ? lError.message
-          : "Failed to load"
-      : null;
+      : "totalLocations" in data
+        ? {
+            groups: data.totalLocations,
+            jobs: data.totalJobs,
+          }
+        : null
+    : null;
+  const pageCount = data?.pageCount ?? 1;
+  const currentPage = data?.page ?? page;
+  const loading = isLoading && !data;
+  const error = swrError
+    ? swrError instanceof Error
+      ? swrError.message
+      : "Failed to load"
+    : null;
 
   const groups = view === "company" ? companies : locations;
   const groupLabel = view === "company" ? "companies" : "locations";
 
   return (
-    <div className="mx-auto max-w-6xl">
-      {/* One compact row: title + chips + toggle + search (All Jobs style) */}
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-xl font-semibold tracking-tight text-claude-text">
-            Browse Jobs
-          </h1>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
-            {view === "company" ? (
-              <>
-                <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
-                  <Building2 size={12} />
-                  {(totals?.companies ?? 0).toLocaleString()} companies
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
-                  <Briefcase size={12} />
-                  {(totals?.companyJobs ?? 0).toLocaleString()} jobs
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="inline-flex items-center gap-1 rounded-md bg-[#e3efe3] px-2 py-1 font-medium text-[#3d7a3d]">
-                  <MapPin size={12} />
-                  {(totals?.locations ?? 0).toLocaleString()} locations
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
-                  <Briefcase size={12} />
-                  {(totals?.locationJobs ?? 0).toLocaleString()} jobs
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:max-w-xl lg:justify-end">
-          <div className="inline-flex shrink-0 rounded-md bg-claude-bg p-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setView("company");
-                setExpanded(null);
-              }}
-              className={cn(
-                "inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium",
-                view === "company"
-                  ? "bg-white text-claude-text shadow-sm"
-                  : "text-claude-muted hover:text-claude-text"
+    <PageChrome
+      header={
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="text-lg font-semibold tracking-tight text-claude-text">
+              Browse Jobs
+            </h1>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
+              {view === "company" ? (
+                <>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-1.5 py-0.5 font-medium text-[#4a6d8c]">
+                    <Building2 size={11} />
+                    {(totals?.groups ?? 0).toLocaleString()} companies
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-1.5 py-0.5 font-medium text-claude-accent">
+                    <Briefcase size={11} />
+                    {(totals?.jobs ?? 0).toLocaleString()} jobs
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[#e3efe3] px-1.5 py-0.5 font-medium text-[#3d7a3d]">
+                    <MapPin size={11} />
+                    {(totals?.groups ?? 0).toLocaleString()} locations
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-1.5 py-0.5 font-medium text-claude-accent">
+                    <Briefcase size={11} />
+                    {(totals?.jobs ?? 0).toLocaleString()} jobs
+                  </span>
+                </>
               )}
-            >
-              <Building2 size={12} />
-              Company
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setView("location");
-                setExpanded(null);
-              }}
-              className={cn(
-                "inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium",
-                view === "location"
-                  ? "bg-white text-claude-text shadow-sm"
-                  : "text-claude-muted hover:text-claude-text"
-              )}
-            >
-              <MapPin size={12} />
-              Location
-            </button>
+            </div>
           </div>
 
-          <div className="relative min-w-[180px] flex-1">
-            <Search
-              size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Company or location…"
-              className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
-            />
-            {search && (
+          <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-1.5">
+            <div className="inline-flex shrink-0 rounded-md bg-claude-bg p-0.5">
               <button
                 type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+                onClick={() => setView("company")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium",
+                  view === "company"
+                    ? "bg-white text-claude-text shadow-sm"
+                    : "text-claude-muted hover:text-claude-text"
+                )}
               >
-                <X size={13} />
+                <Building2 size={12} />
+                Company
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setView("location")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium",
+                  view === "location"
+                    ? "bg-white text-claude-text shadow-sm"
+                    : "text-claude-muted hover:text-claude-text"
+                )}
+              >
+                <MapPin size={12} />
+                Location
+              </button>
+            </div>
+
+            <div className="relative w-[11rem] sm:w-[14rem]">
+              <Search
+                size={13}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-claude-muted"
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Company or location…"
+                className="w-full rounded-md border border-claude-border bg-white py-1 pl-7 pr-6 text-xs outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* List */}
+      }
+    >
+      {/* Compact cards — same chrome as All Jobs JobCard */}
       {loading ? (
         <GroupListSkeleton />
       ) : error ? (
-        <div className="rounded-xl border border-claude-border bg-white p-8 text-center text-sm text-claude-muted shadow-sm">
-          {error}
-        </div>
+        <p className="py-6 text-center text-sm text-claude-muted">{error}</p>
       ) : groups.length === 0 ? (
-        <div className="rounded-xl border border-claude-border bg-white p-16 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-claude-accent-soft text-claude-accent">
-            <Inbox size={24} />
-          </div>
-          <p className="text-base font-semibold text-claude-text">
+        <div className="rounded-lg border border-claude-border bg-white px-4 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-claude-text">
             No {groupLabel} found
           </p>
-          <p className="mt-2 text-sm text-claude-muted">
+          <p className="mt-0.5 text-xs text-claude-muted">
             Try a different filter, or upload more job PDFs.
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
+          <div className="flex items-center justify-end px-0.5">
+            <ShowingRange
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              itemCount={groups.length}
+              total={totals?.groups ?? 0}
+            />
+          </div>
           {view === "company"
             ? companies.map((group) => {
                 const color = avatarColor(group.company);
@@ -275,37 +288,37 @@ export default function BrowsePage() {
                   <div
                     key={group.company}
                     className={cn(
-                      "overflow-hidden rounded-xl border bg-white shadow-sm transition-all",
+                      "overflow-hidden rounded-lg border bg-white shadow-sm",
                       open
-                        ? "border-claude-accent/40 ring-2 ring-claude-accent/10"
+                        ? "border-claude-accent/35"
                         : "border-claude-border"
                     )}
                   >
-                    {/* Company header */}
                     <button
-                      onClick={() => setExpanded(open ? null : group.company)}
-                      className="flex w-full items-center gap-3 px-5 py-4 text-left"
+                      type="button"
+                      onClick={() =>
+                        setExpanded(open ? null : group.company)
+                      }
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left"
                     >
                       <div
                         className={cn(
-                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold",
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold",
                           color
                         )}
                       >
                         {initials(group.company)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h2 className="truncate text-[15px] font-semibold text-claude-text">
-                            {group.company}
-                          </h2>
-                          <span className="rounded-full bg-claude-accent-soft px-2 py-0.5 text-[11px] font-medium text-claude-accent-strong">
-                            {group.count} job{group.count === 1 ? "" : "s"}
-                          </span>
-                        </div>
+                        <h2 className="truncate text-[13px] font-semibold text-claude-text">
+                          {group.company}
+                        </h2>
                       </div>
+                      <span className="rounded bg-claude-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-claude-accent">
+                        {group.count}
+                      </span>
                       <ChevronDown
-                        size={16}
+                        size={14}
                         className={cn(
                           "shrink-0 text-claude-muted transition-transform",
                           open && "rotate-180"
@@ -313,48 +326,41 @@ export default function BrowsePage() {
                       />
                     </button>
 
-                    {/* Jobs */}
                     {open && (
-                      <div className="border-t border-claude-border bg-claude-bg/40">
+                      <div className="border-t border-claude-border">
                         {group.jobs.map((job) => (
                           <div
                             key={job.id}
-                            className="flex items-start gap-3 border-b border-claude-border px-5 py-3 last:border-b-0"
+                            className="border-b border-claude-border/70 px-3.5 py-2 last:border-b-0"
                           >
-                            <Briefcase
-                              size={14}
-                              className="mt-0.5 shrink-0 text-claude-muted"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-claude-text">
-                                {job.title}
-                              </div>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-claude-muted">
-                                {job.location && (
-                                  <span className="flex items-center gap-1">
-                                    <MapPin size={11} />
-                                    {job.location}
-                                  </span>
-                                )}
-                                {job.experience && (
-                                  <span className="flex items-center gap-1">
-                                    <Clock size={11} />
-                                    {job.experience}
-                                  </span>
-                                )}
-                                {job.email && (
-                                  <span className="flex items-center gap-1">
-                                    <Mail size={11} />
-                                    {job.email}
-                                  </span>
-                                )}
-                              </div>
-                              {job.description && (
-                                <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-claude-muted">
-                                  {job.description}
-                                </p>
+                            <div className="text-[13px] font-medium text-claude-text">
+                              {job.title}
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-claude-muted">
+                              {job.location && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin size={10} />
+                                  {job.location}
+                                </span>
+                              )}
+                              {job.experience && (
+                                <span className="flex items-center gap-1">
+                                  <Clock size={10} />
+                                  {job.experience}
+                                </span>
+                              )}
+                              {job.email && (
+                                <span className="flex items-center gap-1">
+                                  <Mail size={10} />
+                                  {job.email}
+                                </span>
                               )}
                             </div>
+                            {job.description && (
+                              <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-claude-muted">
+                                {job.description}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -368,32 +374,32 @@ export default function BrowsePage() {
                   <div
                     key={group.location}
                     className={cn(
-                      "overflow-hidden rounded-xl border bg-white shadow-sm transition-all",
+                      "overflow-hidden rounded-lg border bg-white shadow-sm",
                       open
-                        ? "border-claude-accent/40 ring-2 ring-claude-accent/10"
+                        ? "border-claude-accent/35"
                         : "border-claude-border"
                     )}
                   >
-                    {/* Location header */}
                     <button
-                      onClick={() => setExpanded(open ? null : group.location)}
-                      className="flex w-full items-center gap-3 px-5 py-4 text-left"
+                      type="button"
+                      onClick={() =>
+                        setExpanded(open ? null : group.location)
+                      }
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left"
                     >
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-claude-accent-soft text-claude-accent">
-                        <MapPin size={18} />
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-claude-accent-soft text-claude-accent">
+                        <MapPin size={14} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h2 className="truncate text-[15px] font-semibold text-claude-text">
-                            {group.location}
-                          </h2>
-                          <span className="rounded-full bg-claude-accent-soft px-2 py-0.5 text-[11px] font-medium text-claude-accent-strong">
-                            {group.count} job{group.count === 1 ? "" : "s"}
-                          </span>
-                        </div>
+                        <h2 className="truncate text-[13px] font-semibold text-claude-text">
+                          {group.location}
+                        </h2>
                       </div>
+                      <span className="rounded bg-claude-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-claude-accent">
+                        {group.count}
+                      </span>
                       <ChevronDown
-                        size={16}
+                        size={14}
                         className={cn(
                           "shrink-0 text-claude-muted transition-transform",
                           open && "rotate-180"
@@ -401,51 +407,42 @@ export default function BrowsePage() {
                       />
                     </button>
 
-                    {/* Jobs — same detail style as the company view */}
                     {open && (
-                      <div className="border-t border-claude-border bg-claude-bg/40">
+                      <div className="border-t border-claude-border">
                         {group.jobs.map((job) => (
                           <div
                             key={job.id}
-                            className="flex items-start gap-3 border-b border-claude-border px-5 py-3 last:border-b-0"
+                            className="border-b border-claude-border/70 px-3.5 py-2 last:border-b-0"
                           >
-                            <Briefcase
-                              size={14}
-                              className="mt-0.5 shrink-0 text-claude-muted"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-claude-text">
-                                {job.title}
-                              </div>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-claude-muted">
+                            <div className="text-[13px] font-medium text-claude-text">
+                              {job.title}
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-claude-muted">
+                              <span className="flex items-center gap-1">
+                                <Building2 size={10} />
+                                {job.company}
+                              </span>
+                              {job.email && (
                                 <span className="flex items-center gap-1">
-                                  <Building2 size={11} />
-                                  {job.company}
+                                  <Mail size={10} />
+                                  {job.email}
                                 </span>
-                                {job.email && (
-                                  <span className="flex items-center gap-1">
-                                    <Mail size={11} />
-                                    {job.email}
-                                  </span>
-                                )}
-                                {job.experience && (
-                                  <span className="flex items-center gap-1">
-                                    <Clock size={11} />
-                                    {job.experience}
-                                  </span>
-                                )}
-                                {job.jobDate && (
-                                  <span className="flex items-center gap-1">
-                                    {formatShortDate(job.jobDate)}
-                                  </span>
-                                )}
-                              </div>
-                              {job.description && (
-                                <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-claude-muted">
-                                  {job.description}
-                                </p>
+                              )}
+                              {job.experience && (
+                                <span className="flex items-center gap-1">
+                                  <Clock size={10} />
+                                  {job.experience}
+                                </span>
+                              )}
+                              {job.jobDate && (
+                                <span>{formatShortDate(job.jobDate)}</span>
                               )}
                             </div>
+                            {job.description && (
+                              <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-claude-muted">
+                                {job.description}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -455,6 +452,16 @@ export default function BrowsePage() {
               })}
         </div>
       )}
-    </div>
+
+      {!loading && !error && groups.length > 0 && (
+        <ListPagination
+          page={currentPage}
+          pageCount={pageCount}
+          total={totals?.groups}
+          loading={isLoading}
+          onPageChange={setPage}
+        />
+      )}
+    </PageChrome>
   );
 }

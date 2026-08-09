@@ -63,11 +63,17 @@
 - Results are deduplicated (by title + email + company) against existing rows.
 - Strict-JSON prompting with fallback-safe parsing (handles markdown fences / prose around JSON).
 
-### 📊 Dashboard (default page)
-- **Stat cards**: total jobs, jobs with company info, unique source files.
-- **Search** across title, company, location, experience, and email (debounced).
-- **Status filter** and **sort** (newest / oldest / company A–Z).
-- **Expandable job cards** showing the full job description, source file, and resolved company info inline.
+### 📊 All Jobs (default page)
+- Compact job cards with search and sort (newest / oldest).
+- **Pagination** (40 per page) with First / Prev / Next / Last.
+- Click a job for a **centered full-screen detail modal** (page header hidden while open).
+- Client list cache via SWR (~5 min soft TTL).
+
+### 🗂️ Browse Jobs & Recruiter Contacts
+- **Browse**: group by company or location; expand a group to see its jobs.
+- **Contacts**: company → recruiter email(s), copy / mailto.
+- Both pages paginate groups (40 per page) and show **Showing 1–40 of N** (same company universe when Browse is on Company view).
+- Shared pagination chrome and range label components.
 
 ### 🏢 Company details (inline, no separate tab)
 - Every job's email domain is checked against a **generic-domain blocklist**:
@@ -87,15 +93,16 @@
 - List GET APIs send `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` so Vercel’s edge can serve short-lived responses too (same behavior on localhost and production).
 
 ### 🎯 Match Jobs by Resume (per-user scoring)
-- Nav: **Match by Resume**. Upload a resume and score shared board jobs against it.
-- Users register/login with their own account (separate from admin upload login).
-- Upload a resume (PDF/DOCX) — text is extracted in the browser and stored per user in Postgres.
-- Score shared board jobs against that resume via OpenRouter. Each wave lists free `:free` models, then fires **one parallel request per model** with **10 jobs** each (e.g. 10 models → 100 jobs/wave). Results upsert to `JobScore` as each chunk returns.
-- Per-model: up to **2 tries**, then blacklist that model for the run and reassign the chunk to another working free model.
+- Nav: **Match by Resume**. Register/login, upload a resume, score shared board jobs against it.
+- Compact fixed page header (title, scored/left counts, resume chip, Unscored/Rescore, Score, account) plus the privacy blurb under the title.
+- Filters (**Any score**, company, location, Remote) live **inside** the results table card with **Showing 1–40 of N** (updates per page).
+- Column headers sort by score / company / location; 40 rows per page.
+- Detail popup is centered and covers the viewport (header hidden while open).
+- Score shared board jobs via OpenRouter. Each wave lists free `:free` models, then fires **one parallel request per model** with **10 jobs** each. Results upsert to `JobScore` as each chunk returns.
+- Per-model: up to **2 tries**, then blacklist that model for the run and reassign the chunk.
 - Scores keyed by `(userId, jobId)` so users never see each other’s results.
-- Large runs (≥100 jobs) show a time warning before starting; scoring can be resumed (unscored-only).
-- Results table sorted by fit % with strengths/gaps.
-- Admin list of accounts: `GET /api/users` — requires non-empty `USERS_ADMIN_API_KEY` in `.env`, passed as `x-api-key` or `Authorization: Bearer …` (Postman/curl). No session cookie. Returns id/email/name/dates/resume meta/scoreCount (never password hashes).
+- Large runs (≥100 jobs) show a time warning; scoring can be resumed (unscored-only).
+- Admin list of accounts: `GET /api/users` — requires non-empty `USERS_ADMIN_API_KEY`, passed as `x-api-key` or `Authorization: Bearer …`.
 
 ---
 
@@ -120,20 +127,23 @@
 ```
 job-details/
 ├─ app/
-│  ├─ (app)/                    # sidebar-wrapped pages (SWRProvider)
-│  │  ├─ page.tsx               # Dashboard — jobs list (SWR-cached)
-│  │  ├─ browse/                # By company / location (SWR-cached)
-│  │  ├─ contacts/              # Recruiter emails by company (SWR-cached)
-│  │  └─ upload/                # multi-file upload + extraction
+│  ├─ (app)/                    # sidebar-wrapped pages (SWRProvider + PageChrome)
+│  │  ├─ page.tsx               # All Jobs — cards + centered detail modal
+│  │  ├─ browse/                # By company / location (paginated)
+│  │  ├─ contacts/              # Recruiter emails by company (paginated)
+│  │  ├─ score/                 # Match by Resume — auth, upload, scoring, results
+│  │  └─ upload/                # multi-file upload + extraction (admin)
 │  ├─ api/
 │  │  ├─ upload/                # POST — extract + persist jobs
 │  │  ├─ jobs/                  # GET (list/search, Cache-Control) · DELETE
 │  │  ├─ jobs/[id]/             # GET · DELETE single job
 │  │  ├─ companies/             # GET list
-│  │  ├─ companies/jobs/        # GET jobs grouped by company (Cache-Control)
+│  │  ├─ companies/jobs/        # GET jobs grouped by company (page, pageSize)
 │  │  ├─ companies/resolve/     # POST — resolve company info from emails
-│  │  ├─ locations/             # GET jobs grouped by location (Cache-Control)
-│  │  ├─ contacts/              # GET emails by company (Cache-Control)
+│  │  ├─ locations/             # GET jobs grouped by location (page, pageSize)
+│  │  ├─ contacts/              # GET emails by company (page, pageSize)
+│  │  ├─ user/                  # register · login · logout · me · resume · score · matches
+│  │  ├─ users/                 # GET admin user list (USERS_ADMIN_API_KEY)
 │  │  ├─ settings/              # GET — config status (key configured, model)
 │  │  └─ extract-preview/       # POST — word count for pasted text
 │  ├─ layout.tsx                # root layout (font, metadata)
@@ -141,7 +151,11 @@ job-details/
 │  └─ globals.css               # Claude beige theme tokens
 ├─ components/
 │  ├─ Sidebar.tsx               # left navigation
-│  └─ SWRProvider.tsx           # shared SWRConfig for list pages
+│  ├─ SWRProvider.tsx           # shared SWRConfig for list pages
+│  ├─ PageChrome.tsx            # fixed page header + scroll body
+│  ├─ ListPagination.tsx        # First / Prev / Next / Last control
+│  ├─ ShowingRange.tsx          # "Showing 1–40 of N" label
+│  └─ Skeleton.tsx              # loading placeholders
 ├─ lib/
 │  ├─ client/pdf.ts             # browser-side PDF/DOCX text extraction
 │  ├─ use-list-swr.ts           # SWR hook + ~5 min TTL + upload invalidate
@@ -151,10 +165,11 @@ job-details/
 │  ├─ company.ts                # email-domain → company resolution
 │  ├─ config.ts                 # env-var config
 │  ├─ auth.ts                   # env-only API key resolver
+│  ├─ user-auth.ts              # Match-by-Resume cookie session helpers
 │  ├─ db.ts                     # Prisma singleton (driver adapter)
 │  ├─ types.ts / utils.ts / extract.ts
 ├─ prisma/
-│  └─ schema.prisma             # Job + Company models
+│  └─ schema.prisma             # Job + Company + User + Resume + JobScore
 ├─ prisma.config.ts             # Prisma 7 config (DB URL for CLI)
 ├─ generated/                   # Prisma client (gitignored)
 ├─ .env.example                 # env template (checked in)
@@ -215,6 +230,7 @@ npm run dev
 | `GENERIC_EMAIL_DOMAINS` | ❌     | Comma-separated personal-email domains hidden from the dashboard             | `gmail.com,yahoo.com,live.com,…`                              |
 | `ADMIN_USERNAME`     | ❌       | Username that unlocks the Upload page (defaults to `admin`)                  | `admin`                                                       |
 | `ADMIN_PASSWORD`     | ❌       | Password that unlocks the Upload page — without it, uploads stay locked      | `admin123`                                                    |
+| `USERS_ADMIN_API_KEY`| ❌       | API key for `GET /api/users` (Match-by-Resume account list). Empty = 503.   | `your-secret-key`                                             |
 | `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                                | `QA Tracker`                                                  |
 | `NEXT_PUBLIC_APP_URL`  | ❌     | Public app URL (sent to OpenRouter as referer)                               | `https://your-app.vercel.app`                                 |
 | `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | ❌ | Max upload size per file shown on the Upload page                          | `50`                                                          |
@@ -382,9 +398,9 @@ a pause takes a few seconds to wake the DB. That's normal.
 | `DELETE` | `/api/jobs/:id`        | Delete one job                                      | —                                                   |
 | `POST` | `/api/upload`            | Extract + persist jobs from text                    | `{ fileName, text, model? }`                        |
 | `GET`  | `/api/companies`         | List companies with job counts                      | —                                                   |
-| `GET`  | `/api/companies/jobs`    | Jobs grouped by company (edge-cached 60s)           | `search`, `sort`                                    |
-| `GET`  | `/api/locations`         | Jobs grouped by location (edge-cached 60s)          | `search`                                            |
-| `GET`  | `/api/contacts`          | Recruiter emails by company (edge-cached 60s)       | `search`                                            |
+| `GET`  | `/api/companies/jobs`    | Jobs grouped by company (edge-cached 60s)           | `search`, `sort`, `page`, `pageSize`                |
+| `GET`  | `/api/locations`         | Jobs grouped by location (edge-cached 60s)          | `search`, `page`, `pageSize`                        |
+| `GET`  | `/api/contacts`          | Recruiter emails by company (edge-cached 60s)       | `search`, `page`, `pageSize`                        |
 | `POST` | `/api/companies/resolve` | Resolve/backfill company info in batches (~10 domains/call). Repeat until `remaining` is 0. | `{ model?, limit? }` |
 | `GET`  | `/api/settings`          | Config status: key configured, source, model, models| —                                                   |
 | `POST` | `/api/extract-preview`   | Word/char count for pasted text                     | `{ text }`                                          |
