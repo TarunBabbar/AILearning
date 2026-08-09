@@ -29,9 +29,11 @@ let configCache: { at: number; value: ReturnType<typeof buildConfig> } | null = 
 function buildConfig() {
   const embeddingDims = Number(process.env.EMBEDDING_DIMENSIONS);
   const sessionDays = Number(process.env.AUTH_SESSION_DAYS);
-  const scryptN = Number(process.env.SCRYPT_N);
-  const scryptR = Number(process.env.SCRYPT_R);
-  const scryptP = Number(process.env.SCRYPT_P);
+  // Sensible defaults so auth never breaks when the optional SCRYPT_* vars
+  // are missing (e.g. fresh Vercel env setup). Matches the original seed.
+  const scryptN = Number(process.env.SCRYPT_N || 16384);
+  const scryptR = Number(process.env.SCRYPT_R || 8);
+  const scryptP = Number(process.env.SCRYPT_P || 1);
 
   return {
     // OpenRouter
