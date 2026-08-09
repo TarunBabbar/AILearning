@@ -5,3 +5,11 @@ next-env.d.ts
 .env
 .env.local
 .prisma/
+
+# Local dev artifacts (sessions, probes, temp screenshots)
+cookies.txt
+session_cookie.txt
+scripts/_probe_*.cjs
+scripts/_reset_pw.cjs
+screenshots/_ui_*.png
+generated/

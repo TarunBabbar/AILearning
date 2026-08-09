@@ -1,141 +1,132 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, Loader2, Mail, Send, Settings2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Loader2, Send, Settings } from "lucide-react";
+import PageChrome from "@/components/ui/PageChrome";
+import { JobAvatar } from "@/components/ui/JobAvatar";
+import { JobCardSkeleton } from "@/components/ui/Skeleton";
+import Button from "@/components/ui/Button";
+import JobDetailModal from "@/components/ui/JobDetailModal";
+import { invalidateListCaches, useListSWR } from "@/lib/use-list-swr";
 
-type Job = {
-  id: string;
-  title: string;
-  company: string;
-  email?: string;
-  score?: number;
-  emailSent: boolean;
-};
+type Job = { id: string; title: string; company: string; email?: string | null; score?: number | null; emailSent: boolean; emailSentAt?: string | null; location?: string | null };
+type JobsResponse = { jobs: Job[]; total: number; pageCount: number };
+const DEFAULT_TEMPLATE = "Hi {{company}} team,\n\nI'm applying for the {{title}} position.\n\nKey highlights from my background:\n{{highlights}}\n\nI'd welcome the chance to discuss how I can contribute.\n\nBest regards,\n{{signature}}";
+
+function scoreTone(score?: number | null) { return score != null && score >= 60 ? "bg-[#e3efe3] text-[#3d7a3d]" : "bg-bg-surface text-text-muted"; }
+
+/** Bullets from raw highlights (one per line) — each skill line becomes a bullet. */
+function formatHighlights(raw: string): string {
+  return raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => `• ${line}`).join("\n");
+}
+
+function renderTemplate(template: string, job: Job, highlights: string, signature: string) { return template.replaceAll("{{company}}", job.company).replaceAll("{{title}}", job.title).replaceAll("{{email}}", job.email || "").replaceAll("{{highlights}}", highlights).replaceAll("{{signature}}", signature); }
+
+/** Renders the email body; resume-highlight lines (starting with •) get bold + accent treatment. */
+function EmailPreview({ text }: { text: string }) {
+  return (
+    <div className="whitespace-pre-wrap rounded-lg bg-bg-page p-4 text-sm leading-relaxed text-text-secondary">
+      {text.split(/\r?\n/).map((line, i) =>
+        line.startsWith("• ") ? (
+          <p key={i} className="flex items-start gap-1.5 font-medium text-text-primary">
+            <span className="text-amber-600">•</span>
+            <span>{line.slice(2)}</span>
+          </p>
+        ) : (
+          <p key={i} className={line.trim() ? "min-h-[1.25rem]" : "h-3"}>{line}</p>
+        )
+      )}
+    </div>
+  );
+}
 
 export default function EmailAgentPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [filter, setFilter] = useState<"high" | "low" | "ignored">("high");
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState<string | null>(null);
-  const [gmailUser, setGmailUser] = useState("");
-  const [gmailPass, setGmailPass] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
+  const [includeSent, setIncludeSent] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
+  const [draftTemplate, setDraftTemplate] = useState(DEFAULT_TEMPLATE);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sentCount, setSentCount] = useState(0);
+  const [totalToSend, setTotalToSend] = useState(0);
+  const [signature, setSignature] = useState("QA Candidate");
+  const [highlights, setHighlights] = useState("");
+  const key = "/api/jobs?view=scored&pageSize=100";
+  const { data, error, isLoading, mutate } = useListSWR<JobsResponse>(key);
+  const jobs = useMemo(() => (data?.jobs || []).filter((job) => includeSent || !job.emailSent).filter((job) => !!job.email), [data, includeSent]);
 
-  useEffect(() => {
-    fetch("/api/jobs")
-      .then((r) => r.json())
-      .then((data) => setJobs(data.jobs || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  // Load the real resume: highlights (skills / key points) + the person's name for the signature.
+  useEffect(() => { fetch("/api/resume").then((r) => r.json()).then((d) => { if (d?.resume?.highlights) setHighlights(formatHighlights(d.resume.highlights)); if (d?.resume?.name) setSignature(d.resume.name); }).catch(() => undefined); }, []);
 
-  const filteredJobs = jobs.filter((j) => {
-    if (filter === "high") return (j.score ?? 0) >= 60 && !j.emailSent;
-    if (filter === "low") return (j.score ?? 0) < 60 && !j.emailSent;
-    return !j.emailSent;
-  });
+  useEffect(() => { fetch("/api/settings").then((r) => r.json()).then((d) => { if (d.emailTemplate) { setTemplate(d.emailTemplate); setDraftTemplate(d.emailTemplate); } }).catch(() => undefined); }, []);
 
-  const sendEmail = async (job: Job) => {
-    if (!gmailUser || !gmailPass) {
-      setShowSettings(true);
-      return;
-    }
-    setSending(job.id);
+  const openTemplate = () => { setDraftTemplate(template); setMessage(""); setTemplateOpen(true); };
+
+  const saveTemplate = async () => {
+    setSavingTemplate(true);
     try {
-      await fetch("/api/jobs/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.id, gmailUser, gmailPass }),
-      });
-      setJobs((prev) =>
-        prev.map((j) => (j.id === job.id ? { ...j, emailSent: true } : j))
-      );
-    } catch {}
-    setSending(null);
+      const res = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emailTemplate: draftTemplate }) });
+      if (res.ok) { setTemplate(draftTemplate); setMessage("Email template saved"); setTemplateOpen(false); }
+      else setMessage("Could not save template");
+    } finally { setSavingTemplate(false); }
+  };
+
+  const sendJobs = async (jobIds: string[]) => {
+    if (!jobIds.length) return;
+    setSending(true); setSentCount(0); setTotalToSend(jobIds.length); setMessage("");
+    try {
+      const res = await fetch("/api/jobs/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobIds, template }) });
+      const type = res.headers.get("content-type") || "";
+      if (type.includes("ndjson") && res.body) {
+        const reader = res.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
+        while (true) { const { done, value } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const lines = buffer.split("\n"); buffer = lines.pop() || ""; for (const line of lines) { if (!line.trim()) continue; try { const event = JSON.parse(line); if (event.type === "progress") setSentCount(Number(event.sent || 0)); if (event.type === "done") setMessage(`Sent ${event.sent || 0} application emails.`); } catch { /* skip malformed event */ } } }
+      } else { const body = await res.json(); if (!res.ok) setMessage(body.error || "Send failed"); else setMessage(body.message || "Email sent"); }
+      await invalidateListCaches(); await mutate();
+    } catch { setMessage("Send failed"); } finally { setSending(false); }
   };
 
   return (
-    <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Email Agent</h1>
-          <p className="text-sm text-text-muted">Send personalized job applications via Gmail</p>
+    <PageChrome
+      maxWidthClass="max-w-6xl"
+      header={<div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2"><Mail size={18} className="text-amber-500" /><h1 className="text-lg font-semibold tracking-tight text-text-primary">Email Agent</h1><span className="rounded-md bg-accent-soft px-2 py-1 text-xs font-medium text-accent-strong">{jobs.length} ready</span></div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setIncludeSent(!includeSent)}>{includeSent ? "Hide sent" : "Show sent"}</Button>
+          <Button size="sm" variant="ghost" onClick={openTemplate}><Settings2 size={13} />Template</Button>
+          <Button size="sm" onClick={() => sendJobs(jobs.filter((j) => !j.emailSent).map((j) => j.id))} disabled={sending || jobs.every((j) => j.emailSent)}>{sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}Send all</Button>
         </div>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-bg-surface border border-border rounded-lg hover:bg-bg-hover"
-        >
-          <Settings size={16} />
-          Gmail Settings
-        </button>
+      </div>}
+    >
+      <div className="space-y-4 pb-8">
+        {sending && <div className="rounded-xl border border-border bg-white p-4 shadow-sm"><div className="flex items-center justify-between text-sm"><span className="font-medium text-text-primary">Sending applications…</span><span className="text-text-muted">{sentCount}/{totalToSend}</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-bg-surface"><div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${totalToSend ? (sentCount / totalToSend) * 100 : 0}%` }} /></div></div>}
+        {message && !sending && <div className="rounded-lg border border-border bg-white p-3 text-sm text-text-secondary">{message}</div>}
+        {error ? <div className="rounded-xl border border-border bg-white p-12 text-center text-sm text-red-600">Failed to load email jobs.</div> : isLoading && !data ? <div className="grid gap-3 sm:grid-cols-2">{Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)}</div> : jobs.length === 0 ? <div className="rounded-xl border border-border bg-white p-16 text-center"><Mail size={28} className="mx-auto mb-3 text-amber-500" /><p className="font-medium text-text-primary">No jobs ready to email</p><p className="mt-1 text-sm text-text-muted">Score matches first, then send tailored applications here.</p></div> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{jobs.map((job) => <div key={job.id} className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start gap-3"><JobAvatar name={job.company} /><div className="min-w-0 flex-1"><p className="truncate font-medium text-text-primary">{job.title}</p><p className="truncate text-sm text-text-muted">{job.company}</p><p className="mt-1 truncate text-xs text-text-muted">{job.email}</p></div><span className={cn("rounded-md px-1.5 py-0.5 text-xs font-bold", scoreTone(job.score))}>{job.score ?? "—"}%</span></div><div className="mt-3 flex items-center justify-between"><span className={cn("rounded-full px-2 py-0.5 text-[10px]", job.emailSent ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700")}>{job.emailSent ? `Sent${job.emailSentAt ? ` · ${new Date(job.emailSentAt).toLocaleDateString()}` : ""}` : "Ready"}</span><div className="flex gap-1"><button onClick={() => setSelectedJob(job)} className="rounded-md p-1.5 text-text-muted hover:bg-bg-surface hover:text-text-primary" title="Preview"><Eye size={15} /></button>{!job.emailSent && <button onClick={() => sendJobs([job.id])} disabled={sending} className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"><Send size={12} />Send</button>}</div></div></div>)}</div>}
+
+        {selectedJob && <JobDetailModal open={!!selectedJob} onClose={() => setSelectedJob(null)} title={`Email preview · ${selectedJob.title}`} company={selectedJob.company} subtitle={<span>{selectedJob.email}</span>} sections={[{ label: "Message preview", body: <EmailPreview text={renderTemplate(template, selectedJob, highlights, signature)} /> }]} footer={!selectedJob.emailSent ? <Button onClick={() => { setSelectedJob(null); sendJobs([selectedJob.id]); }}><Send size={14} />Send application</Button> : undefined} />}
       </div>
 
-      {showSettings && (
-        <div className="bg-white border border-border rounded-lg p-4 mb-4 space-y-3">
-          <h3 className="font-medium text-sm">Gmail SMTP Credentials</h3>
-          <input
-            type="email"
-            placeholder="your.email@gmail.com"
-            value={gmailUser}
-            onChange={(e) => setGmailUser(e.target.value)}
-            className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
-          />
-          <input
-            type="password"
-            placeholder="App Password"
-            value={gmailPass}
-            onChange={(e) => setGmailPass(e.target.value)}
-            className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
-          />
-          <p className="text-xs text-text-muted">
-            Use a Gmail App Password (not your regular password). Generate one from Google Account &gt; Security &gt; App Passwords.
-          </p>
-        </div>
-      )}
-
-      {/* Filter tabs */}
-      <div className="flex gap-1 mb-4 bg-bg-surface rounded-lg border border-border p-0.5 w-fit">
-        {(["high", "low", "ignored"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-sm capitalize transition-colors",
-              filter === f
-                ? "bg-white text-text-primary shadow-sm font-medium"
-                : "text-text-muted hover:text-text-primary"
-            )}
-          >
-            {f} Score ({filteredJobs.length})
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-text-muted" /></div>
-      ) : filteredJobs.length === 0 ? (
-        <div className="text-center py-12 text-text-muted text-sm">No jobs to email. Upload and score jobs first.</div>
-      ) : (
-        <div className="space-y-2">
-          {filteredJobs.map((job) => (
-            <div key={job.id} className="bg-white border border-border rounded-lg p-4 flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-text-primary truncate">{job.title}</p>
-                <p className="text-sm text-text-muted truncate">{job.company} {job.email ? `· ${job.email}` : ""}</p>
-              </div>
-              <button
-                onClick={() => sendEmail(job)}
-                disabled={sending === job.id}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition-colors flex-shrink-0 ml-3"
-              >
-                {sending === job.id ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Send
-              </button>
+      {/* Template editor modal */}
+      {templateOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" onClick={() => setTemplateOpen(false)}>
+          <div className="fade-up flex max-h-[min(90vh,56rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div className="flex items-center gap-2"><Settings2 size={18} className="text-amber-500" /><h2 className="text-lg font-semibold text-text-primary">Application template</h2></div>
+              <button onClick={() => setTemplateOpen(false)} className="rounded-lg p-1.5 text-text-muted hover:bg-bg-surface" title="Close"><X size={18} /></button>
             </div>
-          ))}
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <p className="mb-2 text-xs text-text-muted">Placeholders: <code className="rounded bg-bg-surface px-1 py-0.5">{"{{company}}"}</code>, <code className="rounded bg-bg-surface px-1 py-0.5">{"{{title}}"}</code>, <code className="rounded bg-bg-surface px-1 py-0.5">{"{{highlights}}"}</code> (skills from your resume), <code className="rounded bg-bg-surface px-1 py-0.5">{"{{signature}}"}</code> (your name).</p>
+              <textarea value={draftTemplate} onChange={(e) => setDraftTemplate(e.target.value)} rows={14} className="w-full resize-y rounded-lg border border-border-input bg-bg-input px-3 py-2 text-sm leading-relaxed outline-none focus:border-border-focus" />
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-border p-4">
+              <Button variant="ghost" size="md" onClick={() => setTemplateOpen(false)}>Cancel</Button>
+              <Button size="md" onClick={saveTemplate} disabled={savingTemplate}>{savingTemplate && <Loader2 size={15} className="animate-spin" />}Save template</Button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </PageChrome>
   );
 }

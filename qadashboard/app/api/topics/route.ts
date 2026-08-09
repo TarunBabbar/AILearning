@@ -1,22 +1,44 @@
 import { NextRequest } from "next/server";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { getTopicDetail, getTopicsSummary } from "@/lib/topics-data";
 
-export async function GET(_req: NextRequest) {
-  const filePath = join(process.cwd(), "data", "ai-topics.json");
-  const raw = readFileSync(filePath, "utf-8");
-  const data: { name: string; questions: { question: string; answer: string; source: string }[] }[] = JSON.parse(raw);
+/**
+ * GET /api/topics
+ * - default / ?summary=1 → lightweight topic list (name + count)
+ * - ?topic=Name → questions for one topic only
+ */
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const topicName = searchParams.get("topic")?.trim();
 
-  const topics = data.map((t) => ({
-    name: t.name,
-    count: t.questions.length,
-    questions: t.questions.map((q, i) => ({
-      id: `${t.name}-${i}`,
-      question: q.question,
-      answer: q.answer,
-      source: q.source,
-    })),
-  }));
+  if (topicName) {
+    const topic = getTopicDetail(topicName);
+    if (!topic) {
+      return Response.json({ error: "Topic not found" }, { status: 404 });
+    }
+    return Response.json(
+      {
+        topic: {
+          name: topic.name,
+          count: topic.questions.length,
+          questions: topic.questions.map((q, i) => ({
+            id: `${topic.name}-${i}`,
+            question: q.question,
+            answer: q.answer,
+            source: q.source,
+          })),
+        },
+      },
+      {
+        headers: { "Cache-Control": "private, max-age=120" },
+      }
+    );
+  }
 
-  return Response.json({ topics });
+  const topics = getTopicsSummary();
+  return Response.json(
+    { topics, total: topics.length },
+    {
+      headers: { "Cache-Control": "private, max-age=120" },
+    }
+  );
 }

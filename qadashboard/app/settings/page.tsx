@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Key, Mail, Database, Save, Loader2 } from "lucide-react";
+import { Save, Loader2, CheckCircle2, XCircle, Database } from "lucide-react";
+import PageChrome from "@/components/ui/PageChrome";
+import Button from "@/components/ui/Button";
+
+type ModelOption = { id: string; name: string };
+type Status = { openrouter: boolean; gmail: boolean; pinecone: boolean };
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    openrouterKey: "",
-    gmailUser: "",
-    gmailPass: "",
-    llmModel: "google/gemma-4-26b-a4b-it:free",
-  });
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [llmModel, setLlmModel] = useState("");
+  const [status, setStatus] = useState<Status>({ openrouter: false, gmail: false, pinecone: false });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -17,7 +19,11 @@ export default function SettingsPage() {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        if (data) setSettings((prev) => ({ ...prev, ...data }));
+        if (data.models?.length > 0) {
+          setModels(data.models);
+          setLlmModel(data.llmModel || data.models[0].id);
+        }
+        if (data.status) setStatus(data.status);
       })
       .catch(() => {});
   }, []);
@@ -29,100 +35,85 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ llmModel }),
       });
-      if (res.ok) setMessage("Settings saved");
-      else setMessage("Failed to save");
+      if (res.ok) setMessage("Model preference saved");
+      else setMessage((await res.json()).error || "Failed to save");
     } catch {
       setMessage("Failed to save");
     }
     setSaving(false);
   };
 
-  return (
-    <div className="flex-1 p-6 max-w-2xl mx-auto w-full">
-      <h1 className="text-2xl font-bold text-text-primary mb-2">Settings</h1>
-      <p className="text-text-secondary mb-6">Configure API keys and preferences</p>
+  const statusCard = (label: string, ok: boolean) => (
+    <div className="flex items-center justify-between bg-white border border-border rounded-lg p-4">
+      <span className="text-sm font-medium text-text-primary">{label}</span>
+      {ok ? (
+        <span className="flex items-center gap-1 text-sm text-green-600">
+          <CheckCircle2 size={16} /> Configured
+        </span>
+      ) : (
+        <span className="flex items-center gap-1 text-sm text-text-muted">
+          <XCircle size={16} /> Not configured
+        </span>
+      )}
+    </div>
+  );
 
-      <div className="space-y-4">
+  return (
+    <PageChrome maxWidthClass="max-w-3xl" header={<div><h1 className="text-lg font-semibold tracking-tight text-text-primary">Settings</h1><p className="mt-1 text-sm text-text-muted">Pick your AI model and review service status.</p></div>}>
+      <div className="space-y-4 pb-8">
         {/* AI Model */}
         <div className="bg-white border border-border rounded-lg p-5">
           <h2 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
             <Database size={18} className="text-amber-500" />
-            AI Model
+            AI Model (free only)
           </h2>
-          <select
-            value={settings.llmModel}
-            onChange={(e) => setSettings((prev) => ({ ...prev, llmModel: e.target.value }))}
-            className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
-          >
-            <option value="google/gemma-4-26b-a4b-it:free">Google Gemma 4 26B (free)</option>
-            <option value="nvidia/nemotron-3-super-120b-a12b:free">NVIDIA Nemotron 3 Super (free)</option>
-            <option value="meta-llama/llama-3.3-70b-instruct:free">Meta Llama 3.3 70B (free)</option>
-            <option value="qwen/qwen3-next-80b-a3b-instruct:free">Qwen 3 Next 80B (free)</option>
-            <option value="google/gemini-2.5-flash-lite">Google Gemini 2.5 Flash Lite</option>
-            <option value="openrouter/free">OpenRouter Auto Free</option>
-          </select>
-        </div>
-
-        {/* OpenRouter */}
-        <div className="bg-white border border-border rounded-lg p-5">
-          <h2 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Key size={18} className="text-amber-500" />
-            OpenRouter API Key
-          </h2>
-          <input
-            type="password"
-            value={settings.openrouterKey}
-            onChange={(e) => setSettings((prev) => ({ ...prev, openrouterKey: e.target.value }))}
-            placeholder="sk-or-v1-..."
-            className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
-          />
-          <p className="text-xs text-text-muted mt-1">
-            Required for AI features. Get one from{" "}
-            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:underline">
-              openrouter.ai/keys
-            </a>
+          {models.length > 0 ? (
+            <select
+              value={llmModel}
+              onChange={(e) => setLlmModel(e.target.value)}
+              className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-sm text-text-muted">No models configured (check LLM_MODELS_JSON in .env).</p>
+          )}
+          <p className="text-xs text-text-muted mt-2">
+            The app refuses to call anything that isn&apos;t a free (:free) model.
           </p>
         </div>
 
-        {/* Gmail */}
+        {/* Service status */}
         <div className="bg-white border border-border rounded-lg p-5">
-          <h2 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Mail size={18} className="text-amber-500" />
-            Gmail SMTP (for Email Agent)
-          </h2>
+          <h2 className="font-semibold text-text-primary mb-3">Service Status</h2>
           <div className="space-y-2">
-            <input
-              type="email"
-              value={settings.gmailUser}
-              onChange={(e) => setSettings((prev) => ({ ...prev, gmailUser: e.target.value }))}
-              placeholder="your.email@gmail.com"
-              className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
-            />
-            <input
-              type="password"
-              value={settings.gmailPass}
-              onChange={(e) => setSettings((prev) => ({ ...prev, gmailPass: e.target.value }))}
-              placeholder="App Password"
-              className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
-            />
+            {statusCard("OpenRouter (AI)", status.openrouter)}
+            {statusCard("Gmail SMTP (Email Agent)", status.gmail)}
+            {statusCard("Pinecone (vector search)", status.pinecone)}
           </div>
+          <p className="text-xs text-text-muted mt-2">
+            These come from environment variables in .env. API keys are never stored in the database.
+          </p>
         </div>
 
-        <button
+        <Button
           onClick={save}
-          disabled={saving}
-          className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition-colors"
+          disabled={saving || models.length === 0}
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Save Settings
-        </button>
+          Save Model Preference
+        </Button>
 
         {message && (
           <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">{message}</p>
         )}
       </div>
-    </div>
+    </PageChrome>
   );
 }

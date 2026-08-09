@@ -8,14 +8,18 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String?
-  email     String   @unique
-  image     String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String?  @unique
+  passwordHash String
+  name         String?
+  image        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   resumes       Resume[]
   jobs          Job[]
+  documents     Document[]
   projects      Project[]
   conversations Conversation[]
   settings      UserSettings?
@@ -25,10 +29,11 @@ model UserSettings {
   id            String @id @default(uuid())
   userId        String @unique
   user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  openrouterKey String?
+  llmModel      String?
   gmailUser     String?
   gmailPass     String?
   pineconeIndex String?
+  emailTemplate String?
 }
 
 model Resume {
@@ -37,9 +42,15 @@ model Resume {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   filename  String
   content   String
+  highlights String?
+  type      String   @default("txt")
   createdAt DateTime @default(now())
+
+  @@unique([userId])
 }
 
+/// Local overlay for a remote job-board listing (originalId = remote Job.id).
+/// Scores, pipeline status, and email flags live here; the job corpus stays on JOB_DETAILS_API_BASE.
 model Job {
   id          String   @id @default(uuid())
   userId      String
@@ -56,20 +67,38 @@ model Job {
   gaps        String?
   emailSent   Boolean  @default(false)
   emailSentAt DateTime?
+  /// Remote job id from JOB_DETAILS_API_BASE
   originalId  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@unique([userId, originalId])
+  @@index([userId, score])
+  @@index([userId, status])
 }
 
 model Document {
   id        String   @id @default(uuid())
-  userId    String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   type      String
   content   String
   summary   String?
   size      Int
   createdAt DateTime @default(now())
+
+  chunks DocumentChunk[]
+}
+
+model DocumentChunk {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  index      Int
+  text       String
+
+  @@index([documentId])
 }
 
 model Project {

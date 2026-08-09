@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Loader2, Sparkles, FileText, Beaker } from "lucide-react";
 import { cn } from "@/lib/utils";
+import PageChrome from "@/components/ui/PageChrome";
+import Button from "@/components/ui/Button";
 
 type TestCase = {
   title: string;
@@ -40,11 +42,8 @@ export default function TestArchitectPage() {
   };
 
   return (
-    <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-      <h1 className="text-2xl font-bold text-text-primary mb-2">Test Architect</h1>
-      <p className="text-text-secondary mb-6">
-        Paste PRD requirements to automatically generate structured test cases
-      </p>
+    <PageChrome maxWidthClass="max-w-5xl" header={<div><h1 className="text-lg font-semibold tracking-tight text-text-primary">Test Architect</h1><p className="mt-1 text-sm text-text-muted">Paste PRD requirements to automatically generate structured test cases.</p></div>}>
+      <div className="space-y-4 pb-8">
 
       {/* Input */}
       <div className="bg-white border border-border rounded-lg p-5 mb-4">
@@ -67,14 +66,13 @@ export default function TestArchitectPage() {
             placeholder="JIRA Key (optional): PRD-123"
             className="flex-1 px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus"
           />
-          <button
+          <Button
             onClick={generateTests}
             disabled={!prdText.trim() || loading}
-            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition-colors"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
             Generate Tests
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -92,7 +90,7 @@ export default function TestArchitectPage() {
             Generated Test Cases ({testCases.length})
           </h2>
           {testCases.map((tc, i) => (
-            <div key={i} className="bg-white border border-border rounded-lg overflow-hidden">
+            <div key={i} className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
               <div className="px-4 py-3 bg-bg-surface border-b border-border flex items-center justify-between">
                 <div>
                   <span className="text-xs text-text-muted mr-2">TC-{i + 1}</span>
@@ -143,6 +141,7 @@ export default function TestArchitectPage() {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </PageChrome>
   );
 }

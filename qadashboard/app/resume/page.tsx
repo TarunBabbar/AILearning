@@ -1,151 +1,80 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileText, Loader2, ArrowRight } from "lucide-react";
+import { Upload, FileText, Loader2, Sparkles, ArrowRight, Briefcase, Mail, Building2 } from "lucide-react";
 import Link from "next/link";
+import { runScoreWave, type ScoreProgress } from "@/lib/score-wave";
+import { ScoreLivePanel } from "@/components/ui/ScoreLivePanel";
+import PageChrome from "@/components/ui/PageChrome";
+import Button from "@/components/ui/Button";
+import { invalidateListCaches } from "@/lib/use-list-swr";
 
 export default function ResumePage() {
   const router = useRouter();
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [jobFiles, setJobFiles] = useState<File[]>([]);
+  const [resumeMeta, setResumeMeta] = useState<{ filename: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [progress, setProgress] = useState<ScoreProgress | null>(null);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    fetch("/api/resume")
+      .then((r) => r.json())
+      .then((d) => { if (d.resume) setResumeMeta({ filename: d.resume.filename }); })
+      .catch(() => setMessage("Could not load resume status"));
+  }, []);
 
   const handleResumeUpload = async () => {
     if (!resumeFile) return;
-    setUploading(true);
-    setMessage("");
-    const form = new FormData();
-    form.append("resume", resumeFile);
+    setUploading(true); setMessage("");
+    const form = new FormData(); form.append("resume", resumeFile);
     try {
       const res = await fetch("/api/resume", { method: "POST", body: form });
       const data = await res.json();
-      if (res.ok) setMessage(`Resume uploaded: ${data.filename}`);
-      else setMessage(`Error: ${data.error}`);
-    } catch {
-      setMessage("Upload failed");
-    }
-    setUploading(false);
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setMessage(`Resume uploaded: ${data.filename}`);
+      setResumeMeta({ filename: data.filename }); setResumeFile(null);
+      await invalidateListCaches();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed"); }
+    finally { setUploading(false); }
   };
 
-  const handleJobsUpload = async () => {
-    if (jobFiles.length === 0) return;
-    setUploading(true);
-    setMessage("");
-    const form = new FormData();
-    jobFiles.forEach((f) => form.append("jobs", f));
+  const handleScore = async () => {
+    setScoring(true); setMessage("");
+    setProgress({ percent: 1, completed: 0, attempted: 0, scored: 0, strongMatches: 0, message: "Starting…", ticker: "Parsing job descriptions…" });
     try {
-      const res = await fetch("/api/jobs", { method: "POST", body: form });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`${data.count} jobs extracted. Scoring now...`);
-        // Trigger scoring
-        const scoreRes = await fetch("/api/jobs/score", { method: "POST" });
-        const scoreData = await scoreRes.json();
-        setMessage(`Done! ${data.count} jobs extracted and scored.`);
-        router.push("/resume/matches");
-      } else {
-        setMessage(`Error: ${data.error}`);
-      }
-    } catch {
-      setMessage("Upload failed");
-    }
-    setUploading(false);
+      const result = await runScoreWave({ scope: "unscored", onProgress: setProgress });
+      if (!result.ok) setMessage(`Error: ${result.error || result.message}`);
+      else { setMessage(result.strongMatches > 0 ? `Found ${result.strongMatches} strong matches this wave.` : "Wave finished — no new strong matches this round."); if (result.strongMatches > 0) router.push("/resume/matches"); }
+      await invalidateListCaches();
+    } catch { setMessage("Scoring failed"); }
+    finally { setScoring(false); }
   };
+
+  const links = [
+    { href: "/resume/matches", label: "Matches", icon: Briefcase, text: "Review fit scores, strengths, gaps, and pipeline status." },
+    { href: "/resume/email", label: "Email Agent", icon: Mail, text: "Prepare and send tailored applications." },
+    { href: "/resume/companies", label: "Companies", icon: Building2, text: "Explore companies behind your strongest roles." },
+  ];
 
   return (
-    <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
-      <h1 className="text-2xl font-bold text-text-primary mb-2">Resume & Job Matcher</h1>
-      <p className="text-text-secondary mb-6">
-        Upload your resume and job listing PDFs. AI extracts job details and scores matches.
-      </p>
-
-      {/* Resume upload */}
-      <div className="bg-white border border-border rounded-lg p-5 mb-4">
-        <h2 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
-          <FileText size={18} className="text-amber-500" />
-          Upload Resume
-        </h2>
-        <label className="flex items-center gap-3 p-4 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-amber-500/40 transition-colors">
-          <Upload size={24} className="text-text-muted flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-text-primary font-medium">
-              {resumeFile ? resumeFile.name : "Click to select resume (PDF/DOCX)"}
-            </p>
+    <PageChrome maxWidthClass="max-w-5xl" header={<div><h1 className="text-lg font-semibold tracking-tight text-text-primary">Resume & Job Matcher</h1><p className="mt-1 text-sm text-text-muted">Upload your resume, score open roles, and manage your application pipeline.</p></div>}>
+      <div className="space-y-4 pb-8">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-border bg-white p-5 shadow-sm md:col-span-2">
+            <div className="mb-3 flex items-center gap-2"><FileText size={18} className="text-amber-500" /><h2 className="font-semibold text-text-primary">Upload resume</h2></div>
+            {resumeMeta && <p className="mb-3 text-sm text-text-muted">Current: <span className="font-medium text-text-primary">{resumeMeta.filename}</span></p>}
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-border bg-bg-page p-5 transition-colors hover:border-amber-500/50 hover:bg-accent-soft/30"><Upload size={24} className="shrink-0 text-text-muted" /><div className="min-w-0 flex-1"><p className="text-sm font-medium text-text-primary">{resumeFile ? resumeFile.name : "Choose a resume file"}</p><p className="mt-1 text-xs text-text-muted">PDF, DOCX, TXT, or Markdown</p></div><input type="file" accept=".pdf,.docx,.txt,.md" onChange={(e) => setResumeFile(e.target.files?.[0] || null)} className="hidden" /></label>
+            {resumeFile && <Button onClick={handleResumeUpload} disabled={uploading} className="mt-3">{uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Upload resume</Button>}
           </div>
-          <input
-            type="file"
-            accept=".pdf,.docx"
-            onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-            className="hidden"
-          />
-        </label>
-        {resumeFile && (
-          <button
-            onClick={handleResumeUpload}
-            disabled={uploading}
-            className="mt-3 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition-colors"
-          >
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : "Upload Resume"}
-          </button>
-        )}
-      </div>
-
-      {/* Jobs upload */}
-      <div className="bg-white border border-border rounded-lg p-5 mb-4">
-        <h2 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
-          <FileText size={18} className="text-amber-500" />
-          Upload Job Listings
-        </h2>
-        <label className="flex items-center gap-3 p-4 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-amber-500/40 transition-colors">
-          <Upload size={24} className="text-text-muted flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-text-primary font-medium">
-              {jobFiles.length > 0
-                ? `${jobFiles.length} files selected`
-                : "Click to select job PDFs (up to 20)"}
-            </p>
-          </div>
-          <input
-            type="file"
-            accept=".pdf,.docx"
-            multiple
-            onChange={(e) => setJobFiles(Array.from(e.target.files || []))}
-            className="hidden"
-          />
-        </label>
-        {jobFiles.length > 0 && (
-          <button
-            onClick={handleJobsUpload}
-            disabled={uploading}
-            className="mt-3 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition-colors"
-          >
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : "Upload & Extract Jobs"}
-          </button>
-        )}
-      </div>
-
-      {message && (
-        <div className="bg-bg-surface border border-border rounded-lg p-3 text-sm text-text-secondary">
-          {message}
+          <div className="rounded-xl border border-border bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Next step</p><p className="mt-2 text-lg font-semibold text-text-primary">Score your fit</p><p className="mt-1 text-sm leading-relaxed text-text-muted">Compare your profile with open roles using multiple free AI models.</p><Button onClick={handleScore} disabled={scoring || !resumeMeta} className="mt-4 w-full">{scoring ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}{scoring ? "Scoring…" : "Score next wave"}</Button>{!resumeMeta && <p className="mt-2 text-xs text-amber-700">Upload a resume first.</p>}</div>
         </div>
-      )}
-
-      <div className="flex gap-3 mt-6">
-        <Link
-          href="/resume/matches"
-          className="flex items-center gap-1 px-4 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary hover:bg-bg-hover transition-colors"
-        >
-          View Matches <ArrowRight size={16} />
-        </Link>
-        <Link
-          href="/resume/email"
-          className="flex items-center gap-1 px-4 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary hover:bg-bg-hover transition-colors"
-        >
-          Email Agent <ArrowRight size={16} />
-        </Link>
+        {scoring && progress && <ScoreLivePanel progress={progress} />}
+        {message && !scoring && <div className="rounded-lg border border-border bg-white p-3 text-sm text-text-secondary">{message}</div>}
+        <div className="grid gap-3 md:grid-cols-3">{links.map(({ href, label, icon: Icon, text }) => <Link key={href} href={href} className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-500/30 hover:shadow-md"><div className="mb-3 flex items-center justify-between"><span className="rounded-lg bg-accent-soft p-2 text-accent-strong"><Icon size={18} /></span><ArrowRight size={16} className="text-text-muted transition-transform group-hover:translate-x-1 group-hover:text-amber-600" /></div><h3 className="font-semibold text-text-primary">{label}</h3><p className="mt-1 text-sm leading-relaxed text-text-muted">{text}</p></Link>)}</div>
       </div>
-    </div>
+    </PageChrome>
   );
 }

@@ -1,49 +1,88 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 
-type User = { id: string; username: string };
+type User = { id: string; username: string; email: string | null };
 
 type AuthContextType = {
   user: User | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  register: (username: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   login: async () => {},
-  logout: () => {},
+  register: async () => {},
+  logout: async () => {},
 });
+
+const USER_CACHE_KEY = "qa_auth_user";
+
+function readCachedUser(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(USER_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUser(user: User | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (user) sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
+    else sessionStorage.removeItem(USER_CACHE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
 
-  const getToken = () => localStorage.getItem("qa_token");
+  // Instant hydrate from sessionStorage so nav shell appears immediately
+  useEffect(() => {
+    const cached = readCachedUser();
+    if (cached) {
+      setUser(cached);
+      setLoading(false);
+    }
+    setHydrated(true);
+  }, []);
 
   const checkAuth = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
     try {
-      const res = await fetch("/api/auth/me", {
-        headers: { authorization: `Bearer ${token}` },
-      });
+      const res = await fetch("/api/auth/me", { cache: "no-store" });
       const data = await res.json();
-      setUser(data.user || null);
+      const next = data.user || null;
+      setUser(next);
+      writeCachedUser(next);
     } catch {
       setUser(null);
+      writeCachedUser(null);
     }
     setLoading(false);
   }, []);
 
-  useEffect(() => { checkAuth(); }, [checkAuth]);
+  useEffect(() => {
+    if (!hydrated) return;
+    checkAuth();
+  }, [hydrated, checkAuth]);
 
   const login = async (username: string, password: string) => {
     const res = await fetch("/api/auth/login", {
@@ -53,17 +92,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Login failed");
-    localStorage.setItem("qa_token", data.token);
     setUser(data.user);
+    writeCachedUser(data.user);
+    setLoading(false);
   };
 
-  const logout = () => {
-    localStorage.removeItem("qa_token");
+  const register = async (username: string, email: string, password: string) => {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Registration failed");
+    setUser(data.user);
+    writeCachedUser(data.user);
+    setLoading(false);
+  };
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setUser(null);
+    writeCachedUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

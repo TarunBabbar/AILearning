@@ -1,18 +1,21 @@
 import { NextRequest } from "next/server";
-import { verifyToken, findUserById } from "@/lib/auth";
+import { verifySessionToken, findUserById } from "@/lib/auth";
+import { getConfig } from "@/lib/config";
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (!auth?.startsWith("Bearer ")) {
+  const cfg = getConfig();
+  const cookieName = cfg.authCookieName;
+  const token = cookieName ? req.cookies.get(cookieName)?.value : undefined;
+
+  if (!token) {
     return Response.json({ user: null }, { status: 200 });
   }
 
-  const token = auth.slice(7);
-  const session = verifyToken(token);
+  const session = await verifySessionToken(token);
   if (!session) {
     return Response.json({ user: null }, { status: 200 });
   }
 
-  const user = findUserById(session.userId);
+  const user = await findUserById(session.userId);
   return Response.json({ user });
 }

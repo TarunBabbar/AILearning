@@ -1,27 +1,38 @@
 import { NextRequest } from "next/server";
-import { v4 as uuid } from "uuid";
+import { prisma } from "@/lib/prisma";
+import { getSessionUserId, unauthorized } from "@/lib/session";
 
-const globalProjects = globalThis as unknown as { __projects?: any[] };
-if (!globalProjects.__projects) globalProjects.__projects = [];
+export async function GET(req: NextRequest) {
+  const userId = await getSessionUserId(req);
+  if (!userId) return unauthorized();
 
-export async function GET() {
-  return Response.json({ projects: globalProjects.__projects || [] });
+  const projects = await prisma.project.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    include: { _count: { select: { testCases: true } } },
+  });
+
+  const list = projects.map((p: { _count: { testCases: number } }) => {
+    const { _count, ...rest } = p;
+    return { ...rest, testCases: _count.testCases };
+  });
+
+  return Response.json({ projects: list });
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await getSessionUserId(req);
+  if (!userId) return unauthorized();
+
   try {
     const { name, description, jiraUrl } = await req.json();
-    const project = {
-      id: uuid(),
-      name,
-      description: description || null,
-      jiraUrl: jiraUrl || null,
-      createdAt: new Date().toISOString(),
-      testCases: 0,
-    };
-    globalProjects.__projects!.push(project);
-    return Response.json(project);
-  } catch (err) {
+    if (!name) return Response.json({ error: "Name required" }, { status: 400 });
+
+    const project = await prisma.project.create({
+      data: { userId, name, description: description || null, jiraUrl: jiraUrl || null },
+    });
+    return Response.json({ ...project, testCases: 0 });
+  } catch {
     return Response.json({ error: "Failed to create" }, { status: 500 });
   }
 }

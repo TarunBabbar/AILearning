@@ -1,27 +1,26 @@
 import { NextRequest } from "next/server";
 import { chatCompletionStream } from "@/lib/openrouter";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { getTopicsData } from "@/lib/topics-data";
+import { prisma } from "@/lib/prisma";
+import { getSessionUserId, unauthorized } from "@/lib/session";
 
 type QAItem = { question: string; answer: string; source: string };
 type QATopic = { name: string; questions: QAItem[] };
+type Match = { text: string; score: number; source: string };
 
-// Fetch Q&A pairs from ai-topics.json and score how well each stored
-// question matches the user's question (keyword overlap + substring boost).
-function findMatches(question: string, data: QATopic[]): { text: string; score: number; source: string }[] {
+// Keyword-overlap retrieval over ai-topics.json (used for QA + learning).
+// Loads topics through lib/topics-data.ts which caches the JSON for 5 min.
+function findMatches(question: string, data: QATopic[]): Match[] {
   const qLower = question.toLowerCase();
-  const matches: { text: string; score: number; source: string }[] = [];
+  const matches: Match[] = [];
 
   for (const topic of data) {
     for (const q of topic.questions) {
       const qq = q.question.toLowerCase();
-      // Keyword overlap scoring
       const keywords = qq.split(/\W+/).filter((w) => w.length > 3);
       const hitCount = keywords.filter((k) => qLower.includes(k)).length;
       const ratio = hitCount / Math.max(keywords.length, 1);
-      // Exact substring boost
       const substrHit = qLower.length > 8 && qq.includes(qLower.slice(0, 12)) ? 0.3 : 0;
-      // Question-word match boost
       const qWords = qLower.split(/\W+/).filter((w) => w.length > 3);
       const qWordHits = qWords.filter((w) => qq.includes(w)).length;
       const qRatio = qWordHits / Math.max(qWords.length, 1);
@@ -36,9 +35,7 @@ function findMatches(question: string, data: QATopic[]): { text: string; score: 
   return matches;
 }
 
-// Keep the best-scoring matches while collapsing near-duplicate Q&A entries
-// (same source file + near-identical question text) down to one.
-function dedupeMatches(matches: { text: string; score: number; source: string }[]): { text: string; score: number; source: string }[] {
+function dedupeMatches(matches: Match[]): Match[] {
   const seenQ = new Set<string>();
   const seenSource = new Set<string>();
   return matches
@@ -55,21 +52,62 @@ function dedupeMatches(matches: { text: string; score: number; source: string }[
     });
 }
 
+// Keyword retrieval over a document's stored chunks.
+function scoreChunks(question: string, chunks: { text: string; index: number }[]): Match[] {
+  const qLower = question.toLowerCase();
+  const qWords = qLower.split(/\W+/).filter((w) => w.length > 3);
+  return chunks
+    .map((c) => {
+      const text = c.text.toLowerCase();
+      const hits = qWords.filter((w) => text.includes(w)).length;
+      const score = hits / Math.max(qWords.length, 1);
+      return { text: c.text, score, source: `chunk-${c.index}` };
+    })
+    .filter((m) => m.score > 0.1)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+}
+
 export async function POST(req: NextRequest) {
+  const userId = await getSessionUserId(req);
+  if (!userId) return unauthorized();
+
   try {
-    const { question, namespace, model, systemMessage } = await req.json();
+    const { question, namespace, model, systemMessage, conversationId, module } = await req.json();
 
     if (!question) {
       return new Response(JSON.stringify({ error: "Question required" }), { status: 400 });
     }
 
-    // Read Q&A pairs from ai-topics.json and find the best matches
-    const filePath = join(process.cwd(), "data", "ai-topics.json");
-    const raw = readFileSync(filePath, "utf-8");
-    const data: QATopic[] = JSON.parse(raw);
+    // ── Retrieval ──
+    let results: Match[] = [];
 
-    const matches = dedupeMatches(findMatches(question, data));
-    const results = matches.slice(0, 3);
+    if (namespace && namespace !== "__default__" && namespace !== "learning") {
+      // Document-scoped chat: retrieve from the user's document
+      const doc = await prisma.document.findFirst({
+        where: { id: namespace, userId },
+        include: { chunks: { orderBy: { index: "asc" } } },
+      });
+      if (doc) {
+        results = scoreChunks(question, doc.chunks);
+      }
+    }
+
+    if (results.length === 0) {
+      // QA / learning (or no doc matches) → knowledge base retrieval
+      // (lib/topics-data caches the parsed JSON for 5 min — no per-request file read)
+      const data = getTopicsData() as unknown as QATopic[];
+      results = dedupeMatches(findMatches(question, data)).slice(0, 3);
+    }
+
+    // ── Persist conversation (best-effort) ──
+    let conversationIdOut: string | null = conversationId || null;
+    if (conversationIdOut) {
+      const conv = await prisma.conversation.findFirst({
+        where: { id: conversationIdOut, userId },
+      });
+      if (!conv) conversationIdOut = null;
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -78,7 +116,6 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
         };
 
-        // Send sources first
         const sources = results.map((r) => ({
           source: r.source || "unknown",
           score: Math.min(0.99, r.score),
@@ -89,19 +126,14 @@ export async function POST(req: NextRequest) {
           send({
             type: "chunk",
             content:
-              "I couldn't find a matching Q&A in the knowledge base. Try rephrasing your question or ask about a QA topic like testing, automation, API, or Agile.",
+              "I couldn't find a matching answer. Try rephrasing your question or ask about a QA topic like testing, automation, API, or Agile.",
           });
           send({ type: "done" });
           controller.close();
           return;
         }
 
-        // Ground the LLM in the best matching stored Q&A pairs so the answer
-        // is accurate, then let it restructure/clean up the response.
-        const context = results
-          .map((r) => r.text)
-          .join("\n\n---\n\n");
-
+        const context = results.map((r) => r.text).join("\n\n---\n\n");
         const sysMsg =
           systemMessage ||
           `You are a senior QA interview coach. The user asked a question, and below are the best-matching Q&A pairs retrieved from the knowledge base.
@@ -117,8 +149,8 @@ Rules:
 Context:
 ${context}`;
 
+        let fullAnswer = "";
         try {
-          // Stream the LLM answer in chunks
           const chunkSize = 40;
           let buffer = "";
           for await (const piece of chatCompletionStream(
@@ -129,6 +161,7 @@ ${context}`;
             model
           )) {
             buffer += piece;
+            fullAnswer += piece;
             while (buffer.length >= chunkSize) {
               send({ type: "chunk", content: buffer.slice(0, chunkSize) });
               buffer = buffer.slice(chunkSize);
@@ -147,6 +180,21 @@ ${context}`;
         }
 
         send({ type: "done" });
+
+        // Persist messages best-effort after streaming
+        if (conversationIdOut) {
+          try {
+            await prisma.message.createMany({
+              data: [
+                { conversationId: conversationIdOut, role: "user", content: question },
+                { conversationId: conversationIdOut, role: "assistant", content: fullAnswer, sources },
+              ],
+            });
+          } catch (e) {
+            console.error("Failed to persist messages:", e);
+          }
+        }
+
         controller.close();
       },
     });

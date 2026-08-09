@@ -1,46 +1,44 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { SidebarProvider } from "@/lib/sidebar-context";
 import { Sidebar } from "@/components/ui/Sidebar";
+import { ShellSkeleton } from "@/components/ui/Skeleton";
 import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
 
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading } = useAuth();
-  const isLoginPage = pathname === "/login";
+  const isPublicPage = pathname === "/login" || pathname === "/register";
 
   useEffect(() => {
-    if (!loading && !user && !isLoginPage) {
-      window.location.href = "/login";
+    if (!loading && !user && !isPublicPage) {
+      router.replace("/login");
     }
-  }, [loading, user, isLoginPage]);
+  }, [loading, user, isPublicPage, router]);
 
-  if (loading) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-bg-page">
-        <Loader2 size={32} className="animate-spin text-amber-500" />
-      </div>
-    );
+  // Public pages — never block
+  if (isPublicPage) {
+    return <>{children}</>;
   }
 
-  if (isLoginPage) {
-    return <>{children}</>;
+  // First visit with no cached user — show a shell skeleton, not a bare spinner
+  if (loading && !user) {
+    return <ShellSkeleton />;
   }
 
   if (!user) {
     return null;
   }
 
+  // Authenticated shell stays mounted across tab navigations
   return (
     <SidebarProvider>
       <div className="h-full flex">
         <Sidebar />
-        <main className="flex-1 flex flex-col min-w-0 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 flex flex-col min-w-0 overflow-auto">{children}</main>
       </div>
     </SidebarProvider>
   );

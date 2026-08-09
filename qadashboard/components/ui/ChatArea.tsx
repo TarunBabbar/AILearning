@@ -19,6 +19,8 @@ type Props = {
   namespace?: string;
   showSources?: boolean;
   systemMessage?: string;
+  conversationId?: string | null;
+  onNewConversation?: () => Promise<string | null>;
 };
 
 export function ChatArea({
@@ -27,6 +29,8 @@ export function ChatArea({
   namespace = "default",
   showSources = true,
   systemMessage,
+  conversationId,
+  onNewConversation,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -36,6 +40,62 @@ export function ChatArea({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialSent = useRef(false);
+  const activeController = useRef<AbortController | null>(null);
+  const streamText = useRef("");
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    activeController.current?.abort();
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+  }, []);
+
+  const flushAssistant = useCallback((sources?: { source: string; score: number }[]) => {
+    const content = streamText.current;
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.role !== "assistant") return prev;
+      return [...prev.slice(0, -1), { ...last, content, ...(sources ? { sources } : {}) }];
+    });
+  }, []);
+
+  const queueAssistantUpdate = useCallback((content: string) => {
+    streamText.current = content;
+    if (flushTimer.current) return;
+    flushTimer.current = setTimeout(() => {
+      flushTimer.current = null;
+      flushAssistant();
+    }, 120);
+  }, [flushAssistant]);
+
+  const startController = useCallback(() => {
+    activeController.current?.abort();
+    const controller = new AbortController();
+    activeController.current = controller;
+    return controller;
+  }, []);
+
+  const trimMessages = (list: Message[]) => list.length > 200 ? list.slice(-200) : list;
+
+  // Load past conversation when conversationId changes
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([]);
+      return;
+    }
+    fetch(`/api/conversations/${conversationId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.conversation?.messages) setMessages(data.conversation.messages);
+      })
+      .catch(() => {});
+  }, [conversationId]);
+
+  // Start a new conversation for this module when there isn't one
+  const ensureConversation = async (): Promise<string | null> => {
+    if (conversationId) return conversationId;
+    if (!onNewConversation) return null;
+    return onNewConversation();
+  };
 
   // Load top suggestion questions from the knowledge base
   useEffect(() => {
@@ -62,9 +122,12 @@ export function ChatArea({
       const userMsg: Message = { role: "user", content: ask };
       const assistantMsg: Message = { role: "assistant", content: "" };
       setMessages([userMsg, assistantMsg]);
+      streamText.current = "";
+      const controller = startController();
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({ question: ask, namespace, model, systemMessage }),
       })
         .then(async (res) => {
@@ -86,23 +149,14 @@ export function ChatArea({
                 const parsed = JSON.parse(line);
                 if (parsed.type === "sources") sources = parsed.content;
                 else if (parsed.type === "chunk") {
-                  setMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    if (last?.role !== "assistant") return prev;
-                    return [
-                      ...prev.slice(0, -1),
-                      { ...last, content: last.content + parsed.content },
-                    ];
-                  });
+                  queueAssistantUpdate(streamText.current + parsed.content);
                 }
               } catch {}
             }
           }
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last?.role !== "assistant") return prev;
-            return [...prev.slice(0, -1), { ...last, sources }];
-          });
+          if (flushTimer.current) clearTimeout(flushTimer.current);
+          flushTimer.current = null;
+          flushAssistant(sources);
         })
         .catch(() => {
           setMessages((prev) => {
@@ -135,19 +189,25 @@ export function ChatArea({
     setInput("");
     setLoading(true);
 
+    const convId = await ensureConversation();
+
     const userMsg: Message = { role: "user", content: q };
     const assistantMsg: Message = { role: "assistant", content: "" };
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setMessages((prev) => trimMessages([...prev, userMsg, assistantMsg]));
+    streamText.current = "";
+    const controller = startController();
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           question: q,
           namespace,
           model,
           systemMessage,
+          conversationId: convId,
         }),
       });
 
@@ -175,14 +235,7 @@ export function ChatArea({
             if (parsed.type === "sources") {
               sources = parsed.content;
             } else if (parsed.type === "chunk") {
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role !== "assistant") return prev;
-                return [
-                  ...prev.slice(0, -1),
-                  { ...last, content: last.content + parsed.content },
-                ];
-              });
+              queueAssistantUpdate(streamText.current + parsed.content);
             }
           } catch {
             // skip
@@ -190,11 +243,9 @@ export function ChatArea({
         }
       }
 
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role !== "assistant") return prev;
-        return [...prev.slice(0, -1), { ...last, sources }];
-      });
+      if (flushTimer.current) clearTimeout(flushTimer.current);
+      flushTimer.current = null;
+      flushAssistant(sources);
     } catch {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -264,7 +315,11 @@ export function ChatArea({
               )}
             >
               {msg.role === "assistant" && msg.content === "" && loading ? (
-                <Loader2 size={18} className="animate-spin text-text-muted" />
+                <span className="flex items-center gap-1 py-1" aria-label="Thinking">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500" style={{ animationDelay: "0ms" }} />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500" style={{ animationDelay: "150ms" }} />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500" style={{ animationDelay: "300ms" }} />
+                </span>
               ) : msg.role === "assistant" ? (
                 <div className="markdown-body text-sm">
                   <ReactMarkdown

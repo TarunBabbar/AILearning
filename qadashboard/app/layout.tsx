@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ProtectedLayout } from "@/components/ui/ProtectedLayout";
+import SWRProvider from "@/components/ui/SWRProvider";
 
 export const metadata: Metadata = {
   title: "QA AI Dashboard",
@@ -13,9 +14,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="h-full">
       <body className="h-full">
         <AuthProvider>
-          <ProtectedLayout>
-            {children}
-          </ProtectedLayout>
+          <SWRProvider>
+            <ProtectedLayout>
+              {children}
+            </ProtectedLayout>
+          </SWRProvider>
         </AuthProvider>
       </body>
     </html>

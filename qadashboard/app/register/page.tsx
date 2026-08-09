@@ -1,0 +1,102 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { LogIn, Loader2, Bug, UserPlus } from "lucide-react";
+import Link from "next/link";
+
+export default function RegisterPage() {
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { register } = useAuth();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await register(username.trim(), email.trim(), password);
+      router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bg-page">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-xl bg-amber-500 flex items-center justify-center mx-auto mb-4">
+            <Bug size={28} className="text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-text-primary">QA AI Dashboard</h1>
+          <p className="text-sm text-text-muted mt-1">Create your account</p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="bg-white border border-border rounded-xl p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Choose a username"
+              className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-amber-500/20"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">Email (optional)</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-amber-500/20"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 6 characters"
+              className="w-full px-3 py-2 border border-border-input rounded-lg text-sm bg-bg-input focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-amber-500/20"
+            />
+          </div>
+
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={!username || !password || loading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+            Create Account
+          </button>
+
+          <div className="text-center text-sm text-text-muted">
+            Already have an account?{" "}
+            <Link href="/login" className="text-amber-600 hover:text-amber-700 font-medium">
+              Sign in
+            </Link>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -1,25 +1,34 @@
-import { readFileSync } from "fs";
-import { join } from "path";
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getSessionUserId, unauthorized } from "@/lib/session";
+import { getTopicsStats } from "@/lib/topics-data";
+import { countJobStats } from "@/lib/job-overlay";
 
-export async function GET() {
-  const filePath = join(process.cwd(), "data", "ai-topics.json");
-  let qaPairs = 0;
-  let topics = 0;
+export const dynamic = "force-dynamic";
 
-  try {
-    const raw = readFileSync(filePath, "utf-8");
-    const data: { name: string; questions: unknown[] }[] = JSON.parse(raw);
-    topics = data.length;
-    qaPairs = data.reduce((sum, t) => sum + t.questions.length, 0);
-  } catch {
-    // file not found — return 0
-  }
+export async function GET(req: NextRequest) {
+  const userId = await getSessionUserId(req);
+  if (!userId) return unauthorized();
 
-  return Response.json({
-    documents: 0,
-    qaPairs,
-    jobs: 0,
-    topics,
-    projects: 0,
-  });
+  const { topics, qaPairs } = getTopicsStats();
+
+  const [documents, jobs, projects, jobCounts] = await Promise.all([
+    prisma.document.count({ where: { userId } }),
+    // Strong matches only (dashboard "Jobs" stat)
+    prisma.job.count({ where: { userId, score: { gte: 60 }, status: { not: "deleted" } } }),
+    prisma.project.count({ where: { userId } }),
+    // Scored / strong totals come from the same table in one groupBy
+    countJobStats(userId),
+  ]);
+
+  return Response.json(
+    { documents, qaPairs, jobs: jobCounts.strong || jobs, topics, projects },
+    {
+      headers: {
+        // 15s browser cache + 60s CDN stale-while-revalidate; per-user safe
+        // because responses are still keyed by the session cookie.
+        "Cache-Control": "private, s-maxage=60, stale-while-revalidate=300, max-age=15",
+      },
+    }
+  );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,6 @@ import {
   BookOpen,
   Beaker,
   GraduationCap,
-  Settings,
   ChevronLeft,
   ChevronRight,
   Mail,
@@ -26,9 +25,7 @@ import {
 const navItems = [
   {
     section: "Main",
-    items: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    ],
+    items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
     section: "Modules",
@@ -65,22 +62,17 @@ const navItems = [
       { href: "/learn", label: "Learning Tutor", icon: GraduationCap },
     ],
   },
-  {
-    section: "Settings",
-    items: [
-      { href: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { collapsed, setCollapsed } = useSidebar();
   const { user, logout } = useAuth();
 
-  const handleLogout = () => {
-    logout();
-    window.location.href = "/login";
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login");
   };
 
   const isActive = (href: string) => {
@@ -95,7 +87,6 @@ export function Sidebar() {
         collapsed ? "w-14" : "w-56"
       )}
     >
-      {/* Logo */}
       <div className="flex items-center justify-between h-14 px-3 border-b border-border">
         {!collapsed && (
           <span className="font-semibold text-sm text-text-primary truncate">
@@ -111,7 +102,6 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Nav items */}
       <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-4">
         {navItems.map((section) => (
           <div key={section.section}>
@@ -129,19 +119,23 @@ export function Sidebar() {
                   <div key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch
+                      onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
                         "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                         active
-                          ? "bg-amber-500/10 text-amber-700 font-medium"
-                          : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+                          ? "bg-white text-text-primary shadow-sm ring-1 ring-border font-medium"
+                          : "text-text-secondary hover:bg-white/60 hover:text-text-primary"
                       )}
                       title={collapsed ? item.label : undefined}
                     >
-                      <Icon size={18} className="flex-shrink-0" />
+                      <Icon
+                        size={18}
+                        className={cn("flex-shrink-0", active && "text-amber-500")}
+                      />
                       {!collapsed && <span className="truncate">{item.label}</span>}
                     </Link>
 
-                    {/* Nested children */}
                     {!collapsed && active && item.children && (
                       <div className="ml-6 mt-0.5 space-y-0.5 border-l border-border pl-2">
                         {item.children.map((child) => {
@@ -151,14 +145,19 @@ export function Sidebar() {
                             <Link
                               key={child.href}
                               href={child.href}
+                              prefetch
+                              onMouseEnter={() => router.prefetch(child.href)}
                               className={cn(
                                 "flex items-center gap-2 px-2 py-1 rounded-md text-sm transition-colors",
                                 childActive
-                                  ? "bg-amber-500/10 text-amber-700 font-medium"
-                                  : "text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+                                  ? "bg-white text-text-primary shadow-sm ring-1 ring-border font-medium"
+                                  : "text-text-secondary hover:bg-white/60 hover:text-text-primary"
                               )}
                             >
-                              <ChildIcon size={16} className="flex-shrink-0" />
+                              <ChildIcon
+                                size={16}
+                                className={cn("flex-shrink-0", childActive && "text-amber-500")}
+                              />
                               <span className="truncate">{child.label}</span>
                             </Link>
                           );
@@ -173,7 +172,6 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* User area at bottom */}
       <div className="border-t border-border px-2 py-2">
         {collapsed ? (
           <div className="flex justify-center">

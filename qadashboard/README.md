@@ -2,7 +2,7 @@
 
 A unified QA platform that brings six tools into one Claude-inspired UI: resume & job matching, AI interview prep, document RAG, test case generation, and an AI learning tutor.
 
-Built with **Next.js 15**, **Tailwind CSS v4**, **OpenRouter (free AI models)**, **Pinecone (vector search)**, and **Neon PostgreSQL**.
+Built with **Next.js 15**, **Tailwind CSS v4**, **OpenRouter (free AI models only)**, **Pinecone (vector search)**, and **Neon PostgreSQL**.
 
 ---
 
@@ -42,49 +42,68 @@ Built with **Next.js 15**, **Tailwind CSS v4**, **OpenRouter (free AI models)**,
 cd qadashboard
 npm install
 
-# 2. Create your .env file
+# 2. Create your .env from the sample
 cp .env.example .env
-# Edit .env — add OPENROUTER_API_KEY at minimum
+# Edit .env — DATABASE_URL (Neon), OPENROUTER_API_KEY, AUTH_SECRET required
 
-# 3. Start the dev server
+# 3. Set up the database
+npx prisma migrate dev   # apply migrations
+npx tsx prisma/seed.ts   # create the default user (SEED_USERNAME/SEED_PASSWORD in .env)
+
+# 4. Start the dev server
 npm run dev
 
-# 4. Open http://localhost:3000
-#    Login with username: TarunBabbar, password: TarunBabbar
+# 5. Open http://localhost:3000 and register a user (or sign in with the seeded one)
 ```
 
-> No database or Pinecone setup is required to try it — the app works fully in-memory. The `data/ai-topics.json` file ships with 510+ interview Q&A pairs.
+> Data persists in Postgres — jobs, documents, projects, conversations and users survive restarts. The `data/ai-topics.json` file ships with 510 interview Q&A pairs.
 
 ---
 
-## 🔑 Environment Variables
+## 🔑 Environment Variables (all in `.env`)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
+| `DATABASE_URL` | Yes | — | Neon PostgreSQL connection string |
 | `OPENROUTER_API_KEY` | Yes | — | OpenRouter API key for all AI features |
-| `DATABASE_URL` | No | — | Neon PostgreSQL connection string (Prisma) |
-| `PINECONE_API_KEY` | No | — | Pinecone API key for vector indexing |
-| `PINECONE_INDEX_NAME` | No | `qa-dashboard` | Pinecone index name |
-| `PINECONE_NAMESPACE` | No | `qa-interview` | Namespace used when seeding the knowledge base |
-| `LLM_MODEL` | No | `google/gemma-4-26b-a4b-it:free` | Default chat completion model |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | Embedding model (1536-dim) |
-| `EMBEDDING_DIMENSIONS` | No | `1536` | Embedding dimension count |
+| `AUTH_SECRET` | Yes | — | Random hex for JWT signing (generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`) |
+| `LLM_MODEL` | Yes | `nvidia/nemotron-3-ultra-550b-a55b:free` | Default chat model (must be `:free`) |
+| `LLM_MODELS_JSON` | No | built-in free list | JSON array of `{id,name}` shown in model pickers |
 | `OPENROUTER_BASE_URL` | No | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
+| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | Embedding model |
+| `EMBEDDING_DIMENSIONS` | No | `1536` | Embedding dimension count |
+| `PINECONE_API_KEY` | No | — | Pinecone API key for vector indexing |
+| `PINECONE_INDEX_NAME` | No | `qa-interview` | Pinecone index name |
+| `PINECONE_NAMESPACE` | No | `qa-interview` | Pinecone namespace |
+| `AUTH_COOKIE_NAME` | No | `qa_session` | Session cookie name |
+| `AUTH_SESSION_DAYS` | No | `7` | Session length in days |
+| `SCRYPT_N/R/P` | No | `16384/8/1` | Password hashing cost params |
+| `GMAIL_USER` / `GMAIL_PASS` | No | — | Gmail SMTP for the Email Agent |
+| `SEED_USERNAME` / `SEED_PASSWORD` | No | — | Default user created by `prisma/seed.ts` |
 | `NEXT_PUBLIC_APP_NAME` | No | `QA AI Dashboard` | App name shown in headers |
+| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | Public app URL (HTTP-Referer header) |
+
+> **Free models only:** the app refuses to call any model id that doesn't end in `:free` (`assertFreeModel` guard in `lib/openrouter.ts`).
 
 ---
 
-## 🤖 AI Models (OpenRouter Free Tier)
+## 🤖 AI Models (OpenRouter Free Tier Only)
+
+The app ships with these free models (`LLM_MODELS_JSON` in `.env` overrides this list):
 
 | Model | Where it's used |
 |-------|-----------------|
-| `google/gemma-4-26b-a4b-it:free` | Default chat model |
-| `nvidia/nemotron-3-super-120b-a12b:free` | QA Assistant (default pick) |
-| `meta-llama/llama-3.3-70b-instruct:free` | QA Assistant dropdown |
-| `qwen/qwen3-next-80b-a3b-instruct:free` | QA Assistant dropdown |
-| `tencent/hy3:free` | QA Assistant dropdown |
-| `google/gemini-2.5-flash-lite` | Settings option (fast/cheap) |
-| `openai/text-embedding-3-small` | Embeddings (1536 dim) |
+| `nvidia/nemotron-3-ultra-550b-a55b:free` | Default chat model |
+| `openai/gpt-oss-20b:free` | Model picker |
+| `google/gemma-4-26b-a4b-it:free` | Model picker |
+| `inclusionai/ling-3.0-flash:free` | Model picker |
+| `cohere/north-mini-code:free` | Model picker |
+| `poolside/laguna-s-2.1:free` / `poolside/laguna-xs-2.1:free` | Model picker |
+| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | Model picker |
+| `nvidia/nemotron-3-super-120b-a12b:free` | Model picker |
+| `text-embedding-3-small` | Embeddings (1536 dim) |
+
+> A hard runtime guard (`assertFreeModel`) rejects any non-`:free` model id before it reaches the API.
 
 ---
 
@@ -95,7 +114,13 @@ npm run dev
 3. The best matching Q&A pairs are fed to the selected **free OpenRouter model** as grounding context.
 4. The model rewrites a clean, well-structured answer (no duplicates, no garbled text) that streams back with source citations.
 
-You can see this pipeline explained right on the QA page: **Ask Question → RAG + Pinecone + Embeddings → LLM**.
+Document Q&A works the same way, but retrieves from the specific uploaded document (its chunks) instead of the knowledge base. Chat history persists per user in Postgres.
+
+---
+
+## 🔐 Auth
+
+Multi-user accounts backed by Postgres. Passwords are scrypt-hashed (params from `.env`). Sessions are JWT (HS256, `AUTH_SECRET`) stored in an httpOnly cookie; the `middleware.ts` guard rejects unauthenticated API calls with 401. Every API route scopes data to the logged-in user.
 
 ---
 
@@ -117,8 +142,9 @@ You can see this pipeline explained right on the QA page: **Ask Question → RAG
 
 1. Push `qadashboard/` to a GitHub repo.
 2. Import the repo into Vercel (framework auto-detected as Next.js).
-3. Add the environment variables (at minimum `OPENROUTER_API_KEY`).
-4. Deploy — all routes work out of the box.
+3. Add the environment variables — at minimum `DATABASE_URL`, `OPENROUTER_API_KEY`, `AUTH_SECRET`.
+4. Set the build command to `next build` (the `postinstall` script runs `prisma generate` automatically). Run `prisma migrate deploy` once against the production DB.
+5. Deploy — all routes work, and data persists in Postgres.
 
 `vercel.json` ships ready: `buildCommand: next build`, `installCommand: npm install`.
 
@@ -129,7 +155,7 @@ You can see this pipeline explained right on the QA page: **Ask Question → RAG
 ```
 qadashboard/
 ├── app/                  # Next.js App Router (pages + API routes)
-│   ├── api/              # auth, chat, resume, jobs, documents, test-cases, topics, settings, stats
+│   ├── api/              # auth, chat, conversations, resume, jobs, documents, test-cases, topics, settings, stats
 │   ├── qa/               # QA Interview Prep (chat + topics browser)
 │   ├── resume/           # Resume & Job Matcher (upload, matches, email, companies)
 │   ├── documents/        # Document RAG (list + per-doc chat)
@@ -137,11 +163,12 @@ qadashboard/
 │   ├── learn/            # AI Learning Tutor
 │   └── settings/         # Settings
 ├── components/ui/        # Sidebar, ChatArea, ProtectedLayout
-├── lib/                  # auth, config, openrouter, embeddings, rag pipeline
-├── prisma/               # schema.prisma (9 tables)
-├── data/                 # ai-topics.json — the 510+ Q&A knowledge base
+├── lib/                  # auth, session, config, openrouter, email, file parsing, rag pipeline
+├── prisma/               # schema.prisma (10 tables) + seed.ts
+├── data/                 # ai-topics.json — the 510 Q&A knowledge base
+├── middleware.ts         # JWT session guard for /api/*
 ├── scripts/              # Pinecone seeding + diagnostic utilities
-└── .env.example
+└── .env / .env.example
 ```
 
 ---

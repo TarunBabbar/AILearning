@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { authenticateUser, createToken } from "@/lib/auth";
+import { authenticateUser, createSessionToken, buildSessionCookie } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,10 +8,11 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Username and password required" }, { status: 400 });
     }
 
-    const user = authenticateUser(username, password);
-    const token = createToken(user.id);
-
-    return Response.json({ user, token });
+    const user = await authenticateUser(username, password);
+    const token = await createSessionToken(user.id);
+    const response = Response.json({ user, token });
+    response.headers.set("Set-Cookie", buildSessionCookie(token));
+    return response;
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : "Invalid credentials" },

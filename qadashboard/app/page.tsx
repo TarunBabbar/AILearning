@@ -1,154 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import {
-  Briefcase,
-  MessageSquare,
-  FileText,
-  Beaker,
-  GraduationCap,
-  ArrowRight,
-  BookOpen,
-  FileUp,
-  Sparkles,
-} from "lucide-react";
+import { Briefcase, MessageSquare, FileText, Beaker, GraduationCap, ArrowRight, BookOpen, FileUp, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import PageChrome from "@/components/ui/PageChrome";
+import { StatSkeleton } from "@/components/ui/Skeleton";
+import { useListSWR } from "@/lib/use-list-swr";
 
-type Stats = {
-  documents: number;
-  qaPairs: number;
-  jobs: number;
-  topics: number;
-  projects: number;
-};
+type Stats = { documents: number; qaPairs: number; jobs: number; topics: number; projects: number };
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats>({
-    documents: 0,
-    qaPairs: 0,
-    jobs: 0,
-    topics: 0,
-    projects: 0,
-  });
-
-  useEffect(() => {
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then(setStats)
-      .catch(() => {});
-  }, []);
-
+  const { data: stats, error } = useListSWR<Stats>("/api/stats");
+  const values = stats || { documents: 0, qaPairs: 0, jobs: 0, topics: 0, projects: 0 };
   const modules = [
-    {
-      title: "Resume & Job Matcher",
-      description: "Upload your resume, extract jobs from PDFs, get AI-scored matches and send applications.",
-      href: "/resume",
-      icon: Briefcase,
-      color: "bg-amber-500/10 text-amber-600",
-      stat: `${stats.jobs} jobs`,
-    },
-    {
-      title: "QA Interview Prep",
-      description: "AI-powered Q&A assistant with 400+ interview questions. Chat, browse topics, upload more docs.",
-      href: "/qa",
-      icon: MessageSquare,
-      color: "bg-blue-500/10 text-blue-600",
-      stat: `${stats.qaPairs} Q&A pairs`,
-    },
-    {
-      title: "Document RAG",
-      description: "Upload PDFs, DOCX, spreadsheets and ask questions. AI answers grounded in your documents.",
-      href: "/documents",
-      icon: FileText,
-      color: "bg-purple-500/10 text-purple-600",
-      stat: `${stats.documents} documents`,
-    },
-    {
-      title: "Test Architect",
-      description: "Paste PRD requirements or JIRA keys to generate structured test cases with AI.",
-      href: "/test-architect",
-      icon: Beaker,
-      color: "bg-green-500/10 text-green-600",
-      stat: `${stats.projects} projects`,
-    },
-    {
-      title: "AI Learning Tutor",
-      description: "Interactive AI tutor for QA concepts, automation frameworks, and interview prep.",
-      href: "/learn",
-      icon: GraduationCap,
-      color: "bg-rose-500/10 text-rose-600",
-      stat: "Interactive",
-    },
+    { title: "Resume & Job Matcher", description: "Upload your resume, extract jobs from PDFs, get AI-scored matches and send applications.", href: "/resume", icon: Briefcase, color: "bg-accent-soft text-accent-strong", stat: `${values.jobs} jobs` },
+    { title: "QA Interview Prep", description: "AI-powered Q&A assistant with interview questions, grounded answers, and source citations.", href: "/qa", icon: MessageSquare, color: "bg-[#e6edf5] text-[#4a6d8c]", stat: `${values.qaPairs} Q&A pairs` },
+    { title: "Document RAG", description: "Upload PDFs, DOCX, spreadsheets and ask questions grounded in your documents.", href: "/documents", icon: FileText, color: "bg-[#f3e8f5] text-[#7a3d8c]", stat: `${values.documents} documents` },
+    { title: "Test Architect", description: "Paste requirements or JIRA keys to generate structured test cases with AI.", href: "/test-architect", icon: Beaker, color: "bg-[#e3efe3] text-[#3d7a3d]", stat: `${values.projects} projects` },
+    { title: "AI Learning Tutor", description: "Interactive AI tutor for QA concepts, frameworks, and interview preparation.", href: "/learn", icon: GraduationCap, color: "bg-[#fdf0d5] text-[#9a7b2d]", stat: "Interactive" },
   ];
+  const statItems = [{ label: "Documents", value: values.documents, icon: FileUp, color: "bg-[#f3e8f5] text-[#7a3d8c]" }, { label: "Q&A Pairs", value: values.qaPairs, icon: BookOpen, color: "bg-[#e6edf5] text-[#4a6d8c]" }, { label: "Jobs", value: values.jobs, icon: Briefcase, color: "bg-accent-soft text-accent-strong" }, { label: "Topics", value: values.topics, icon: Sparkles, color: "bg-[#e3efe3] text-[#3d7a3d]" }, { label: "Projects", value: values.projects, icon: Beaker, color: "bg-[#fdf0d5] text-[#9a7b2d]" }];
 
-  return (
-    <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">QA AI Dashboard</h1>
-        <p className="text-text-secondary mt-1">
-          Your unified QA platform — resume matching, interview prep, document analysis, and test generation.
-        </p>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-        {[
-          { label: "Documents", value: stats.documents, icon: FileUp, color: "bg-purple-500/10 text-purple-600" },
-          { label: "Q&A Pairs", value: stats.qaPairs, icon: BookOpen, color: "bg-blue-500/10 text-blue-600" },
-          { label: "Jobs", value: stats.jobs, icon: Briefcase, color: "bg-amber-500/10 text-amber-600" },
-          { label: "Topics", value: stats.topics, icon: Sparkles, color: "bg-green-500/10 text-green-600" },
-          { label: "Projects", value: stats.projects, icon: Beaker, color: "bg-rose-500/10 text-rose-600" },
-        ].map((s) => {
-          const Icon = s.icon;
-          return (
-            <div
-              key={s.label}
-              className="bg-bg-surface rounded-lg border border-border p-4 flex items-center gap-3"
-            >
-              <div className={cn("p-2 rounded-lg", s.color)}>
-                <Icon size={20} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-text-primary">{s.value}</p>
-                <p className="text-xs text-text-muted">{s.label}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Action Cards */}
-      <h2 className="text-lg font-semibold text-text-primary mb-4">Modules</h2>
-      <div className="grid md:grid-cols-2 gap-4">
-        {modules.map((mod) => {
-          const Icon = mod.icon;
-          return (
-            <Link
-              key={mod.href}
-              href={mod.href}
-              className="group bg-white rounded-lg border border-border p-5 hover:border-amber-500/30 hover:shadow-sm transition-all"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={cn("p-2.5 rounded-lg", mod.color)}>
-                  <Icon size={22} />
-                </div>
-                <span className="text-xs text-text-muted bg-bg-surface px-2 py-0.5 rounded-full">
-                  {mod.stat}
-                </span>
-              </div>
-              <h3 className="font-semibold text-text-primary mb-1 group-hover:text-amber-700 transition-colors">
-                {mod.title}
-              </h3>
-              <p className="text-sm text-text-secondary leading-relaxed">{mod.description}</p>
-              <div className="flex items-center gap-1 mt-3 text-sm text-amber-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                Open <ArrowRight size={14} />
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return <PageChrome maxWidthClass="max-w-6xl" header={<div><h1 className="text-lg font-semibold tracking-tight text-text-primary">QA AI Dashboard</h1><p className="mt-1 text-sm text-text-muted">Your unified workspace for QA learning, job matching, documents, and test design.</p></div>}><div className="space-y-6 pb-8">{!stats && !error ? <StatSkeleton /> : <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{statItems.map(({ label, value, icon: Icon, color }) => <div key={label} className="flex items-center gap-3 rounded-xl border border-border bg-white p-4 shadow-sm"><div className={cn("rounded-lg p-2.5", color)}><Icon size={19} /></div><div><p className="text-xl font-bold tabular-nums text-text-primary">{value}</p><p className="text-xs text-text-muted">{label}</p></div></div>)}</div>}{error && <div className="rounded-lg border border-border bg-white p-3 text-sm text-red-600">Could not load dashboard statistics.</div>}<div><h2 className="mb-3 text-base font-semibold text-text-primary">Workspace modules</h2><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{modules.map(({ title, description, href, icon: Icon, color, stat }) => <Link key={href} href={href} className="group overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><div className="p-5"><div className="flex items-start justify-between"><span className={cn("rounded-lg p-2.5", color)}><Icon size={21} /></span><span className="rounded-md bg-bg-surface px-2 py-1 text-xs text-text-muted">{stat}</span></div><h3 className="mt-4 font-semibold text-text-primary">{title}</h3><p className="mt-1 text-sm leading-relaxed text-text-secondary">{description}</p><div className="mt-4 flex items-center gap-1 text-sm font-medium text-amber-700 opacity-0 transition-opacity group-hover:opacity-100">Open <ArrowRight size={14} /></div></div></Link>)}</div></div></div></PageChrome>;
 }
