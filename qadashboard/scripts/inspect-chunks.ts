@@ -13,11 +13,14 @@ async function main() {
 
   // List some vector IDs from default namespace
   const listRes = await index.namespace("__default__").listPaginated({ limit: 10 });
-  const ids = listRes.vectors?.map((v) => v.id) || [];
+  const ids: string[] = [];
+  for (const v of listRes.vectors || []) {
+    if (v.id) ids.push(v.id);
+  }
   console.log("Sample IDs:", ids);
 
   if (ids.length > 0) {
-    const fetched = await index.namespace("__default__").fetch(ids);
+    const fetched = await index.namespace("__default__").fetch({ ids: ids as [string, ...string[]] });
     for (const [id, vec] of Object.entries(fetched.records || {})) {
       const text = (vec.metadata?.text as string) || "";
       console.log(`\n=== ${id} (${text.length} chars) ===`);

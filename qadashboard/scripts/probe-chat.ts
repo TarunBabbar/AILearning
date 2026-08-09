@@ -1,4 +1,4 @@
-async function main() {
+(async () => {
   const body = JSON.stringify({
     question: "What is the difference between smoke and regression testing?",
     model: "openrouter/auto",
@@ -12,5 +12,4 @@ async function main() {
 
   const text = await res.text();
   console.log(text);
-}
-main();
+})();

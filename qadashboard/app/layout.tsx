@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   description: "Unified QA platform — resume matching, interview prep, test architect & more",
 };
 
+// All pages are authenticated + client-fetched; never statically prerender.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="h-full">

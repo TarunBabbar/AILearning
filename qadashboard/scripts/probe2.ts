@@ -1,4 +1,4 @@
-async function main() {
+(async () => {
   const res = await fetch("http://localhost:3000/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -11,5 +11,4 @@ async function main() {
     if (l.type === "sources") console.log("\n\nSOURCES:", JSON.stringify(l.content));
   }
   console.log("\n\nDONE");
-}
-main();
+})();
