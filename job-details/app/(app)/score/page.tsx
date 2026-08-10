@@ -207,9 +207,10 @@ export default function ScoreJobsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load dropdown options once on mount (shared with QA Jobs).
+  // Load dropdown options once on mount — scoped to this user's scored jobs
+  // so counts match what the results grid will actually show.
   useEffect(() => {
-    fetch("/api/jobs/filters", { cache: "no-store" })
+    fetch("/api/user/matches/filters", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setFilterOptions(d);

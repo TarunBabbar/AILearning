@@ -80,7 +80,7 @@ export async function GET(req: Request) {
       jobAnd.push(companyFilterWhere(company));
     }
     if (location) {
-      jobAnd.push({ location: { contains: location, mode: "insensitive" } });
+      jobAnd.push({ location: { equals: location, mode: "insensitive" } });
     }
     if (remoteOnly) {
       jobAnd.push({
