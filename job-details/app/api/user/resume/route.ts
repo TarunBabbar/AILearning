@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     if (!filename || !content) {
       return NextResponse.json(
-        { error: "filename and content are required." },
+        { error: "Please choose a resume file to upload." },
         { status: 400 }
       );
     }

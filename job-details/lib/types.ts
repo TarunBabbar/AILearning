@@ -28,6 +28,18 @@ export type Job = {
   companyInfo: CompanyInfo | null;
 };
 
+/** Slim job shape returned by /api/user/matches (score rows). */
+export type JobLike = {
+  id: string;
+  title: string;
+  company: string;
+  email: string | null;
+  location: string | null;
+  experience: string | null;
+  description: string | null;
+  jobDate: string | null;
+};
+
 export type JobsResponse = {
   jobs: Job[];
   total: number;
@@ -43,4 +55,14 @@ export type JobsResponse = {
 
 export type CompaniesResponse = {
   companies: (CompanyInfo & { _count: { jobs: number } })[];
+};
+
+export type FilterOption = {
+  value: string;
+  count: number;
+};
+
+export type JobFiltersOptions = {
+  companies: FilterOption[];
+  locations: FilterOption[];
 };

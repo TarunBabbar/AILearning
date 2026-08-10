@@ -13,8 +13,7 @@ export function isListCacheKey(key: unknown): boolean {
   if (typeof key === "string") {
     return (
       key.startsWith("/api/jobs") ||
-      key.startsWith("/api/companies/jobs") ||
-      key.startsWith("/api/locations") ||
+      key.startsWith("/api/jobs/filters") ||
       key.startsWith("/api/contacts")
     );
   }

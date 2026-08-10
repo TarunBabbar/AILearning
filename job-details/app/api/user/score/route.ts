@@ -5,7 +5,6 @@ import { resolveApiKey } from "@/lib/auth";
 import {
   jobsSearchWhere,
   parallelWaveCapacity,
-  SCORE_JOBS_PER_MODEL,
   scoreJobsParallel,
 } from "@/lib/score-jobs";
 
@@ -49,7 +48,7 @@ export async function POST(req: Request) {
   const { apiKey } = resolveApiKey();
   if (!apiKey) {
     return NextResponse.json(
-      { error: "OPENROUTER_API_KEY is not configured." },
+      { error: "Scoring is temporarily unavailable. Please try again later." },
       { status: 400 }
     );
   }
@@ -112,8 +111,6 @@ export async function POST(req: Request) {
           attempted: wave.length,
           remainingBefore,
           totalMatching,
-          modelCount: Math.ceil(wave.length / SCORE_JOBS_PER_MODEL),
-          jobsPerModel: SCORE_JOBS_PER_MODEL,
         });
 
         const result = await scoreJobsParallel(
@@ -142,19 +139,13 @@ export async function POST(req: Request) {
           send({
             type: "error",
             error:
-              result.failedModels.length > 0
-                ? `All free models failed this wave (${result.failedModels
-                    .slice(0, 5)
-                    .join(", ")}${result.failedModels.length > 5 ? "…" : ""}). Try again later.`
-                : "Scoring returned no results. Try again later.",
+              "Scoring didn't complete this round. Please try again in a moment.",
             scored: 0,
             attempted: result.attempted,
             remaining: stillUnscored,
             totalMatching,
             scoredCount,
             done: false,
-            modelCount: result.modelCount,
-            failedModels: result.failedModels,
           });
           return;
         }
@@ -167,20 +158,14 @@ export async function POST(req: Request) {
           totalMatching,
           scoredCount,
           done: stillUnscored === 0,
-          modelCount: result.modelCount,
-          modelsUsed: result.modelsUsed,
-          failedModels: result.failedModels,
-          jobsPerModel: SCORE_JOBS_PER_MODEL,
-          message: `Wave: ${result.scored}/${result.attempted} scored via ${result.modelsUsed.length} model(s); ${stillUnscored} remaining.`,
+          message: `Wave complete: ${result.scored}/${result.attempted} jobs scored; ${stillUnscored} remaining.`,
         });
       } catch (e) {
         console.error("[user/score]", e);
         send({
           type: "error",
           error:
-            e instanceof Error
-              ? e.message
-              : "Scoring failed. Check the OpenRouter key and try again.",
+            "Scoring is temporarily unavailable. Please try again in a moment.",
         });
       } finally {
         controller.close();
@@ -242,8 +227,6 @@ export async function GET(req: Request) {
       scoredCount: scoredIds.size,
       unscored,
       estMinutesUnscored,
-      waveCapacity: capacity,
-      jobsPerModel: SCORE_JOBS_PER_MODEL,
     });
   } catch (e) {
     console.error("[user/score GET]", e);

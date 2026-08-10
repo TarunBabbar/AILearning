@@ -11,7 +11,7 @@ export default function NotFound() {
         href="/"
         className="mt-6 rounded-lg bg-claude-accent px-4 py-2 text-sm font-medium text-white hover:bg-claude-accent-strong"
       >
-        Back to All Jobs
+        Back to QA Jobs
       </Link>
     </div>
   );

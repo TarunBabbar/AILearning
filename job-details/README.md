@@ -63,17 +63,15 @@
 - Results are deduplicated (by title + email + company) against existing rows.
 - Strict-JSON prompting with fallback-safe parsing (handles markdown fences / prose around JSON).
 
-### 📊 All Jobs (default page)
-- Compact job cards with search and sort (newest / oldest).
+### 📊 QA Jobs (default page)
+- Compact job cards with search, company / location dropdown filters, and sort (newest / oldest / company).
 - **Pagination** (40 per page) with First / Prev / Next / Last.
 - Click a job for a **centered full-screen detail modal** (page header hidden while open).
 - Client list cache via SWR (~5 min soft TTL).
 
-### 🗂️ Browse Jobs & Recruiter Contacts
-- **Browse**: group by company or location; expand a group to see its jobs.
+### 📇 Recruiter Contacts
 - **Contacts**: company → recruiter email(s), copy / mailto.
-- Both pages paginate groups (40 per page) and show **Showing 1–40 of N** (same company universe when Browse is on Company view).
-- Shared pagination chrome and range label components.
+- Paginated (40 per page) with **Showing 1–40 of N**.
 
 ### 🏢 Company details (inline, no separate tab)
 - Every job's email domain is checked against a **generic-domain blocklist**:
@@ -86,18 +84,18 @@
 - The OpenRouter key is read **only** from `OPENROUTER_API_KEY` (`.env` locally, Vercel env vars in production).
 - No settings page, no UI entry, no cookies — the key never reaches the browser.
 
-### ⚡ Client + edge caching (Jobs / Browse / Contacts)
+### ⚡ Client + edge caching (Jobs / Contacts)
 - List pages use **[SWR](https://swr.vercel.app)** so switching tabs reuses in-memory data instead of hitting Neon on every navigation.
 - Soft TTL of **~5 minutes**: within that window, remounting a tab shows cached data with **no network/DB round-trip**.
-- After a successful upload, caches for jobs / companies / locations / contacts are **invalidated** so the next visit refetches fresh rows.
+- After a successful upload, caches for jobs / contacts are **invalidated** so the next visit refetches fresh rows.
 - List GET APIs send `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` so Vercel’s edge can serve short-lived responses too (same behavior on localhost and production).
 
 ### 🎯 Match Jobs by Resume (per-user scoring)
 - Nav: **Match by Resume**. Register/login, upload a resume, score shared board jobs against it.
 - Compact fixed page header (title, scored/left counts, resume chip, Unscored/Rescore, Score, account) plus the privacy blurb under the title.
-- Filters (**Any score**, company, location, Remote) live **inside** the results table card with **Showing 1–40 of N** (updates per page).
-- Column headers sort by score / company / location; 40 rows per page.
-- Detail popup is centered and covers the viewport (header hidden while open).
+- Same shared filter bar as QA Jobs (**search**, **company** / **location** dropdowns, sort by score/company/location) plus score-only controls (min score, Remote) with **Showing 1–40 of N**.
+- Results render as the same job cards as QA Jobs with a **fit % badge** and strengths snippet on each card; 40 cards per page.
+- Click a card for a centered detail popup with strengths, gaps, and full description (header hidden while open).
 - Score shared board jobs via OpenRouter. Each wave lists free `:free` models, then fires **one parallel request per model** with **10 jobs** each. Results upsert to `JobScore` as each chunk returns.
 - Per-model: up to **2 tries**, then blacklist that model for the run and reassign the chunk.
 - Scores keyed by `(userId, jobId)` so users never see each other’s results.
@@ -128,19 +126,17 @@
 job-details/
 ├─ app/
 │  ├─ (app)/                    # sidebar-wrapped pages (SWRProvider + PageChrome)
-│  │  ├─ page.tsx               # All Jobs — cards + centered detail modal
-│  │  ├─ browse/                # By company / location (paginated)
+│  │  ├─ page.tsx               # QA Jobs — filtered cards + centered detail modal
 │  │  ├─ contacts/              # Recruiter emails by company (paginated)
 │  │  ├─ score/                 # Match by Resume — auth, upload, scoring, results
 │  │  └─ upload/                # multi-file upload + extraction (admin)
 │  ├─ api/
 │  │  ├─ upload/                # POST — extract + persist jobs
-│  │  ├─ jobs/                  # GET (list/search, Cache-Control) · DELETE
+│  │  ├─ jobs/                  # GET (list/search/filters, Cache-Control) · DELETE
 │  │  ├─ jobs/[id]/             # GET · DELETE single job
+│  │  ├─ jobs/filters/          # GET — distinct company/location dropdown options
 │  │  ├─ companies/             # GET list
-│  │  ├─ companies/jobs/        # GET jobs grouped by company (page, pageSize)
 │  │  ├─ companies/resolve/     # POST — resolve company info from emails
-│  │  ├─ locations/             # GET jobs grouped by location (page, pageSize)
 │  │  ├─ contacts/              # GET emails by company (page, pageSize)
 │  │  ├─ user/                  # register · login · logout · me · resume · score · matches
 │  │  ├─ users/                 # GET admin user list (USERS_ADMIN_API_KEY)
@@ -155,6 +151,9 @@ job-details/
 │  ├─ PageChrome.tsx            # fixed page header + scroll body
 │  ├─ ListPagination.tsx        # First / Prev / Next / Last control
 │  ├─ ShowingRange.tsx          # "Showing 1–40 of N" label
+│  ├─ JobCard.tsx               # shared job card (QA Jobs + Match by Resume)
+│  ├─ JobFilters.tsx            # shared search / company / location / sort bar
+│  ├─ JobDetailModal.tsx        # shared job detail popup
 │  └─ Skeleton.tsx              # loading placeholders
 ├─ lib/
 │  ├─ client/pdf.ts             # browser-side PDF/DOCX text extraction
@@ -392,18 +391,20 @@ a pause takes a few seconds to wake the DB. That's normal.
 
 | Method | Endpoint                 | Description                                        | Query / Body                                        |
 | ------ | ------------------------ | -------------------------------------------------- | --------------------------------------------------- |
-| `GET`  | `/api/jobs`              | List jobs with company info (edge-cached 60s)       | `search`, `status`, `company`, `sort`               |
+| `GET`  | `/api/jobs`              | List jobs with company info (edge-cached 60s)       | `search`, `status`, `company`, `location`, `sort`   |
 | `GET`  | `/api/jobs/:id`          | Single job + company info                           | —                                                   |
 | `DELETE` | `/api/jobs`            | Clear all jobs                                      | —                                                   |
 | `DELETE` | `/api/jobs/:id`        | Delete one job                                      | —                                                   |
+| `GET`  | `/api/jobs/filters`      | Distinct company/location dropdown options (edge-cached 60s) | `search`, `company`, `location`          |
 | `POST` | `/api/upload`            | Extract + persist jobs from text                    | `{ fileName, text, model? }`                        |
 | `GET`  | `/api/companies`         | List companies with job counts                      | —                                                   |
-| `GET`  | `/api/companies/jobs`    | Jobs grouped by company (edge-cached 60s)           | `search`, `sort`, `page`, `pageSize`                |
-| `GET`  | `/api/locations`         | Jobs grouped by location (edge-cached 60s)          | `search`, `page`, `pageSize`                        |
 | `GET`  | `/api/contacts`          | Recruiter emails by company (edge-cached 60s)       | `search`, `page`, `pageSize`                        |
 | `POST` | `/api/companies/resolve` | Resolve/backfill company info in batches (~10 domains/call). Repeat until `remaining` is 0. | `{ model?, limit? }` |
-| `GET`  | `/api/settings`          | Config status: key configured, source, model, models| —                                                   |
+| `GET`  | `/api/settings`          | Config status: service configured, default model, app name      | —                                                   |
 | `POST` | `/api/extract-preview`   | Word/char count for pasted text                     | `{ text }`                                          |
+| `GET`  | `/api/user/matches`      | Scored jobs for the logged-in user (searchable/filterable)        | `search`, `company`, `location`, `minScore`, `remote`, `sort`, `order`, `page`, `pageSize` |
+| `GET`  | `/api/user/score`        | Score preview counts for the logged-in user                       | `search`                                             |
+| `POST` | `/api/user/score`        | Score shared jobs against the user's resume (NDJSON stream)       | `{ scope, search? }`                                |
 
 > List GET routes that say **edge-cached** return `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. The browser client still uses `cache: "no-store"` so SWR owns freshness after uploads.
 

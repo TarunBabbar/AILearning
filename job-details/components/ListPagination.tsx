@@ -10,7 +10,7 @@ type Props = {
   onPageChange: (page: number) => void;
 };
 
-/** Shared First / Prev / Page / Next / Last control (All Jobs style). */
+/** Shared First / Prev / Page / Next / Last control (QA Jobs style). */
 export default function ListPagination({
   page,
   pageCount,

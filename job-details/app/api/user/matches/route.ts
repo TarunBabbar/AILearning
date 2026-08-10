@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/user-auth";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
+import { companyFilterWhere } from "@/lib/company";
 import type { Prisma } from "@prisma-generated/client";
 
 export const runtime = "nodejs";
@@ -76,7 +77,7 @@ export async function GET(req: Request) {
       });
     }
     if (company) {
-      jobAnd.push({ company: { contains: company, mode: "insensitive" } });
+      jobAnd.push(companyFilterWhere(company));
     }
     if (location) {
       jobAnd.push({ location: { contains: location, mode: "insensitive" } });

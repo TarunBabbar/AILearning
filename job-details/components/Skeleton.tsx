@@ -12,7 +12,7 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** Skeleton grid of job cards (All Jobs page). */
+/** Skeleton grid of job cards (QA Jobs page). */
 export function JobCardSkeleton() {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-claude-border bg-white p-3.5 shadow-sm">
@@ -37,19 +37,12 @@ export function JobCardSkeleton() {
   );
 }
 
-/** Skeleton group header + job rows (Browse page). */
-export function GroupListSkeleton({ count = 6 }: { count?: number }) {
+/** Skeleton grid of job cards (QA Jobs / Match pages). */
+export function JobGridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="space-y-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-2.5 rounded-lg border border-claude-border bg-white px-3.5 py-2.5 shadow-sm"
-        >
-          <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
-          <Skeleton className="h-3.5 max-w-[12rem] flex-1" />
-          <Skeleton className="h-4 w-6 rounded" />
-        </div>
+        <JobCardSkeleton key={i} />
       ))}
     </div>
   );

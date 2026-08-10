@@ -5,6 +5,7 @@ import { isAdminRequest } from "@/lib/admin-auth";
 import {
   GENERIC_DOMAINS,
   dedupeJobs,
+  companyFilterWhere,
 } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
 import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
@@ -36,7 +37,7 @@ function truncatePreview(text: string | null): string | null {
 }
 
 /**
- * GET /api/jobs?search=&status=&company=&sort=&page=&pageSize=
+ * GET /api/jobs?search=&status=&company=&location=&sort=&page=&pageSize=
  * Returns one slim page of jobs. Search/sort apply across the full DB.
  * Full descriptions are loaded via GET /api/jobs/:id when a card is opened.
  */
@@ -45,6 +46,7 @@ export async function GET(req: Request) {
   const search = url.searchParams.get("search")?.trim() || "";
   const status = url.searchParams.get("status")?.trim() || "";
   const company = url.searchParams.get("company")?.trim() || "";
+  const location = url.searchParams.get("location")?.trim() || "";
   const sort = url.searchParams.get("sort")?.trim() || "newest";
   const pageRaw = parseInt(url.searchParams.get("page") || "1", 10);
   const sizeRaw = parseInt(
@@ -73,7 +75,10 @@ export async function GET(req: Request) {
     }
     if (status) filters.push({ status });
     if (company) {
-      filters.push({ company: { contains: company, mode: "insensitive" } });
+      filters.push(companyFilterWhere(company));
+    }
+    if (location) {
+      filters.push({ location: { equals: location, mode: "insensitive" } });
     }
 
     const where: Prisma.JobWhereInput = { AND: filters };
@@ -147,7 +152,7 @@ export async function GET(req: Request) {
         counts: {},
         companyCount,
         sourceCount,
-        filters: { search, status, company, sort },
+        filters: { search, status, company, location, sort },
       },
       {
         headers: {
@@ -164,7 +169,7 @@ export async function GET(req: Request) {
       pageSize,
       pageCount: 0,
       counts: {},
-      filters: { search, status, company, sort },
+      filters: { search, status, company, location, sort },
       dbError: true,
     });
   }

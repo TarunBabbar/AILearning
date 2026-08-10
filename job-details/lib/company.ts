@@ -1,5 +1,6 @@
 import { callOpenRouter, extractJsonArray } from "./openrouter";
 import { getConfig } from "./config";
+import type { Prisma } from "@prisma-generated/client";
 
 /**
  * Email domains treated as personal/free providers, not companies.
@@ -292,4 +293,24 @@ export function groupJobsByCompany<T extends { company: string; email: string | 
     entry.jobs.push(j);
   }
   return map;
+}
+
+/**
+ * Build a Prisma `JobWhereInput` that matches a company label shown in the
+ * filter dropdowns. The dropdown labels come from the email domain (e.g.
+ * "akaasa.com" → "Akaasa"), so a plain match against the raw `company` text
+ * misses jobs whose extracted company name differs (junk/promo text, phone
+ * numbers, …). Matching the email domain too makes the filter find the same
+ * jobs that produced the label.
+ */
+export function companyFilterWhere(label: string): Prisma.JobWhereInput {
+  const domain = getEmailDomain(`${label}.com`); // "Akaasa" → "akaasa.com"
+  const domainRoot = domain ? domain.split(".")[0] : label.toLowerCase();
+
+  return {
+    OR: [
+      { company: { contains: label, mode: "insensitive" } },
+      { email: { contains: domainRoot, mode: "insensitive" } },
+    ],
+  };
 }

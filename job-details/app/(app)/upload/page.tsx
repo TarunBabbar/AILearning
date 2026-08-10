@@ -916,7 +916,7 @@ function LoginGate({
       <p className="mt-4 text-center text-xs text-claude-muted">
         Don&apos;t have admin access? Head back to the{" "}
         <a href="/" className="text-claude-accent hover:underline">
-          All Jobs
+          QA Jobs
         </a>{" "}
         view to explore the available jobs.
       </p>

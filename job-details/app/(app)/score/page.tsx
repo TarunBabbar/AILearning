@@ -1,24 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   LogIn,
   UserPlus,
   LogOut,
   Upload,
   Loader2,
-  X,
   RefreshCw,
   Briefcase,
   Home,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
-import { Skeleton, TableSkeleton } from "@/components/Skeleton";
+import { Skeleton, JobGridSkeleton } from "@/components/Skeleton";
+import JobCard from "@/components/JobCard";
+import JobFilters, { type JobFilterValue } from "@/components/JobFilters";
+import JobDetailModal from "@/components/JobDetailModal";
+import ListPagination from "@/components/ListPagination";
+import ShowingRange from "@/components/ShowingRange";
 import PageChrome from "@/components/PageChrome";
+import type { JobLike, JobFiltersOptions } from "@/lib/types";
 
 type MeResponse = {
   user: { id: string; email: string; name: string | null } | null;
@@ -32,16 +34,7 @@ type MatchRow = {
   strengths: string | null;
   gaps: string | null;
   scoredAt: string;
-  job: {
-    id: string;
-    title: string;
-    company: string;
-    location: string | null;
-    experience: string | null;
-    email: string | null;
-    description: string | null;
-    jobDate: string | null;
-  };
+  job: JobLike;
 };
 
 type ScoreStats = {
@@ -57,17 +50,11 @@ type AuthMode = "login" | "register";
 
 const MATCH_PAGE_SIZE = 40;
 
-function scoreColor(score: number) {
-  if (score >= 60) return "text-[#3d7a3d]";
-  if (score >= 30) return "text-[#9a7b2d]";
-  return "text-[#a04040]";
-}
-
-function scoreBg(score: number) {
-  if (score >= 60) return "bg-[#e3efe3]";
-  if (score >= 30) return "bg-[#fdf0d5]";
-  return "bg-[#f5e5e5]";
-}
+const SCORE_SORT_OPTIONS = [
+  { value: "score", label: "Best score" },
+  { value: "company", label: "Company A–Z" },
+  { value: "location", label: "Location A–Z" },
+];
 
 function userInitials(name: string | null | undefined, email: string) {
   const raw = (name || "").trim();
@@ -109,12 +96,17 @@ export default function ScoreJobsPage() {
   const [matchesPageCount, setMatchesPageCount] = useState(1);
   const [page, setPage] = useState(1);
   const [minScore, setMinScore] = useState(0);
+  const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"score" | "company" | "location">("score");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<MatchRow | null>(null);
+  const [filterOptions, setFilterOptions] = useState<JobFiltersOptions>({
+    companies: [],
+    locations: [],
+  });
 
   const refreshMe = useCallback(async () => {
     const res = await fetch("/api/user/me", { cache: "no-store" });
@@ -126,6 +118,7 @@ export default function ScoreJobsPage() {
   const loadMatches = useCallback(
     async (overrides?: {
       minScore?: number;
+      search?: string;
       company?: string;
       location?: string;
       remote?: boolean;
@@ -137,6 +130,7 @@ export default function ScoreJobsPage() {
       try {
         const params = new URLSearchParams();
         const ms = overrides?.minScore ?? minScore;
+        const searchQ = overrides?.search ?? search;
         const company = overrides?.company ?? companyFilter;
         const location = overrides?.location ?? locationFilter;
         const remote = overrides?.remote ?? remoteOnly;
@@ -145,6 +139,7 @@ export default function ScoreJobsPage() {
         const pageNo = overrides?.page ?? page;
 
         if (ms > 0) params.set("minScore", String(ms));
+        if (searchQ.trim()) params.set("search", searchQ.trim());
         if (company.trim()) params.set("company", company.trim());
         if (location.trim()) params.set("location", location.trim());
         if (remote) params.set("remote", "1");
@@ -178,6 +173,7 @@ export default function ScoreJobsPage() {
     },
     [
       minScore,
+      search,
       companyFilter,
       locationFilter,
       remoteOnly,
@@ -211,10 +207,51 @@ export default function ScoreJobsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load dropdown options once on mount (shared with QA Jobs).
+  useEffect(() => {
+    fetch("/api/jobs/filters", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setFilterOptions(d);
+      })
+      .catch(() => {});
+  }, []);
+
   const pendingCount = useMemo(() => {
     if (!stats) return 0;
     return scope === "all" ? stats.totalMatching : stats.unscored;
   }, [stats, scope]);
+
+  const handleFilters = useCallback(
+    (next: JobFilterValue) => {
+      const sort: "score" | "company" | "location" =
+        next.sort === "company" || next.sort === "location" ? next.sort : "score";
+      const order: "asc" | "desc" = sort === "score" ? "desc" : "asc";
+      setSearch(next.search);
+      setCompanyFilter(next.company);
+      setLocationFilter(next.location);
+      setSortBy(sort);
+      setSortOrder(order);
+      setPage(1);
+      loadMatches({
+        search: next.search,
+        company: next.company,
+        location: next.location,
+        sort,
+        order,
+        page: 1,
+      });
+    },
+    [loadMatches]
+  );
+
+  const filterValue: JobFilterValue = {
+    search,
+    company: companyFilter,
+    location: locationFilter,
+    sort: sortBy,
+    order: sortOrder,
+  };
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -447,7 +484,7 @@ export default function ScoreJobsPage() {
             <Skeleton className="h-8 w-20 rounded-md" />
             <Skeleton className="ml-auto h-8 w-24 rounded-md" />
           </div>
-          <TableSkeleton />
+          <JobGridSkeleton count={6} />
         </div>
       </div>
     );
@@ -690,7 +727,6 @@ export default function ScoreJobsPage() {
         </div>
       }
     >
-
       {(resumeError || scoreError || confirmLarge || (!me.resume && !resumeBusy)) && (
         <div className="space-y-1 text-[11px]">
           {resumeError && <p className="text-[#a04040]">{resumeError}</p>}
@@ -720,389 +756,124 @@ export default function ScoreJobsPage() {
         </div>
       )}
 
-      {/* Results table — filters live inside the same card */}
-      <div className="overflow-hidden rounded-lg border border-claude-border bg-white">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-claude-border bg-white px-3 py-2">
-          <select
-            value={minScore}
-            onChange={(e) => {
-              const v = Number(e.target.value) || 0;
-              setMinScore(v);
-              setPage(1);
-              loadMatches({ minScore: v, page: 1 });
-            }}
-            title="Minimum fit score"
-            className="h-7 rounded-md border border-claude-border bg-white px-1.5 text-[11px] text-claude-text outline-none focus:border-claude-accent"
-          >
-            <option value={0}>Any score</option>
-            <option value={30}>≥ 30%</option>
-            <option value={50}>≥ 50%</option>
-            <option value={70}>≥ 70%</option>
-            <option value={80}>≥ 80%</option>
-          </select>
-
-          <input
-            value={companyFilter}
-            onChange={(e) => setCompanyFilter(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setPage(1);
-                loadMatches({ company: companyFilter, page: 1 });
-              }
-            }}
-            placeholder="Company"
-            className="h-7 w-[7rem] rounded-md border border-claude-border bg-white px-1.5 text-[11px] outline-none focus:border-claude-accent"
-          />
-
-          <input
-            value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setPage(1);
-                loadMatches({ location: locationFilter, page: 1 });
-              }
-            }}
-            placeholder="Location"
-            className="h-7 w-[7rem] rounded-md border border-claude-border bg-white px-1.5 text-[11px] outline-none focus:border-claude-accent"
-          />
-
-          <button
-            type="button"
-            onClick={() => {
-              const next = !remoteOnly;
-              setRemoteOnly(next);
-              setPage(1);
-              loadMatches({ remote: next, page: 1 });
-            }}
-            className={cn(
-              "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium",
-              remoteOnly
-                ? "border-claude-accent bg-claude-accent text-white"
-                : "border-claude-border bg-white text-claude-muted hover:text-claude-text"
-            )}
-            title="Remote / work-from-home / hybrid"
-          >
-            <Home size={11} />
-            Remote
-          </button>
-
-          {matchesTotal > 0 && (
-            <span className="ml-auto text-[11px] text-claude-muted">
-              Showing{" "}
-              <span className="font-medium text-claude-text">
-                {matches.length === 0
-                  ? "0"
-                  : `${(page - 1) * MATCH_PAGE_SIZE + 1}–${
-                      (page - 1) * MATCH_PAGE_SIZE + matches.length
-                    }`}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-claude-text">
-                {matchesTotal.toLocaleString()}
-              </span>
-            </span>
-          )}
-        </div>
-
-        {matchesLoading ? (
-          <div>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 border-b border-claude-border px-3 py-3 last:border-b-0"
+      {/* Filter bar — shared with QA Jobs, plus score-only controls */}
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-1.5">
+        <JobFilters
+          value={filterValue}
+          onChange={handleFilters}
+          companyOptions={filterOptions.companies}
+          locationOptions={filterOptions.locations}
+          sortOptions={SCORE_SORT_OPTIONS}
+          rightSlot={
+            <>
+              <select
+                value={minScore}
+                onChange={(e) => {
+                  const v = Number(e.target.value) || 0;
+                  setMinScore(v);
+                  setPage(1);
+                  loadMatches({ minScore: v, page: 1 });
+                }}
+                title="Minimum fit score"
+                className="h-7 shrink-0 rounded-md border border-claude-border bg-white px-1.5 text-[11px] text-claude-text outline-none focus:border-claude-accent"
               >
-                <Skeleton className="h-3 w-12" />
-                <Skeleton className="h-3 w-40" />
-                <Skeleton className="h-3 w-28" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            ))}
-          </div>
-        ) : matches.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
-            <Briefcase size={18} className="mb-2 text-claude-accent" />
-            <p className="text-sm text-claude-text">
-              {minScore || companyFilter || locationFilter || remoteOnly
-                ? "No scores match these filters"
-                : "No scores yet"}
-            </p>
-            <p className="mt-0.5 text-[11px] text-claude-muted">
-              {minScore || companyFilter || locationFilter || remoteOnly
-                ? "Clear or loosen filters, or score more jobs."
-                : "Upload a resume and run Score to fill this table."}
-            </p>
-          </div>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-[5]">
-              <tr className="border-b border-claude-border bg-white text-[10px] uppercase tracking-wide text-claude-muted shadow-[0_1px_0_0_var(--claude-border)]">
-                <th className="bg-white px-3 py-2 font-semibold">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 hover:text-claude-text"
-                    onClick={() => {
-                      const nextOrder =
-                        sortBy === "score" && sortOrder === "desc"
-                          ? "asc"
-                          : "desc";
-                      setSortBy("score");
-                      setSortOrder(nextOrder);
-                      setPage(1);
-                      loadMatches({
-                        sort: "score",
-                        order: nextOrder,
-                        page: 1,
-                      });
-                    }}
-                  >
-                    Score
-                    {sortBy === "score"
-                      ? sortOrder === "desc"
-                        ? " ↓"
-                        : " ↑"
-                      : ""}
-                  </button>
-                </th>
-                <th className="bg-white px-3 py-2 font-semibold">Title</th>
-                <th className="bg-white px-3 py-2 font-semibold">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 hover:text-claude-text"
-                    onClick={() => {
-                      const nextOrder =
-                        sortBy === "company" && sortOrder === "asc"
-                          ? "desc"
-                          : "asc";
-                      setSortBy("company");
-                      setSortOrder(nextOrder);
-                      setPage(1);
-                      loadMatches({
-                        sort: "company",
-                        order: nextOrder,
-                        page: 1,
-                      });
-                    }}
-                  >
-                    Company
-                    {sortBy === "company"
-                      ? sortOrder === "asc"
-                        ? " ↑"
-                        : " ↓"
-                      : ""}
-                  </button>
-                </th>
-                <th className="bg-white px-3 py-2 font-semibold">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 hover:text-claude-text"
-                    onClick={() => {
-                      const nextOrder =
-                        sortBy === "location" && sortOrder === "asc"
-                          ? "desc"
-                          : "asc";
-                      setSortBy("location");
-                      setSortOrder(nextOrder);
-                      setPage(1);
-                      loadMatches({
-                        sort: "location",
-                        order: nextOrder,
-                        page: 1,
-                      });
-                    }}
-                  >
-                    Location
-                    {sortBy === "location"
-                      ? sortOrder === "asc"
-                        ? " ↑"
-                        : " ↓"
-                      : ""}
-                  </button>
-                </th>
-                <th className="hidden bg-white px-3 py-2 font-semibold lg:table-cell">
-                  Strengths
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-claude-border">
-              {matches.map((m) => (
-                <tr
-                  key={m.id}
-                  className="cursor-pointer transition-colors hover:bg-claude-bg/40"
-                  onClick={() => setSelected(m)}
-                >
-                  <td className="px-3 py-2">
-                    <span
-                      className={cn(
-                        "inline-flex min-w-[2.75rem] justify-center rounded px-1.5 py-0.5 text-xs font-bold",
-                        scoreBg(m.score),
-                        scoreColor(m.score)
-                      )}
-                    >
-                      {m.score}%
-                    </span>
-                  </td>
-                  <td className="max-w-[220px] truncate px-3 py-2 font-medium text-claude-text">
-                    {m.job.title}
-                  </td>
-                  <td className="max-w-[160px] truncate px-3 py-2 text-claude-muted">
-                    {m.job.company}
-                  </td>
-                  <td className="max-w-[140px] truncate px-3 py-2 text-claude-muted">
-                    {m.job.location || "—"}
-                  </td>
-                  <td className="hidden max-w-[240px] truncate px-3 py-2 text-xs text-claude-muted lg:table-cell">
-                    {m.strengths || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                <option value={0}>Any score</option>
+                <option value={30}>≥ 30%</option>
+                <option value={50}>≥ 50%</option>
+                <option value={70}>≥ 70%</option>
+                <option value={80}>≥ 80%</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !remoteOnly;
+                  setRemoteOnly(next);
+                  setPage(1);
+                  loadMatches({ remote: next, page: 1 });
+                }}
+                className={cn(
+                  "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium",
+                  remoteOnly
+                    ? "border-claude-accent bg-claude-accent text-white"
+                    : "border-claude-border bg-white text-claude-muted hover:text-claude-text"
+                )}
+                title="Remote / work-from-home / hybrid"
+              >
+                <Home size={11} />
+                Remote
+              </button>
+
+              {matchesTotal > 0 && (
+                <ShowingRange
+                  page={page}
+                  pageSize={MATCH_PAGE_SIZE}
+                  itemCount={matches.length}
+                  total={matchesTotal}
+                  className="ml-auto shrink-0"
+                />
+              )}
+            </>
+          }
+        />
       </div>
 
-      {matchesTotal > 0 && matchesPageCount > 1 && (
-        <div className="mt-4 flex justify-center">
-          <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-claude-border bg-white px-2 py-1.5 shadow-sm">
-            <button
-              type="button"
-              disabled={page <= 1 || matchesLoading}
-              onClick={() => {
-                setPage(1);
-                loadMatches({ page: 1 });
-              }}
-              title="First page"
-              className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft size={12} className="-mr-1" />
-              <ChevronLeft size={12} />
-              <span className="ml-0.5">First</span>
-            </button>
-            <button
-              type="button"
-              disabled={page <= 1 || matchesLoading}
-              onClick={() => {
-                const next = Math.max(1, page - 1);
-                setPage(next);
-                loadMatches({ page: next });
-              }}
-              className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft size={14} />
-              Prev
-            </button>
-            <span className="px-2 text-xs text-claude-muted">
-              Page{" "}
-              <span className="font-semibold text-claude-text">{page}</span>
-              {" of "}
-              <span className="font-semibold text-claude-text">
-                {matchesPageCount}
-              </span>
-              <span className="ml-1.5 text-claude-muted/70">
-                · {matchesTotal.toLocaleString()}
-              </span>
-            </span>
-            <button
-              type="button"
-              disabled={page >= matchesPageCount || matchesLoading}
-              onClick={() => {
-                const next = Math.min(matchesPageCount, page + 1);
-                setPage(next);
-                loadMatches({ page: next });
-              }}
-              className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Next
-              <ChevronRight size={14} />
-            </button>
-            <button
-              type="button"
-              disabled={page >= matchesPageCount || matchesLoading}
-              onClick={() => {
-                setPage(matchesPageCount);
-                loadMatches({ page: matchesPageCount });
-              }}
-              title="Last page"
-              className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-claude-text transition-colors hover:bg-claude-bg disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span className="mr-0.5">Last</span>
-              <ChevronRight size={12} />
-              <ChevronRight size={12} className="-ml-1" />
-            </button>
-          </div>
+      {/* Results — shared card grid with score badges */}
+      {matchesLoading ? (
+        <JobGridSkeleton />
+      ) : matches.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-claude-border bg-white px-4 py-12 text-center shadow-sm">
+          <Briefcase size={18} className="mb-2 text-claude-accent" />
+          <p className="text-sm text-claude-text">
+            {minScore || search || companyFilter || locationFilter || remoteOnly
+              ? "No scores match these filters"
+              : "No scores yet"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-claude-muted">
+            {minScore || search || companyFilter || locationFilter || remoteOnly
+              ? "Clear or loosen filters, or score more jobs."
+              : "Upload a resume and run Score to fill this page."}
+          </p>
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {matches.map((m) => (
+              <JobCard
+                key={m.id}
+                job={m.job}
+                score={m.score}
+                strengths={m.strengths}
+                onOpen={() => setSelected(m)}
+              />
+            ))}
+          </div>
+
+          {matchesPageCount > 1 && (
+            <ListPagination
+              page={page}
+              pageCount={matchesPageCount}
+              total={matchesTotal}
+              loading={matchesLoading}
+              onPageChange={(p) => {
+                setPage(p);
+                loadMatches({ page: p });
+              }}
+            />
+          )}
+        </>
       )}
 
-      {selected &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm sm:p-8"
-            onClick={() => setSelected(null)}
-          >
-            <div
-              className="fade-up max-h-[min(90vh,56rem)] w-full max-w-2xl overflow-hidden rounded-2xl border border-claude-border bg-white shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between border-b border-claude-border p-5">
-                <div>
-                  <div
-                    className={cn(
-                      "mb-2 inline-flex rounded-md px-2.5 py-1 text-sm font-bold",
-                      scoreBg(selected.score),
-                      scoreColor(selected.score)
-                    )}
-                  >
-                    {selected.score}% score
-                  </div>
-                  <h3 className="text-lg font-semibold text-claude-text">
-                    {selected.job.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-claude-muted">
-                    {selected.job.company}
-                    {selected.job.location ? ` · ${selected.job.location}` : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelected(null)}
-                  className="rounded-lg p-1.5 text-claude-muted hover:bg-claude-bg"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="max-h-[min(60vh,32rem)] space-y-4 overflow-y-auto p-5 text-sm">
-                {selected.strengths && (
-                  <div>
-                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
-                      Strengths
-                    </div>
-                    <p className="text-claude-text">{selected.strengths}</p>
-                  </div>
-                )}
-                {selected.gaps && (
-                  <div>
-                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
-                      Gaps
-                    </div>
-                    <p className="text-claude-text">{selected.gaps}</p>
-                  </div>
-                )}
-                {selected.job.description && (
-                  <div>
-                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-claude-muted">
-                      Description
-                    </div>
-                    <p className="whitespace-pre-wrap text-claude-muted">
-                      {selected.job.description}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {selected && (
+        <JobDetailModal
+          job={selected.job}
+          loading={false}
+          score={selected.score}
+          strengths={selected.strengths}
+          gaps={selected.gaps}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </PageChrome>
   );
 }
