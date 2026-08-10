@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LogIn,
   UserPlus,
@@ -88,7 +88,12 @@ export default function ScoreJobsPage() {
   const [scoring, setScoring] = useState(false);
   const [scoreProgress, setScoreProgress] = useState<string | null>(null);
   const [scorePct, setScorePct] = useState<number | null>(null);
+  const [runCompleted, setRunCompleted] = useState(0);
+  const runTotalRef = useRef(1);
   const [scoreError, setScoreError] = useState<string | null>(null);
+  const [scoreFailed, setScoreFailed] = useState(0);
+  const liveRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveRefreshPendingRef = useRef(false);
 
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
@@ -125,8 +130,10 @@ export default function ScoreJobsPage() {
       sort?: "score" | "company" | "location";
       order?: "asc" | "desc";
       page?: number;
+      /** Background refresh — don't flip the loading skeleton. */
+      silent?: boolean;
     }) => {
-      setMatchesLoading(true);
+      if (!overrides?.silent) setMatchesLoading(true);
       try {
         const params = new URLSearchParams();
         const ms = overrides?.minScore ?? minScore;
@@ -168,7 +175,7 @@ export default function ScoreJobsPage() {
         setMatchesPageCount(Math.max(1, data.pageCount ?? 1));
         if (data.page && data.page !== pageNo) setPage(data.page);
       } finally {
-        setMatchesLoading(false);
+        if (!overrides?.silent) setMatchesLoading(false);
       }
     },
     [
@@ -341,6 +348,7 @@ export default function ScoreJobsPage() {
 
   async function runScoring(force = false) {
     setScoreError(null);
+    setScoreFailed(0);
     if (!force && pendingCount >= 100 && !confirmLarge) {
       setConfirmLarge(true);
       return;
@@ -348,19 +356,49 @@ export default function ScoreJobsPage() {
     setConfirmLarge(false);
     setScoring(true);
     const totalAtStart = Math.max(1, pendingCount);
+    runTotalRef.current = totalAtStart;
     let completed = 0;
+    setRunCompleted(0);
     setScorePct(0);
     setScoreProgress(`0% · 0/${totalAtStart.toLocaleString()}`);
 
+    // Monotonic client-side progress: totalAtStart is fixed, `completed`
+    // only ever increases via scoredDelta / final scored. Never sawtooths.
     const bumpProgress = (extra = "") => {
       const pct =
         completed >= totalAtStart
           ? 100
           : Math.min(99, Math.round((completed / totalAtStart) * 100));
+      setRunCompleted(completed);
       setScorePct(pct);
       setScoreProgress(
         `${pct}% · ${completed.toLocaleString()}/${totalAtStart.toLocaleString()}${extra}`
       );
+    };
+
+    // Live results: refresh the grid only when a scoring chunk actually lands
+    // in the DB (server fires `progress` after each batch save). Debounced so
+    // back-to-back chunks collapse into one refetch, and silent — no skeleton.
+    const scheduleLiveRefresh = () => {
+      if (liveRefreshTimerRef.current) return;
+      liveRefreshTimerRef.current = setTimeout(() => {
+        liveRefreshTimerRef.current = null;
+        if (liveRefreshPendingRef.current) return;
+        liveRefreshPendingRef.current = true;
+        void Promise.all([
+          loadMatches({ silent: true }),
+          loadStats(""),
+        ]).finally(() => {
+          liveRefreshPendingRef.current = false;
+        });
+      }, 800);
+    };
+    const stopLiveRefresh = () => {
+      if (liveRefreshTimerRef.current) {
+        clearTimeout(liveRefreshTimerRef.current);
+        liveRefreshTimerRef.current = null;
+      }
+      liveRefreshPendingRef.current = false;
     };
 
     try {
@@ -422,16 +460,23 @@ export default function ScoreJobsPage() {
               continue;
             }
             if (ev.type === "progress") {
+              scheduleLiveRefresh();
               const delta = Number(ev.scoredDelta ?? 0);
-              waveScored += delta;
-              completed += delta;
-              bumpProgress();
+              if (delta > 0) {
+                waveScored += delta;
+                completed += delta;
+                bumpProgress();
+              }
             } else if (ev.type === "done") {
               waveDone = Boolean(ev.done);
               const reported = Number(ev.scored ?? waveScored);
               if (reported > waveScored) {
                 completed += reported - waveScored;
                 waveScored = reported;
+              }
+              const fc = Number(ev.failedCount ?? 0);
+              if (fc > 0) {
+                setScoreFailed((prev) => prev + fc);
               }
               bumpProgress(waveDone ? " · Done" : "");
               streamFinished = true;
@@ -455,7 +500,12 @@ export default function ScoreJobsPage() {
       }
       await Promise.all([loadMatches(), loadStats(""), refreshMe()]);
     } finally {
+      stopLiveRefresh();
       setScoring(false);
+      // Clear the progress UI so the next interaction starts clean
+      // (no stale "0%" or run counter from a finished run).
+      setScorePct(null);
+      setScoreProgress(null);
     }
   }
 
@@ -607,18 +657,42 @@ export default function ScoreJobsPage() {
 
               {(me.scoreCount != null || stats) && (
                 <span className="shrink-0 text-[11px] text-claude-muted">
-                  {me.scoreCount != null && (
+                  {scoring ? (
                     <span className="font-medium text-[#3d7a3d]">
-                      {me.scoreCount.toLocaleString()} scored
+                      {runCompleted.toLocaleString()} processed
+                      <span className="text-claude-border"> · </span>
+                      <span className="font-medium text-[#9a7b2d]">
+                        {Math.max(
+                          0,
+                          runTotalRef.current - runCompleted
+                        ).toLocaleString()}{" "}
+                        remaining
+                      </span>
+                      {scoreFailed > 0 && (
+                        <>
+                          <span className="text-claude-border"> · </span>
+                          <span className="font-medium text-[#a04040]">
+                            {scoreFailed.toLocaleString()} error
+                          </span>
+                        </>
+                      )}
                     </span>
-                  )}
-                  {me.scoreCount != null && stats && (
-                    <span className="text-claude-border"> · </span>
-                  )}
-                  {stats && (
-                    <span className="font-medium text-[#9a7b2d]">
-                      {pendingCount.toLocaleString()} left
-                    </span>
+                  ) : (
+                    <>
+                      {me.scoreCount != null && (
+                        <span className="font-medium text-[#3d7a3d]">
+                          {me.scoreCount.toLocaleString()} scored
+                        </span>
+                      )}
+                      {me.scoreCount != null && stats && (
+                        <span className="text-claude-border"> · </span>
+                      )}
+                      {stats && (
+                        <span className="font-medium text-[#9a7b2d]">
+                          {pendingCount.toLocaleString()} left
+                        </span>
+                      )}
+                    </>
                   )}
                 </span>
               )}
@@ -689,14 +763,14 @@ export default function ScoreJobsPage() {
                 onClick={() => runScoring(false)}
                 className="inline-flex h-7 items-center gap-1 rounded-md bg-claude-accent px-2 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-40"
               >
-                {scoring ? (
-                  <Loader2 size={11} className="animate-spin" />
+                {scoring && scorePct != null ? (
+                  `${scorePct}%`
                 ) : (
-                  <RefreshCw size={11} />
+                  <>
+                    <RefreshCw size={11} />
+                    {`Score${pendingCount ? ` ${pendingCount.toLocaleString()}` : ""}`}
+                  </>
                 )}
-                {scoring && scorePct != null
-                  ? `${scorePct}%`
-                  : `Score${pendingCount ? ` ${pendingCount.toLocaleString()}` : ""}`}
               </button>
 
               {scoring && scorePct != null && (
@@ -740,10 +814,19 @@ export default function ScoreJobsPage() {
         </div>
       }
     >
-      {(resumeError || scoreError || confirmLarge || (!me.resume && !resumeBusy)) && (
+      {(resumeError || scoreError || scoreFailed > 0 || confirmLarge || (!me.resume && !resumeBusy)) && (
         <div className="space-y-1 text-[11px]">
           {resumeError && <p className="text-[#a04040]">{resumeError}</p>}
           {scoreError && <p className="text-[#a04040]">{scoreError}</p>}
+          {!scoring && scoreFailed > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-[#eadfc2] bg-[#fbf6e9] px-2.5 py-1.5 text-[#6b5a2e]">
+              <span>
+                {scoreFailed.toLocaleString()} job{scoreFailed === 1 ? "" : "s"}{" "}
+                hit an error and couldn&apos;t be scored. The rest are done —
+                click Score again later to retry the failed ones.
+              </span>
+            </div>
+          )}
           {!me.resume && !resumeBusy && (
             <p className="text-claude-muted">Upload a resume to enable scoring.</p>
           )}
@@ -838,14 +921,18 @@ export default function ScoreJobsPage() {
         <div className="flex flex-col items-center justify-center rounded-lg border border-claude-border bg-white px-4 py-12 text-center shadow-sm">
           <Briefcase size={18} className="mb-2 text-claude-accent" />
           <p className="text-sm text-claude-text">
-            {minScore || search || companyFilter || locationFilter || remoteOnly
-              ? "No scores match these filters"
-              : "No scores yet"}
+            {scoring
+              ? "Scoring in progress…"
+              : minScore || search || companyFilter || locationFilter || remoteOnly
+                ? "No scores match these filters"
+                : "No scores yet"}
           </p>
           <p className="mt-0.5 text-[11px] text-claude-muted">
-            {minScore || search || companyFilter || locationFilter || remoteOnly
-              ? "Clear or loosen filters, or score more jobs."
-              : "Upload a resume and run Score to fill this page."}
+            {scoring
+              ? "Results appear here as they're scored — no need to wait for the full run."
+              : minScore || search || companyFilter || locationFilter || remoteOnly
+                ? "Clear or loosen filters, or score more jobs."
+                : "Upload a resume and run Score to fill this page."}
           </p>
         </div>
       ) : (

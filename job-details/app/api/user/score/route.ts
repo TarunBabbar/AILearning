@@ -5,11 +5,16 @@ import { resolveApiKey } from "@/lib/auth";
 import {
   jobsSearchWhere,
   parallelWaveCapacity,
+  rankJobsByResumeRelevance,
   scoreJobsParallel,
+  type ScoreJobInput,
 } from "@/lib/score-jobs";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+/** Floor for the first wave so a run always surfaces ≥ this many results quickly. */
+const MIN_FIRST_WAVE = 20;
 
 type ScoreBody = {
   scope?: string;
@@ -61,11 +66,13 @@ export async function POST(req: Request) {
       title: true,
       company: true,
       description: true,
+      jobDate: true,
+      createdAt: true,
     },
     orderBy: [{ jobDate: "desc" }, { createdAt: "desc" }],
   });
 
-  let candidates = allMatching;
+  let candidates: ScoreJobInput[] = allMatching;
   if (scope === "unscored") {
     const scoredIds = new Set(
       (
@@ -78,9 +85,15 @@ export async function POST(req: Request) {
     candidates = allMatching.filter((j) => !scoredIds.has(j.id));
   }
 
+  // No search filter → score the most resume-relevant jobs first so the
+  // first wave surfaces the highest-probability matches quickly.
+  if (!search) {
+    candidates = rankJobsByResumeRelevance(resume.content, candidates);
+  }
+
   const totalMatching = allMatching.length;
   const remainingBefore = candidates.length;
-  const capacity = await parallelWaveCapacity();
+  const capacity = Math.max(await parallelWaveCapacity(), MIN_FIRST_WAVE);
   const wave = candidates.slice(0, capacity);
 
   if (!wave.length) {
@@ -126,7 +139,8 @@ export async function POST(req: Request) {
               remaining: Math.max(0, remainingBefore - scoredInWave),
               totalMatching,
             });
-          }
+          },
+          scope === "all" ? "all" : "unscored"
         );
 
         const scoredCount = await prisma.jobScore.count({ where: { userId } });
@@ -134,6 +148,10 @@ export async function POST(req: Request) {
           scope === "unscored"
             ? Math.max(0, remainingBefore - result.scored)
             : Math.max(0, remainingBefore - wave.length);
+        const failedCount =
+          scope === "unscored"
+            ? Math.max(0, result.attempted - result.scored)
+            : 0;
 
         if (result.attempted > 0 && result.scored === 0) {
           send({
@@ -145,6 +163,7 @@ export async function POST(req: Request) {
             remaining: stillUnscored,
             totalMatching,
             scoredCount,
+            failedCount,
             done: false,
           });
           return;
@@ -157,8 +176,9 @@ export async function POST(req: Request) {
           remaining: stillUnscored,
           totalMatching,
           scoredCount,
+          failedCount,
           done: stillUnscored === 0,
-          message: `Wave complete: ${result.scored}/${result.attempted} jobs scored; ${stillUnscored} remaining.`,
+          message: `Wave complete: ${result.scored}/${result.attempted} jobs scored; ${stillUnscored} remaining${failedCount ? `; ${failedCount} failed — rerun to retry.` : ""}.`,
         });
       } catch (e) {
         console.error("[user/score]", e);

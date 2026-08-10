@@ -13,6 +13,10 @@ type CallOptions = {
   maxTokens?: number;
   temperature?: number;
   timeoutMs?: number;
+  /** Retry limit per call; defaults to MAX_RETRIES (6). */
+  maxRetries?: number;
+  /** Hard cap on retry backoff in ms; defaults to 120s. */
+  maxRetryDelayMs?: number;
 };
 
 export class OpenRouterError extends Error {
@@ -24,14 +28,14 @@ export class OpenRouterError extends Error {
   }
 }
 
-function retryDelayMs(attempt: number, status?: number): number {
+function retryDelayMs(attempt: number, status: number | undefined, maxDelayMs: number): number {
   // Rate limits need much longer waits (free shared pools).
   if (status === 429) {
-    // 20s, 40s, 80s, 120s…
-    return Math.min(120_000, 20_000 * Math.pow(2, attempt - 1));
+    // 20s, 40s, 80s, 120s… capped at maxDelayMs
+    return Math.min(maxDelayMs, 20_000 * Math.pow(2, attempt - 1));
   }
-  // 1.5s, 3s, 6s, 12s — exponential backoff
-  return BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+  // 1.5s, 3s, 6s, 12s — exponential backoff, capped at maxDelayMs
+  return Math.min(maxDelayMs, BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1));
 }
 
 function isRetryableStatus(status: number): boolean {
@@ -70,6 +74,8 @@ export async function callOpenRouter(
   const maxTokens = opts.maxTokens ?? 8192;
   const temperature = opts.temperature ?? 0.1;
   const timeoutMs = opts.timeoutMs ?? ABORT_TIMEOUT_MS;
+  const maxRetries = opts.maxRetries ?? MAX_RETRIES;
+  const maxRetryDelayMs = opts.maxRetryDelayMs ?? 120_000;
   const url = `${cfg.openrouterBaseUrl}/chat/completions`;
   const keyPreview = key.length > 14 ? `${key.slice(0, 11)}…${key.slice(-3)}` : "***";
   const referer = cfg.appUrl || "https://openrouter.ai";
@@ -79,7 +85,7 @@ export async function callOpenRouter(
   let lastError: Error | null = null;
   const startedAt = Date.now();
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const attemptStart = Date.now();
     try {
       const controller = new AbortController();
@@ -158,11 +164,11 @@ export async function callOpenRouter(
 
       if (!retryable) throw err;
 
-      if (attempt < MAX_RETRIES) {
-        const delay = retryDelayMs(attempt, status);
+      if (attempt < maxRetries) {
+        const delay = retryDelayMs(attempt, status, maxRetryDelayMs);
         log.warn(
           "llm",
-          `Attempt ${attempt}/${MAX_RETRIES} failed (${lastError.message}) — retrying in ${ms(delay)}`,
+          `Attempt ${attempt}/${maxRetries} failed (${lastError.message}) — retrying in ${ms(delay)}`,
           `elapsed ${ms(Date.now() - attemptStart)}`
         );
         await new Promise((r) => setTimeout(r, delay));
@@ -171,7 +177,7 @@ export async function callOpenRouter(
 
       log.error(
         "llm",
-        `All ${MAX_RETRIES} attempts failed after ${ms(Date.now() - startedAt)}`,
+        `All ${maxRetries} attempts failed after ${ms(Date.now() - startedAt)}`,
         lastError.message
       );
     }
