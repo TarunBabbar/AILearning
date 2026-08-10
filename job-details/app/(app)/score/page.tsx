@@ -535,6 +535,18 @@ export default function ScoreJobsPage() {
             </button>
           </div>
 
+          {authMode === "register" && (
+            <div className="mb-4 rounded-lg border border-[#eadfc2] bg-[#fbf6e9] p-3 text-xs leading-relaxed text-[#6b5a2e]">
+              <span className="font-semibold uppercase tracking-wide text-[#7a6120]">
+                Note
+              </span>
+              <p className="mt-1">
+                Use any email id and password to create an account — your
+                results are private to your account.
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleAuth} className="space-y-3">
             {authMode === "register" && (
               <input
