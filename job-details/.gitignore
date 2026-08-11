@@ -34,3 +34,7 @@ next-env.d.ts
 # sqlite artifacts (stray dev.db from ambient DATABASE_URL)
 *.db
 prisma/dev.db
+
+# debug scratch files
+_resolve_out.log
+scripts/_check_prod.sql

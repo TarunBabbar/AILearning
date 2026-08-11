@@ -26,6 +26,7 @@ export function getConfig() {
       process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
     llmModel: process.env.OPENROUTER_MODEL || "",
     llmModels: parseModels(process.env.LLM_MODELS_JSON),
+    chatbotModel: process.env.CHATBOT_MODEL || process.env.OPENROUTER_MODEL || "",
     maxPdfPages: Number.isFinite(maxPdfPages) && maxPdfPages > 0 ? maxPdfPages : 50,
     maxJobs: Number.isFinite(maxJobs) && maxJobs > 0 ? maxJobs : 200,
     maxFileSizeMb:

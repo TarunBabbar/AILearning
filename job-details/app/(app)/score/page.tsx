@@ -17,6 +17,7 @@ import { Skeleton, JobGridSkeleton } from "@/components/Skeleton";
 import JobCard from "@/components/JobCard";
 import JobFilters, { type JobFilterValue } from "@/components/JobFilters";
 import JobDetailModal from "@/components/JobDetailModal";
+import ChatWidget from "@/components/ChatWidget";
 import ListPagination from "@/components/ListPagination";
 import ShowingRange from "@/components/ShowingRange";
 import PageChrome from "@/components/PageChrome";
@@ -982,6 +983,9 @@ export default function ScoreJobsPage() {
           onClose={() => setSelected(null)}
         />
       )}
+
+      {/* Floating chat — only rendered for logged-in users (this branch) */}
+      <ChatWidget />
     </PageChrome>
   );
 }

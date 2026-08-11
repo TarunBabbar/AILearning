@@ -19,6 +19,12 @@ type CallOptions = {
   maxRetryDelayMs?: number;
 };
 
+/** A prior exchange in the conversation, for chat memory. */
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export class OpenRouterError extends Error {
   status: number;
   constructor(message: string, status = 500) {
@@ -52,7 +58,8 @@ export async function callOpenRouter(
   systemPrompt: string,
   apiKey: string,
   opts: CallOptions = {},
-  log: Logger = createLogger()
+  log: Logger = createLogger(),
+  history: ChatMessage[] = []
 ): Promise<string> {
   const cfg = getConfig();
   const key = apiKey || cfg.openrouterApiKey;
@@ -104,6 +111,7 @@ export async function callOpenRouter(
           model,
           messages: [
             { role: "system", content: systemPrompt },
+            ...history.map((h) => ({ role: h.role, content: h.content })),
             { role: "user", content: prompt },
           ],
           max_tokens: maxTokens,
