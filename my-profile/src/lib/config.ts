@@ -63,7 +63,7 @@ export function getConfig() {
     whatsappNumber: env("WHATSAPP_NUMBER") || "",
     whatsappPrefix: env("WHATSAPP_PREFIX") || "+91",
     // Bot persona
-    botName: env("BOT_NAME") || "Tarun Bot",
+    botName: env("BOT_NAME") || "Tarun's AI Assistant",
     profileOwner: env("PROFILE_OWNER") || "Tarun Kumar Babbar",
   };
 }

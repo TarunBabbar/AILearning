@@ -16,7 +16,7 @@ const stats = [
   { num: "8", label: "AI Platforms Built" },
   { num: "100%", label: "Automation Adoption" },
   { num: "~40%", label: "Prod Defect Reduction" },
-  { num: "10", label: "Projects Built" },
+  { num: "9", label: "Projects Built" },
 ];
 
 export default function Hero() {
@@ -36,7 +36,7 @@ export default function Hero() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="hidden md:block shrink-0"
             >
-              <div className="w-40 h-40 lg:w-52 lg:h-52 rounded-full overflow-hidden border-4 border-amber-200/60 shadow-xl shadow-amber-500/10">
+              <div className="w-44 h-44 lg:w-60 lg:h-60 rounded-full overflow-hidden border-4 border-amber-200/60 shadow-xl shadow-amber-500/10">
                 <img
                   src="/tarun-babbar.jpg"
                   alt="Tarun Kumar Babbar"
@@ -61,7 +61,7 @@ export default function Hero() {
 
             <motion.h1
               variants={fadeUp}
-              className="text-[clamp(2.5rem,7vw,4.5rem)] font-extrabold leading-[1.08] tracking-[-0.04em] mb-5"
+              className="text-[clamp(2.8rem,8vw,5.5rem)] font-extrabold leading-[1.05] tracking-[-0.04em] mb-5"
             >
               Tarun Kumar{" "}
               <span className="bg-gradient-to-r from-amber-600 to-amber-400 bg-clip-text text-transparent">

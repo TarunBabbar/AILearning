@@ -17,17 +17,16 @@ A stunning, Claude-themed portfolio website built with **Next.js 16**, **Tailwin
 
 - **Hero** — Name, title, photo, stats bar (18+ years, 6 AI platforms, 100% automation adoption, ~40% defect reduction, 3 enterprise frameworks)
 - **About** — Bio with highlights grid of core skills
-- **Projects** — 10 project cards with GitHub links and live demos:
+- **Projects** — 9 project cards with GitHub links and live demos:
   - QAE2E (Agentic Quality Engineering)
   - QA AI Dashboard
+  - QA Jobs Portal
   - QA Interview Preparation Kit
   - QA RAG Platform
-  - RAG Explorer
   - AI Test Architect (QA Copilot)
   - Resume Job RAG
   - 8-Layer Playwright Framework
   - Self-Healing Playwright Framework
-  - QA Multi-Agent Assistant
 - **Skills** — 6 category grids (Automation, AI/LLM, Vector DBs, Languages, CI/CD, Architecture)
 - **Career** — Timeline with 4 roles (Coupa, Varian, TCS, Infosys) with bullet-point achievements
 - **Education** — BE Computer Science, Modi Institute of Technology, Kota
@@ -52,7 +51,7 @@ npx next dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Tarun Bot (AI Chatbot)
+## Tarun's AI Assistant (Chatbot)
 
 A floating chat widget on the bottom-right of the page. Visitors can ask anything about Tarun — experience, projects, skills, education, contact — and the bot answers from the profile using **OpenRouter free models**.
 

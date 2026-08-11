@@ -19,7 +19,7 @@ const highlights = [
 
 export default function About() {
   return (
-    <section id="about" className="py-20 sm:py-28">
+    <section id="about" className="py-14 sm:py-16">
       <div className="max-w-5xl mx-auto px-6">
         <div className="grid md:grid-cols-2 gap-12 items-start">
           <motion.div

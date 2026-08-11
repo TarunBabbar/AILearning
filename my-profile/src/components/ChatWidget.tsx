@@ -17,7 +17,7 @@ type ApiResponse = {
 const WELCOME: ChatMsg = {
   role: "assistant",
   content:
-    "Hi! I'm **Tarun Bot** — Tarun's AI assistant. Ask me anything about his experience, projects, skills, or how to get in touch. If I can't answer, I'll ping Tarun on WhatsApp for you. 🤖",
+    "Hi! I'm **Tarun's AI Assistant** — here to help you learn about Tarun's experience, projects, skills, or how to get in touch. If I can't answer, I'll ping Tarun on WhatsApp for you. 🤖",
 };
 
 const quickReplies = [
@@ -100,7 +100,7 @@ export default function ChatWidget() {
                 🤖
               </div>
               <div className="flex-1">
-                <div className="text-sm font-bold leading-tight">Tarun Bot</div>
+                <div className="text-sm font-bold leading-tight">Tarun's AI Assistant</div>
                 <div className="text-[11px] text-white/80 leading-tight">
                   AI assistant · answers from the profile
                 </div>
@@ -170,11 +170,11 @@ export default function ChatWidget() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen((v) => !v)}
-        aria-label="Open Tarun Bot chat"
+        aria-label="Open Tarun's AI Assistant chat"
         className="flex items-center gap-2.5 px-4 py-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm shadow-xl shadow-amber-500/30 transition-colors"
       >
         <span className="text-lg">🤖</span>
-        {!open && <span>Tarun Bot</span>}
+        {!open && <span>Ask Tarun</span>}
       </motion.button>
     </div>
   );

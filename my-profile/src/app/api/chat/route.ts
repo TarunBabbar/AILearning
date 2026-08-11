@@ -30,7 +30,7 @@ function rateLimited(ip: string): boolean {
 function buildWaLink(summary: string): string {
   const cfg = getConfig();
   if (!cfg.whatsappNumber) return "";
-  const text = `Hello Tarun! A visitor on your profile asked: ${summary} — Tarun Bot`;
+  const text = `Hello Tarun! A visitor on your profile asked: ${summary} — Tarun's AI Assistant`;
   return `https://wa.me/${cfg.whatsappNumber}?text=${encodeURIComponent(text)}`;
 }
 
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ type: "answer", content, model, modelName });
   } catch (err) {
-    console.error("[TarunBot] All models failed:", err);
+    console.error("[TarunAIAssistant] All models failed:", err);
     // TEMP: expose failure detail for debugging
     return NextResponse.json(
       {

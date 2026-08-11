@@ -70,7 +70,7 @@ export async function chatCompletionWithFallback(
     } catch (err) {
       const reason = err instanceof Error ? err.message : "unknown error";
       failures.push(`${model.name} (${model.id}): ${reason}`);
-      console.error(`[TarunBot] Model "${model.id}" failed → ${reason}`);
+      console.error(`[TarunAIAssistant] Model "${model.id}" failed → ${reason}`);
     }
   }
 

@@ -28,7 +28,7 @@ export const profileKnowledge: ProfileKnowledge = {
     { num: "8", label: "AI Platforms Built" },
     { num: "100%", label: "Automation Adoption" },
     { num: "~40%", label: "Prod Defect Reduction" },
-    { num: "10", label: "Projects Built" },
+    { num: "9", label: "Projects Built" },
   ],
   highlights: [
     "Service & Product Org Leadership",
@@ -160,6 +160,13 @@ export const profileKnowledge: ProfileKnowledge = {
       demo: "https://qadashboard-lime.vercel.app",
     },
     {
+      title: "QA Jobs Portal",
+      desc: "Free daily India QA jobs portal. AI-extracted QA job listings from multiple sources — company, location, posted date, and eligibility — curated for QA engineers and refreshed every day.",
+      tech: ["Next.js 16", "PostgreSQL", "Prisma", "OpenRouter", "AI Extraction"],
+      repo: "https://github.com/TarunBabbar/AILearning/tree/main/job-details",
+      demo: "https://qajobs.vercel.app",
+    },
+    {
       title: "QA Interview Preparation Kit",
       desc: "RAG-powered interview prep: PDF/DOCX knowledge base indexed into Pinecone, streaming QA assistant with grounded citations, and topic-organized Q&A browser.",
       tech: ["Next.js 14", "OpenRouter", "Pinecone", "Tailwind"],
@@ -172,13 +179,6 @@ export const profileKnowledge: ProfileKnowledge = {
       tech: ["Next.js 14", "OpenRouter", "Pinecone", "Mammoth", "Tailwind"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform",
       demo: "https://qaragplatform.vercel.app",
-    },
-    {
-      title: "RAG Explorer",
-      desc: "Transparent 3-panel RAG pipeline visualizer. Ingest PDFs/DOCX, watch chunking → embedding → ChromaDB storage → vector search → LLM answer via SSE.",
-      tech: ["React", "Vite", "ChromaDB", "OpenRouter"],
-      repo: "https://github.com/TarunBabbar/chroma-react-rag-pipeline",
-      demo: "https://rag-explorer.vercel.app",
     },
     {
       title: "AI Test Architect (QA Copilot)",
@@ -206,13 +206,6 @@ export const profileKnowledge: ProfileKnowledge = {
       desc: "AI-powered self-healing test framework using GPT-4 to detect and fix broken locators automatically when UI changes.",
       tech: ["Playwright", "GPT-4", "OpenAI", "TypeScript"],
       repo: "https://github.com/TarunBabbar/SelfHealingPlaywrightFramework",
-      demo: null,
-    },
-    {
-      title: "QA Multi-Agent Assistant",
-      desc: "Multi-agent system orchestrating specialized AI agents for test case generation and automation code production from requirements.",
-      tech: ["TypeScript", "AI Agents", "OpenAI"],
-      repo: "https://github.com/TarunBabbar/QAMultiAgentAssistant",
       demo: null,
     },
   ],
@@ -270,7 +263,7 @@ ${k.stats.map((s) => `${s.label}: ${s.num}`).join(" | ")}`;
 }
 
 export function buildSystemPrompt(): string {
-  return `You are ${profileKnowledge.owner}'s AI assistant — "Tarun Bot" — embedded in his personal profile website.
+  return `You are ${profileKnowledge.owner}'s AI assistant — "Tarun's AI Assistant" — embedded in his personal profile website.
 
 A visitor is chatting with you to learn about ${profileKnowledge.owner}. Answer ONLY using the profile knowledge below. Never invent facts about him that are not present here.
 
