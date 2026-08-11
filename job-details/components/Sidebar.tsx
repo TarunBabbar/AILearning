@@ -3,16 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import useSWR from "swr";
 import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Info, Contact, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SESSION_KEY, swrFetcher } from "@/lib/swr-fetcher";
 
-const NAV_ITEMS = [
+const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "QA Jobs", icon: LayoutDashboard },
-  { href: "/contacts", label: "Recruiter Contacts", icon: Contact },
   { href: "/score", label: "Match by Resume", icon: Target },
 ];
 
+// Only shown to logged-in users — recruiter contact details are gated.
+const AUTH_NAV_ITEMS = [{ href: "/contacts", label: "Recruiter Contacts", icon: Contact }];
+
 const COLLAPSE_KEY = "jobdetails_sidebar_collapsed";
+
+type MeResponse = { user: { id: string } | null };
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -27,6 +33,18 @@ export default function Sidebar() {
       // ignore
     }
   }, []);
+
+  // Shared session key — updates instantly when login/logout happens anywhere
+  // (Score page calls mutate(SESSION_KEY) after auth changes).
+  const { data } = useSWR<MeResponse>(SESSION_KEY, swrFetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
+  const loggedIn = Boolean(data?.user);
+
+  const navItems = loggedIn
+    ? [...PUBLIC_NAV_ITEMS, ...AUTH_NAV_ITEMS]
+    : PUBLIC_NAV_ITEMS;
 
   const toggle = useCallback(() => {
     setCollapsed((c) => {
@@ -71,7 +89,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-3">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active =
             item.href === "/"
               ? pathname === "/"

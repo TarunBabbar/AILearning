@@ -23,5 +23,8 @@ export function isListCacheKey(key: unknown): boolean {
   return false;
 }
 
+/** Shared session key — sidebar + contacts page + score page all read/write it. */
+export const SESSION_KEY = "/api/user/me";
+
 export const CACHE_CONTROL_LIST =
   "public, s-maxage=60, stale-while-revalidate=300";

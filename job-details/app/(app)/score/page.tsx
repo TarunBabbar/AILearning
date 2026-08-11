@@ -21,6 +21,8 @@ import ChatWidget from "@/components/ChatWidget";
 import ListPagination from "@/components/ListPagination";
 import ShowingRange from "@/components/ShowingRange";
 import PageChrome from "@/components/PageChrome";
+import { mutate } from "swr";
+import { SESSION_KEY } from "@/lib/swr-fetcher";
 import type { JobLike, JobFiltersOptions } from "@/lib/types";
 
 type MeResponse = {
@@ -292,6 +294,9 @@ export default function ScoreJobsPage() {
       }
       const next = await refreshMe();
       if (next.user) {
+        // Update the shared session key so sidebar/contacts pages reflect
+        // the login immediately (no refresh needed).
+        await mutate(SESSION_KEY, next, { revalidate: false });
         await Promise.all([loadMatches(), loadStats("")]);
       }
     } finally {
@@ -301,6 +306,9 @@ export default function ScoreJobsPage() {
 
   async function handleLogout() {
     await fetch("/api/user/logout", { method: "POST" });
+    // Clear the shared session key so sidebar/contacts pages hide the
+    // Recruiter Contacts section immediately.
+    await mutate(SESSION_KEY, { user: null }, { revalidate: false });
     setMe({ user: null, resume: null });
     setMatches([]);
     setStats(null);

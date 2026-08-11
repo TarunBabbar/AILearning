@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
+import { getSessionUserId } from "@/lib/user-auth";
 import { groupJobsByCompany, dedupeJobs, getEmailDomain, isGenericDomain, titleCase } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
 import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
@@ -12,9 +13,17 @@ export const runtime = "nodejs";
  * Returns one entry per company with the email(s) people can reach at,
  * derived from the job listings (deduped, spam-free, non-generic domains).
  * The company name is the sanitized display name (email-derived).
+ *
+ * Requires a logged-in user session — recruiter contact details are only
+ * visible to users who sign in (e.g. via Match by Resume).
  */
 export async function GET(req: Request) {
   try {
+    const userId = await getSessionUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Login required." }, { status: 401 });
+    }
+
     const url = new URL(req.url);
     const search = url.searchParams.get("search")?.trim() || "";
 

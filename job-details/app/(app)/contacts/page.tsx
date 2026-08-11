@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Mail, Search, Copy, Check, X, Building2 } from "lucide-react";
+import Link from "next/link";
+import useSWR from "swr";
+import { Mail, Search, Copy, Check, X, Building2, LogIn } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 import ListPagination from "@/components/ListPagination";
 import ShowingRange from "@/components/ShowingRange";
 import PageChrome from "@/components/PageChrome";
 import { useListSWR } from "@/lib/use-list-swr";
+import { SESSION_KEY, swrFetcher } from "@/lib/swr-fetcher";
 
 const PAGE_SIZE = 40;
 
@@ -23,11 +26,21 @@ type Response = {
   contacts: Contact[];
 };
 
+type MeResponse = { user: { id: string } | null };
+
 export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+
+  // Shared session key — updates instantly when login/logout happens elsewhere.
+  const { data: me, isLoading: meLoading } = useSWR<MeResponse>(SESSION_KEY, swrFetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
+  const loggedIn = Boolean(me?.user);
+  const authChecked = !meLoading;
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -43,12 +56,13 @@ export default function ContactsPage() {
   }, [page]);
 
   const contactsKey = useMemo(() => {
+    if (!loggedIn) return null;
     const params = new URLSearchParams();
     if (debounced) params.set("search", debounced);
     params.set("page", String(page));
     params.set("pageSize", String(PAGE_SIZE));
     return `/api/contacts?${params.toString()}`;
-  }, [debounced, page]);
+  }, [debounced, page, loggedIn]);
 
   const { data, error: swrError, isLoading } = useListSWR<Response>(contactsKey);
   const loading = isLoading && !data;
@@ -70,6 +84,54 @@ export default function ContactsPage() {
 
   const pageCount = data?.pageCount ?? 1;
   const currentPage = data?.page ?? page;
+
+  // Recruiter contacts are only visible to signed-in users (e.g. via Match
+  // by Resume). Show a login prompt to everyone else.
+  if (!authChecked) {
+    return (
+      <PageChrome
+        header={
+          <h1 className="text-lg font-semibold tracking-tight text-claude-text">
+            Recruiter Contacts
+          </h1>
+        }
+      >
+        <TableSkeleton />
+      </PageChrome>
+    );
+  }
+
+  if (!loggedIn) {
+    return (
+      <PageChrome
+        header={
+          <h1 className="text-lg font-semibold tracking-tight text-claude-text">
+            Recruiter Contacts
+          </h1>
+        }
+      >
+        <div className="mx-auto flex max-w-md flex-col items-center rounded-xl border border-claude-border bg-white px-6 py-10 text-center shadow-sm">
+          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-claude-accent/10 text-claude-accent">
+            <LogIn size={18} />
+          </span>
+          <p className="text-sm font-medium text-claude-text">
+            Sign in to view recruiter contacts
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-claude-muted">
+            Recruiter contact details are available to logged-in users only.
+            Sign in or create an account to see company emails.
+          </p>
+          <Link
+            href="/score"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-claude-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            <LogIn size={14} />
+            Sign in / Create account
+          </Link>
+        </div>
+      </PageChrome>
+    );
+  }
 
   return (
     <PageChrome

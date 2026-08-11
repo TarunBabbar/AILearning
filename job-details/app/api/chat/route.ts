@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/user-auth";
 import { resolveApiKey } from "@/lib/auth";
-import { callOpenRouter, type ChatMessage } from "@/lib/openrouter";
+import { callOpenRouter, extractJsonObject, type ChatMessage } from "@/lib/openrouter";
 import { getConfig } from "@/lib/config";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { answerChatDataQuestion } from "@/lib/chat-data";
@@ -11,7 +11,6 @@ export const maxDuration = 60;
 
 type ChatBody = {
   message?: string;
-  kind?: "question" | "issue";
   /** Prior conversation turns (client keeps last 20) — gives the bot memory. */
   history?: { role: "user" | "assistant"; content: string }[];
 };
@@ -61,6 +60,74 @@ Each card shows: company avatar (initials, pastel color derived from company nam
 - If the user reports a problem or asks for a feature/improvement, gently tell them it will be passed to Tarun, and they can just describe it.
 - NEVER reveal internal details: API keys, environment variables, phone numbers, database internals, or configuration. Keep answers to 1-3 sentences when possible.`;
 
+const INTENT_SYSTEM_PROMPT = `You are the intent router for Tarun's job-search assistant. You receive a user message (plus recent conversation context) and decide ONE of two things:
+
+- "answer" — the user is asking a question about the site, jobs, how things work, or general knowledge. You can answer it yourself.
+- "forward" — the user is making a REQUEST or SUGGESTION for Tarun to act on: adding a feature, changing something on the site, reporting a problem/bug, or asking to include/list specific jobs. These must go to Tarun.
+
+Important: a short message like "yes, do it", "can you implement this", or "please add that" may REFER BACK to an earlier suggestion in the conversation. If the user is asking you to DO something (implement, add, fix, change) — even referencing a prior idea — that is "forward".
+
+Reply with ONLY valid JSON: {"intent":"answer"} or {"intent":"forward"}. No prose, no markdown fences.`;
+
+// Explicit "this is for Tarun" phrases — if present, always forward even if
+// the classifier model hiccups. These are unmistakable intent markers.
+const EXPLICIT_FORWARD_HINTS = [
+  "tell tarun",
+  "ask tarun",
+  "let tarun know",
+  "for tarun",
+  "message tarun",
+  "pass to tarun",
+  "tell him",
+  "ask him",
+  "can you implement",
+  "can u implement",
+  "can you add",
+  "can u add",
+  "please implement",
+  "please add",
+  "please include",
+  "please fix",
+  "implement this",
+  "add this",
+];
+
+/**
+ * Ask the LLM whether this message should be answered by the assistant or
+ * forwarded to Tarun (Telegram). Falls back to "answer" on any failure so the
+ * chat never breaks — but explicit "tell tarun" requests still get forwarded.
+ */
+async function classifyIntent(
+  message: string,
+  apiKey: string,
+  model: string,
+  history: ChatMessage[]
+): Promise<"answer" | "forward"> {
+  // 1. Explicit "for Tarun" phrases → always forward (no model needed).
+  const t = message.toLowerCase();
+  if (EXPLICIT_FORWARD_HINTS.some((h) => t.includes(h))) return "forward";
+
+  // 2. Otherwise ask the LLM. Uses the stronger main model (gemma-4-26b) —
+  //    the tiny free chatbot model returns empty responses on this JSON
+  //    task. maxTokens=60 with 2 retries so the JSON reliably comes back.
+  try {
+    const raw = await callOpenRouter(
+      message,
+      INTENT_SYSTEM_PROMPT,
+      apiKey,
+      { model, maxTokens: 60, temperature: 0, maxRetries: 2 },
+      undefined,
+      history
+    );
+    const parsed = extractJsonObject<{ intent?: string }>(raw);
+    if (parsed?.intent === "forward") return "forward";
+    return "answer";
+  } catch (e) {
+    console.error("[chat] intent classification failed:", e);
+    return "answer";
+  }
+}
+
 export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) {
@@ -69,7 +136,6 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as ChatBody;
   const message = (body.message || "").trim();
-  const kind = body.kind === "issue" ? "issue" : "question";
 
   if (!message) {
     return NextResponse.json({ error: "Message is required." }, { status: 400 });
@@ -89,18 +155,6 @@ export async function POST(req: Request) {
         .slice(-20)
     : [];
 
-  // Issue / suggestion → forward privately to the owner (Telegram).
-  if (kind === "issue") {
-    const who = user.name ? `${user.name} (${user.email})` : user.email;
-    const text = `🗣 <b>New message for Tarun</b>\n👤 From: ${who}\n💬 ${message}`;
-    const result = await sendTelegramMessage(text);
-    // Always report success to the user (don't leak that Telegram isn't configured).
-    if (!result.ok) {
-      console.error("[chat] forward failed:", result.error);
-    }
-    return NextResponse.json({ mode: "forwarded", ok: true });
-  }
-
   // Project question → answer with the OpenRouter model.
   const { apiKey } = resolveApiKey();
   const cfg = getConfig();
@@ -116,6 +170,33 @@ export async function POST(req: Request) {
   }
 
   try {
+    // 0. Ask the LLM to classify: is this a question we can answer, or a
+    //    suggestion/request that should be forwarded to Tarun? Uses the
+    //    stronger main model (gemma-4-26b) — the tiny free chatbot model
+    //    returns empty responses on this JSON task. The LLM understands
+    //    intent far better than keyword matching.
+    const intent = await classifyIntent(
+      message,
+      apiKey,
+      cfg.llmModel || cfg.chatbotModel || model,
+      history
+    );
+    if (intent === "forward") {
+      const name = user.name?.trim() || "—";
+      const time = new Date().toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const text = `🗣 <b>New message for Tarun</b>\n👤 <b>Name:</b> ${name}\n📧 <b>Email:</b> ${user.email}\n🕐 <b>Time:</b> ${time}\n💬 <b>Message:</b>\n${message}`;
+      const result = await sendTelegramMessage(text);
+      if (!result.ok) {
+        console.error("[chat] forward failed:", result.error);
+      }
+      return NextResponse.json({ mode: "forwarded", ok: true });
+    }
+
     // 1. Data questions about the user's own jobs (counts, scores, top
     //    matches, companies, locations) → answered with real queries.
     const dataAnswer = await answerChatDataQuestion(user.id, message);

@@ -19,30 +19,6 @@ const GREETING =
   "Hi! 👋 I'm Tarun's assistant. Need help with the site or how job parsing works? " +
   "If you're facing an issue or have an idea for improvement, tell me and I'll pass it to Tarun.";
 
-// If the user's message reads like an issue/suggestion, forward it to Tarun.
-// Otherwise answer from the project knowledge (OpenRouter).
-const ISSUE_KEYWORDS = [
-  "issue",
-  "problem",
-  "not working",
-  "broken",
-  "bug",
-  "improvement",
-  "feature",
-  "suggestion",
-  "please fix",
-  "please add",
-  "can you add",
-  "would be nice",
-  "idea",
-  "error",
-];
-
-function looksLikeIssue(text: string): boolean {
-  const t = text.toLowerCase();
-  return ISSUE_KEYWORDS.some((k) => t.includes(k));
-}
-
 function nextId(): string {
   return Math.random().toString(36).slice(2);
 }
@@ -82,7 +58,7 @@ export default function ChatWidget() {
     setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
     setBusy(true);
 
-    const kind = looksLikeIssue(text) ? "issue" : "question";
+    // Intent (answer vs forward-to-Tarun) is decided server-side by the LLM.
     historyRef.current.push({ role: "user", content: text });
     const history = historyRef.current.slice(-HISTORY_LIMIT);
 
@@ -90,7 +66,7 @@ export default function ChatWidget() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, kind, history }),
+        body: JSON.stringify({ message: text, history }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         mode?: string;
