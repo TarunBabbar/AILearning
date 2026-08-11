@@ -111,8 +111,8 @@ export async function GET(req: Request) {
           : sort === "newest"
             ? [
                 { job: { jobDate: order } },
-                { job: { createdAt: order } },
                 { score: "desc" },
+                { job: { createdAt: "desc" } },
               ]
             : [{ score: order }, { scoredAt: "desc" }];
 
