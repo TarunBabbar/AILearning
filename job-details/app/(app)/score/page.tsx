@@ -51,6 +51,7 @@ type AuthMode = "login" | "register";
 const MATCH_PAGE_SIZE = 40;
 
 const SCORE_SORT_OPTIONS = [
+  { value: "newest", label: "Newest first" },
   { value: "score", label: "Best score" },
   { value: "company", label: "Company A–Z" },
   { value: "location", label: "Location A–Z" },
@@ -105,7 +106,9 @@ export default function ScoreJobsPage() {
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<"score" | "company" | "location">("score");
+  const [sortBy, setSortBy] = useState<"newest" | "score" | "company" | "location">(
+    "newest"
+  );
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<MatchRow | null>(null);
   const [filterOptions, setFilterOptions] = useState<JobFiltersOptions>({
@@ -127,7 +130,7 @@ export default function ScoreJobsPage() {
       company?: string;
       location?: string;
       remote?: boolean;
-      sort?: "score" | "company" | "location";
+      sort?: "newest" | "score" | "company" | "location";
       order?: "asc" | "desc";
       page?: number;
       /** Background refresh — don't flip the loading skeleton. */
@@ -232,9 +235,14 @@ export default function ScoreJobsPage() {
 
   const handleFilters = useCallback(
     (next: JobFilterValue) => {
-      const sort: "score" | "company" | "location" =
-        next.sort === "company" || next.sort === "location" ? next.sort : "score";
-      const order: "asc" | "desc" = sort === "score" ? "desc" : "asc";
+      const sort: "newest" | "score" | "company" | "location" =
+        next.sort === "company" || next.sort === "location"
+          ? next.sort
+          : next.sort === "newest"
+            ? "newest"
+            : "score";
+      const order: "asc" | "desc" =
+        sort === "company" || sort === "location" ? "asc" : "desc";
       setSearch(next.search);
       setCompanyFilter(next.company);
       setLocationFilter(next.location);

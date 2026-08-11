@@ -26,8 +26,8 @@ const REMOTE_LOCATION_PATTERNS = [
  *   company=
  *   location=
  *   remote=1  (location looks like remote / WFH / hybrid / home)
- *   sort=score|company|location  (default score)
- *   order=asc|desc              (default desc for score, asc for text)
+ *   sort=score|company|location|newest  (default newest)
+ *   order=asc|desc              (default desc for score/date, asc for text)
  *   page=1
  *   pageSize=40
  */
@@ -49,14 +49,19 @@ export async function GET(req: Request) {
     const remoteOnly =
       url.searchParams.get("remote") === "1" ||
       url.searchParams.get("remote") === "true";
-    const sortRaw = (url.searchParams.get("sort") || "score").toLowerCase();
-    const sort =
-      sortRaw === "company" || sortRaw === "location" ? sortRaw : "score";
+    const sortRaw = (url.searchParams.get("sort") || "newest").toLowerCase();
+    const sort: "score" | "company" | "location" | "newest" =
+      sortRaw === "score" ||
+      sortRaw === "company" ||
+      sortRaw === "location" ||
+      sortRaw === "newest"
+        ? sortRaw
+        : "newest";
     const orderRaw = (url.searchParams.get("order") || "").toLowerCase();
     const order: "asc" | "desc" =
       orderRaw === "asc" || orderRaw === "desc"
         ? orderRaw
-        : sort === "score"
+        : sort === "newest" || sort === "score"
           ? "desc"
           : "asc";
 
@@ -103,7 +108,9 @@ export async function GET(req: Request) {
         ? [{ job: { company: order } }, { score: "desc" }]
         : sort === "location"
           ? [{ job: { location: order } }, { score: "desc" }]
-          : [{ score: order }, { scoredAt: "desc" }];
+          : sort === "newest"
+            ? [{ job: { jobDate: order } }, { job: { createdAt: order } }]
+            : [{ score: order }, { scoredAt: "desc" }];
 
     const total = await prisma.jobScore.count({ where });
     const pageCount = Math.max(1, Math.ceil(total / pageSize));
