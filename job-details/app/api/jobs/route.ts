@@ -3,9 +3,9 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { isAdminRequest } from "@/lib/admin-auth";
 import {
-  GENERIC_DOMAINS,
   dedupeJobs,
   companyFilterWhere,
+  nonGenericEmailWhere,
 } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
 import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
@@ -14,20 +14,6 @@ const DEFAULT_PAGE_SIZE = 40;
 const MAX_PAGE_SIZE = 100;
 const OVERFETCH = 15;
 const PREVIEW_CHARS = 200;
-
-/** Exclude personal/free email domains in SQL (same set as isGenericDomain). */
-function nonGenericEmailWhere(): Prisma.JobWhereInput {
-  const notGeneric = [...GENERIC_DOMAINS].map((d) => ({
-    NOT: { email: { endsWith: `@${d}`, mode: "insensitive" as const } },
-  }));
-  return {
-    AND: [
-      { email: { not: null } },
-      { NOT: { email: { equals: "" } } },
-      ...notGeneric,
-    ],
-  };
-}
 
 function truncatePreview(text: string | null): string | null {
   if (!text) return null;

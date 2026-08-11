@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/user-auth";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
-import { groupJobsByCompany } from "@/lib/company";
+import { groupJobsByCompany, nonGenericEmailWhere } from "@/lib/company";
 
 export const runtime = "nodejs";
 
@@ -25,7 +25,10 @@ export async function GET() {
     }
 
     const rows = await prisma.jobScore.findMany({
-      where: { userId },
+      where: {
+        userId,
+        job: nonGenericEmailWhere(),
+      },
       select: {
         job: {
           select: {

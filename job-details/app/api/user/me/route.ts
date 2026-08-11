@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/user-auth";
 import { prisma } from "@/lib/db";
+import { nonGenericEmailWhere } from "@/lib/company";
 
 export const runtime = "nodejs";
 
@@ -12,8 +13,13 @@ export async function GET() {
       return NextResponse.json({ user: null });
     }
 
+    // Count only scores for jobs in the QA Jobs universe (recruiter emails),
+    // so "X scored" matches the dashboard's job count.
     const scoreCount = await prisma.jobScore.count({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        job: nonGenericEmailWhere(),
+      },
     });
 
     return NextResponse.json({

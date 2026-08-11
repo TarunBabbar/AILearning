@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/user-auth";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
-import { companyFilterWhere } from "@/lib/company";
+import { companyFilterWhere, nonGenericEmailWhere } from "@/lib/company";
 import type { Prisma } from "@prisma-generated/client";
 
 export const runtime = "nodejs";
@@ -93,7 +93,9 @@ export async function GET(req: Request) {
     const where: Prisma.JobScoreWhereInput = {
       userId,
       score: { gte: minScore },
-      ...(jobAnd.length ? { job: { AND: jobAnd } } : {}),
+      job: {
+        AND: [nonGenericEmailWhere(), ...jobAnd],
+      },
     };
 
     const orderBy: Prisma.JobScoreOrderByWithRelationInput[] =

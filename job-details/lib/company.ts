@@ -31,6 +31,24 @@ export function isGenericDomain(domain: string | null): boolean {
   return false;
 }
 
+/**
+ * Prisma where that selects only jobs with a non-generic (recruiter) email.
+ * This is the QA Jobs dashboard's job universe; the resume-scoring pipeline
+ * must use the same filter so counts match across pages.
+ */
+export function nonGenericEmailWhere(): Prisma.JobWhereInput {
+  const notGeneric = [...GENERIC_DOMAINS].map((d) => ({
+    NOT: { email: { endsWith: `@${d}`, mode: "insensitive" as const } },
+  }));
+  return {
+    AND: [
+      { email: { not: null } },
+      { NOT: { email: { equals: "" } } },
+      ...notGeneric,
+    ],
+  };
+}
+
 export type CompanyInfo = {
   domain: string;
   company: string;

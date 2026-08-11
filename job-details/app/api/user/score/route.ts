@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/user-auth";
 import { resolveApiKey } from "@/lib/auth";
+import { nonGenericEmailWhere } from "@/lib/company";
 import {
   jobsSearchWhere,
   parallelWaveCapacity,
@@ -97,7 +98,9 @@ export async function POST(req: Request) {
   const wave = candidates.slice(0, capacity);
 
   if (!wave.length) {
-    const scoredCount = await prisma.jobScore.count({ where: { userId } });
+    const scoredCount = await prisma.jobScore.count({
+      where: { userId, job: nonGenericEmailWhere() },
+    });
     return NextResponse.json({
       type: "done",
       scored: 0,
@@ -143,7 +146,9 @@ export async function POST(req: Request) {
           scope === "all" ? "all" : "unscored"
         );
 
-        const scoredCount = await prisma.jobScore.count({ where: { userId } });
+        const scoredCount = await prisma.jobScore.count({
+          where: { userId, job: nonGenericEmailWhere() },
+        });
         const stillUnscored =
           scope === "unscored"
             ? Math.max(0, remainingBefore - result.scored)
@@ -220,7 +225,7 @@ export async function GET(req: Request) {
     const [totalMatching, scoredRows, capacity] = await Promise.all([
       prisma.job.count({ where }),
       prisma.jobScore.findMany({
-        where: { userId },
+        where: { userId, job: nonGenericEmailWhere() },
         select: { jobId: true },
       }),
       parallelWaveCapacity(),

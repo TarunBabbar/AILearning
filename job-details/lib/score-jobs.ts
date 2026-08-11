@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { listFreeOpenRouterModelIds } from "@/lib/free-models";
 import { getConfig } from "@/lib/config";
 import { createLogger } from "@/lib/logger";
+import { nonGenericEmailWhere } from "@/lib/company";
 import type { Prisma } from "@prisma-generated/client";
 
 /** Jobs per LLM request. */
@@ -318,19 +319,23 @@ export async function parallelWaveCapacity(): Promise<number> {
   }
 }
 
-/** Build Prisma where for shared jobs + optional search. */
+/** Build Prisma where for shared jobs + optional search.
+ * Always scoped to the QA Jobs universe (recruiter emails only) so the
+ * Match by Resume counts match the dashboard's job count. */
 export function jobsSearchWhere(search: string): Prisma.JobWhereInput {
   const q = search.trim();
-  if (!q) return {};
-  return {
-    OR: [
-      { title: { contains: q, mode: "insensitive" } },
-      { company: { contains: q, mode: "insensitive" } },
-      { location: { contains: q, mode: "insensitive" } },
-      { experience: { contains: q, mode: "insensitive" } },
-      { email: { contains: q, mode: "insensitive" } },
-    ],
-  };
+  const searchWhere: Prisma.JobWhereInput = q
+    ? {
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { company: { contains: q, mode: "insensitive" } },
+          { location: { contains: q, mode: "insensitive" } },
+          { experience: { contains: q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
+        ],
+      }
+    : {};
+  return { AND: [searchWhere, nonGenericEmailWhere()] };
 }
 
 const RESUME_STOPWORDS = new Set(
