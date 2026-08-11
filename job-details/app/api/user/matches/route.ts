@@ -109,7 +109,11 @@ export async function GET(req: Request) {
         : sort === "location"
           ? [{ job: { location: order } }, { score: "desc" }]
           : sort === "newest"
-            ? [{ job: { jobDate: order } }, { job: { createdAt: order } }]
+            ? [
+                { job: { jobDate: order } },
+                { job: { createdAt: order } },
+                { score: "desc" },
+              ]
             : [{ score: order }, { scoredAt: "desc" }];
 
     const total = await prisma.jobScore.count({ where });
