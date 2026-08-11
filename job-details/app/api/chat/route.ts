@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/user-auth";
 import { resolveApiKey } from "@/lib/auth";
-import { callOpenRouter, extractJsonObject, type ChatMessage } from "@/lib/openrouter";
+import { callOpenRouter, type ChatMessage } from "@/lib/openrouter";
 import { getConfig } from "@/lib/config";
 import { sendTelegramMessage } from "@/lib/telegram";
-import { answerChatDataQuestion } from "@/lib/chat-data";
+import { buildUserContext } from "@/lib/chat-data";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type ChatBody = {
   message?: string;
+  /** "question" (AI answers) | "message" (force forward to Tarun) | undefined (classify). */
+  mode?: "question" | "message";
   /** Prior conversation turns (client keeps last 20) — gives the bot memory. */
   history?: { role: "user" | "assistant"; content: string }[];
+  /** User context snapshot (project + user data), cached client-side. When
+   *  present, the server skips the per-message DB query for faster answers. */
+  context?: string;
 };
 
 const CHAT_SYSTEM_PROMPT = `You are Tarun's assistant for "Job Details" (QA Tracker) — a job-search web app built for QA engineers and testers. You help users with the site, how it works, and where things are. Answer concisely, warmly, like a helpful colleague. When unsure, be honest and suggest the most likely place.
@@ -60,74 +65,6 @@ Each card shows: company avatar (initials, pastel color derived from company nam
 - If the user reports a problem or asks for a feature/improvement, gently tell them it will be passed to Tarun, and they can just describe it.
 - NEVER reveal internal details: API keys, environment variables, phone numbers, database internals, or configuration. Keep answers to 1-3 sentences when possible.`;
 
-const INTENT_SYSTEM_PROMPT = `You are the intent router for Tarun's job-search assistant. You receive a user message (plus recent conversation context) and decide ONE of two things:
-
-- "answer" — the user is asking a question about the site, jobs, how things work, or general knowledge. You can answer it yourself.
-- "forward" — the user is making a REQUEST or SUGGESTION for Tarun to act on: adding a feature, changing something on the site, reporting a problem/bug, or asking to include/list specific jobs. These must go to Tarun.
-
-Important: a short message like "yes, do it", "can you implement this", or "please add that" may REFER BACK to an earlier suggestion in the conversation. If the user is asking you to DO something (implement, add, fix, change) — even referencing a prior idea — that is "forward".
-
-Reply with ONLY valid JSON: {"intent":"answer"} or {"intent":"forward"}. No prose, no markdown fences.`;
-
-// Explicit "this is for Tarun" phrases — if present, always forward even if
-// the classifier model hiccups. These are unmistakable intent markers.
-const EXPLICIT_FORWARD_HINTS = [
-  "tell tarun",
-  "ask tarun",
-  "let tarun know",
-  "for tarun",
-  "message tarun",
-  "pass to tarun",
-  "tell him",
-  "ask him",
-  "can you implement",
-  "can u implement",
-  "can you add",
-  "can u add",
-  "please implement",
-  "please add",
-  "please include",
-  "please fix",
-  "implement this",
-  "add this",
-];
-
-/**
- * Ask the LLM whether this message should be answered by the assistant or
- * forwarded to Tarun (Telegram). Falls back to "answer" on any failure so the
- * chat never breaks — but explicit "tell tarun" requests still get forwarded.
- */
-async function classifyIntent(
-  message: string,
-  apiKey: string,
-  model: string,
-  history: ChatMessage[]
-): Promise<"answer" | "forward"> {
-  // 1. Explicit "for Tarun" phrases → always forward (no model needed).
-  const t = message.toLowerCase();
-  if (EXPLICIT_FORWARD_HINTS.some((h) => t.includes(h))) return "forward";
-
-  // 2. Otherwise ask the LLM. Uses the stronger main model (gemma-4-26b) —
-  //    the tiny free chatbot model returns empty responses on this JSON
-  //    task. maxTokens=60 with 2 retries so the JSON reliably comes back.
-  try {
-    const raw = await callOpenRouter(
-      message,
-      INTENT_SYSTEM_PROMPT,
-      apiKey,
-      { model, maxTokens: 60, temperature: 0, maxRetries: 2 },
-      undefined,
-      history
-    );
-    const parsed = extractJsonObject<{ intent?: string }>(raw);
-    if (parsed?.intent === "forward") return "forward";
-    return "answer";
-  } catch (e) {
-    console.error("[chat] intent classification failed:", e);
-    return "answer";
-  }
-}
-
 export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) {
@@ -136,6 +73,7 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as ChatBody;
   const message = (body.message || "").trim();
+  const explicitMode = body.mode === "message" ? "message" : "question";
 
   if (!message) {
     return NextResponse.json({ error: "Message is required." }, { status: 400 });
@@ -170,18 +108,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 0. Ask the LLM to classify: is this a question we can answer, or a
-    //    suggestion/request that should be forwarded to Tarun? Uses the
-    //    stronger main model (gemma-4-26b) — the tiny free chatbot model
-    //    returns empty responses on this JSON task. The LLM understands
-    //    intent far better than keyword matching.
-    const intent = await classifyIntent(
-      message,
-      apiKey,
-      cfg.llmModel || cfg.chatbotModel || model,
-      history
-    );
-    if (intent === "forward") {
+    // Mode strictly controls the flow:
+    //   "message" → forward to Tarun (no classifier).
+    //   "question" → the LLM ALWAYS answers. Never forward — the user chose
+    //                to ask the AI, so it must reply with its own answer.
+    if (explicitMode === "message") {
       const name = user.name?.trim() || "—";
       const time = new Date().toLocaleString("en-IN", {
         day: "2-digit",
@@ -189,7 +120,16 @@ export async function POST(req: Request) {
         hour: "2-digit",
         minute: "2-digit",
       });
-      const text = `🗣 <b>New message for Tarun</b>\n👤 <b>Name:</b> ${name}\n📧 <b>Email:</b> ${user.email}\n🕐 <b>Time:</b> ${time}\n💬 <b>Message:</b>\n${message}`;
+
+      // Include the conversation history so Tarun sees the full context,
+      // not just the final message.
+      const historyText = history.length
+        ? `\n\n🗨 <b>Conversation so far:</b>\n${history
+            .map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`)
+            .join("\n")}`
+        : "";
+
+      const text = `🗣 <b>New message for Tarun</b>\n👤 <b>Name:</b> ${name}\n📧 <b>Email:</b> ${user.email}\n🕐 <b>Time:</b> ${time}\n💬 <b>Message:</b>\n${message}${historyText}`;
       const result = await sendTelegramMessage(text);
       if (!result.ok) {
         console.error("[chat] forward failed:", result.error);
@@ -197,30 +137,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ mode: "forwarded", ok: true });
     }
 
-    // 1. Data questions about the user's own jobs (counts, scores, top
-    //    matches, companies, locations) → answered with real queries.
-    const dataAnswer = await answerChatDataQuestion(user.id, message);
-    if (dataAnswer) {
-      const itemsText = dataAnswer.items?.length
-        ? `\n\nSupporting details:\n${dataAnswer.items
-            .map(
-              (i, n) =>
-                `${n + 1}. ${i.title}${i.company ? ` — ${i.company}` : ""}${
-                  i.score != null ? ` (${i.score}%)` : ""
-                }`
-            )
-            .join("\n")}`
-        : "";
-      return NextResponse.json({
-        mode: "answer",
-        answer: `${dataAnswer.answer}${itemsText}`,
-      });
-    }
+    // 1. Use the client-cached user context when available (fast — no
+    //    per-message DB query). Fall back to building it server-side.
+    //    Injected into the LLM's prompt so it answers all questions from
+    //    real data + project knowledge — no regex routing.
+    const userContext = body.context?.trim()
+      ? body.context
+      : await buildUserContext(user.id);
+    const systemPrompt = `${CHAT_SYSTEM_PROMPT}
 
-    // 2. Otherwise → answer from project knowledge (OpenRouter).
+# The user's current job data (real, from their account)
+${userContext}
+
+Use this data when the user asks about their own jobs, scores, companies, or locations. If they ask about something not covered here, answer from the site knowledge above. Never invent numbers.`;
+
     const answer = await callOpenRouter(
       message,
-      CHAT_SYSTEM_PROMPT,
+      systemPrompt,
       apiKey,
       { model, maxTokens: 512, temperature: 0.4, maxRetries: 2 },
       undefined,
