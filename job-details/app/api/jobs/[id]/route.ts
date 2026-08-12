@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
+import { isAdminRequest } from "@/lib/admin-auth";
 
 /**
  * GET /api/jobs/[id] — single job with company info.
@@ -26,13 +27,19 @@ export async function GET(
 }
 
 /**
- * DELETE /api/jobs/[id] — remove a single job.
+ * DELETE /api/jobs/[id] — remove a single job. Admin only.
  */
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await isAdminRequest())) {
+      return NextResponse.json(
+        { error: "Admin access required." },
+        { status: 403 }
+      );
+    }
     const { id } = await params;
     await prisma.job.delete({ where: { id } });
     return NextResponse.json({ message: "Job deleted." });

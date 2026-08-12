@@ -6,11 +6,13 @@ export const USER_COOKIE = "jobdetails_user";
 const SESSION_DAYS = 14;
 
 function sessionSecret(): string {
+  // No hardcoded fallback — if this is empty, session signing is disabled
+  // so tokens can never be forged with a known default.
   return (
     process.env.USER_SESSION_SECRET ||
     process.env.ADMIN_PASSWORD ||
     process.env.OPENROUTER_API_KEY ||
-    "jobdetails-dev-secret"
+    ""
   );
 }
 
@@ -47,6 +49,7 @@ export function signUserToken(userId: string): string {
 /** Returns userId if token is valid, else null. */
 export function verifyUserToken(token: string | undefined): string | null {
   if (!token) return null;
+  if (!sessionSecret()) return null; // signing disabled — no valid sessions
   const parts = token.split(".");
   if (parts.length !== 2) return null;
   const payload = Buffer.from(parts[0], "base64url").toString("utf8");

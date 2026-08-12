@@ -6,6 +6,7 @@ import {
   verifyPassword,
 } from "@/lib/user-auth";
 import { logUserAction, logUserActionError } from "@/lib/action-log";
+import { rateLimited, clientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,14 @@ export const runtime = "nodejs";
  */
 export async function POST(req: Request) {
   try {
+    const ip = clientIp(req);
+    if (rateLimited(`login:${ip}`, 10, 15 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as { email?: string; password?: string };
     const email = (body.email || "").trim().toLowerCase();
     const password = body.password || "";

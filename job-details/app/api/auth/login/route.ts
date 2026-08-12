@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { checkAdminCredentials, signAdminToken, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { rateLimited, clientIp } from "@/lib/rate-limit";
 
 /**
  * POST /api/auth/login
@@ -9,6 +10,14 @@ import { checkAdminCredentials, signAdminToken, ADMIN_COOKIE } from "@/lib/admin
  */
 export async function POST(req: Request) {
   try {
+    const ip = clientIp(req);
+    if (rateLimited(`admin-login:${ip}`, 5, 15 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const { username, password } = (await req.json()) as {
       username?: string;
       password?: string;

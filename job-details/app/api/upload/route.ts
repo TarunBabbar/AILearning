@@ -101,6 +101,13 @@ export async function POST(req: Request) {
           controller.close();
           return;
         }
+        // Server-side cap so a malicious client can't push a giant payload
+        // through the LLM extraction pipeline (~5MB of text).
+        if (text.length > 5_000_000) {
+          send({ type: "error", message: "Uploaded text is too large (max 5MB)." });
+          controller.close();
+          return;
+        }
 
         const { apiKey, source } = resolveApiKey();
         if (!apiKey) {

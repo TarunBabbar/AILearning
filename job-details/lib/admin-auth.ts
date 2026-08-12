@@ -8,6 +8,10 @@ function hmac(value: string): string {
   return createHmac("sha256", secret).update(value).digest("hex");
 }
 
+function hmacSecretConfigured(): boolean {
+  return Boolean(process.env.ADMIN_PASSWORD || process.env.OPENROUTER_API_KEY);
+}
+
 function safeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
@@ -38,6 +42,7 @@ export function signAdminToken(username: string): string {
  */
 export function verifyAdminToken(token: string | undefined): boolean {
   if (!token) return false;
+  if (!hmacSecretConfigured()) return false; // no secret → no valid sessions
   const parts = token.split(".");
   if (parts.length !== 2) return false;
   const payload = Buffer.from(parts[0], "base64url").toString("utf8");

@@ -6,6 +6,7 @@ import {
   userCookieOptions,
 } from "@/lib/user-auth";
 import { logUserAction } from "@/lib/action-log";
+import { rateLimited, clientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,14 @@ export const runtime = "nodejs";
  */
 export async function POST(req: Request) {
   try {
+    const ip = clientIp(req);
+    if (rateLimited(`register:${ip}`, 5, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "Too many accounts created from this address. Try later." },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as {
       email?: string;
       password?: string;

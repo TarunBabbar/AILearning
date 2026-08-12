@@ -6,6 +6,7 @@ import { getConfig } from "@/lib/config";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { buildUserContext } from "@/lib/chat-data";
 import { logUserAction, logUserActionError } from "@/lib/action-log";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -70,6 +71,13 @@ export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Login required." }, { status: 401 });
+  }
+
+  if (rateLimited(`chat:${user.id}`, 30, 60 * 1000)) {
+    return NextResponse.json(
+      { error: "Too many messages. Please wait a moment." },
+      { status: 429 }
+    );
   }
 
   const body = (await req.json().catch(() => ({}))) as ChatBody;
