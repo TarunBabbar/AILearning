@@ -5,6 +5,7 @@ import { callOpenRouter, type ChatMessage } from "@/lib/openrouter";
 import { getConfig } from "@/lib/config";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { buildUserContext } from "@/lib/chat-data";
+import { logUserAction, logUserActionError } from "@/lib/action-log";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -132,7 +133,18 @@ export async function POST(req: Request) {
       const text = `🗣 <b>New message for Tarun</b>\n👤 <b>Name:</b> ${name}\n📧 <b>Email:</b> ${user.email}\n🕐 <b>Time:</b> ${time}\n💬 <b>Message:</b>\n${message}${historyText}`;
       const result = await sendTelegramMessage(text);
       if (!result.ok) {
+        logUserActionError(
+          user,
+          "chat.message",
+          `forward to Telegram failed: ${result.error}`
+        );
         console.error("[chat] forward failed:", result.error);
+      } else {
+        logUserAction(
+          user,
+          "chat.message",
+          `forwarded to Telegram: "${message.slice(0, 80)}"`
+        );
       }
       return NextResponse.json({ mode: "forwarded", ok: true });
     }
@@ -159,9 +171,15 @@ Use this data when the user asks about their own jobs, scores, companies, or loc
       undefined,
       history
     );
+    logUserAction(
+      user,
+      "chat.question",
+      `"${message.slice(0, 80)}" → ${answer.length} char reply`
+    );
     return NextResponse.json({ mode: "answer", answer });
   } catch (e) {
     console.error("[chat] openrouter failed:", e);
+    logUserActionError(user, "chat.question", `LLM call failed: ${e instanceof Error ? e.message : String(e)}`);
     return NextResponse.json({
       mode: "answer",
       answer:

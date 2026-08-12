@@ -5,6 +5,7 @@ import {
   signUserToken,
   userCookieOptions,
 } from "@/lib/user-auth";
+import { logUserAction } from "@/lib/action-log";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,12 @@ export async function POST(req: Request) {
       },
       select: { id: true, email: true, name: true },
     });
+
+    logUserAction(
+      { id: user.id, email: user.email, name: user.name },
+      "register",
+      "new account created"
+    );
 
     const token = signUserToken(user.id);
     const res = NextResponse.json({

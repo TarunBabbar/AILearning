@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/user-auth";
+import { getUserForLog, logUserAction } from "@/lib/action-log";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
 import { companyFilterWhere, nonGenericEmailWhere } from "@/lib/company";
 import type { Prisma } from "@prisma-generated/client";
@@ -148,6 +149,13 @@ export async function GET(req: Request) {
         },
       };
     });
+
+    const user = await getUserForLog(userId);
+    logUserAction(
+      user,
+      "matches.view",
+      `search="${search}" company="${company}" location="${location}" remote=${remoteOnly} sort=${sort}${order} page=${safePage}`
+    );
 
     return NextResponse.json(
       {

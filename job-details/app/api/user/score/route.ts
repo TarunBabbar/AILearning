@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/user-auth";
+import { getUserForLog, logUserAction } from "@/lib/action-log";
 import { resolveApiKey } from "@/lib/auth";
 import { nonGenericEmailWhere } from "@/lib/company";
 import {
@@ -96,6 +97,13 @@ export async function POST(req: Request) {
   const remainingBefore = candidates.length;
   const capacity = Math.max(await parallelWaveCapacity(), MIN_FIRST_WAVE);
   const wave = candidates.slice(0, capacity);
+
+  const user = await getUserForLog(userId);
+  logUserAction(
+    user,
+    "score.run",
+    `scope=${scope}${search ? ` search="${search}"` : ""} → ${wave.length} jobs this wave (${totalMatching} matching, ${remainingBefore} remaining)`
+  );
 
   if (!wave.length) {
     const scoredCount = await prisma.jobScore.count({

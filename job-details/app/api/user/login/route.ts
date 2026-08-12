@@ -5,6 +5,7 @@ import {
   userCookieOptions,
   verifyPassword,
 } from "@/lib/user-auth";
+import { logUserAction, logUserActionError } from "@/lib/action-log";
 
 export const runtime = "nodejs";
 
@@ -27,11 +28,18 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !verifyPassword(password, user.passwordHash)) {
+      logUserActionError(null, "login", `failed login attempt for ${email}`);
       return NextResponse.json(
         { error: "Invalid email or password." },
         { status: 401 }
       );
     }
+
+    logUserAction(
+      { id: user.id, email: user.email, name: user.name },
+      "login",
+      "success"
+    );
 
     const token = signUserToken(user.id);
     const res = NextResponse.json({

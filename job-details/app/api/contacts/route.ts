@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma-generated/client";
 import { getSessionUserId } from "@/lib/user-auth";
+import { getUserForLog, logUserAction } from "@/lib/action-log";
 import { groupJobsByCompany, dedupeJobs, getEmailDomain, isGenericDomain, titleCase } from "@/lib/company";
 import { sanitizeJobForDisplay } from "@/lib/sanitize";
 import { CACHE_CONTROL_LIST } from "@/lib/swr-fetcher";
@@ -95,6 +96,13 @@ export async function GET(req: Request) {
       Math.max(1, Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1)
     );
     const contacts = contactsAll.slice((page - 1) * pageSize, page * pageSize);
+
+    const user = await getUserForLog(userId);
+    logUserAction(
+      user,
+      "contacts.view",
+      `search="${search}" page=${page} → ${contactsAll.length} companies / ${totalEmails} emails`
+    );
 
     return NextResponse.json(
       {
