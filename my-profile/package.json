@@ -9,21 +9,25 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "dotenv": "^17.4.2",
-    "framer-motion": "^12.43.0",
-    "next": "16.2.12",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-markdown": "^10.1.0"
+    "@alloc/quick-lru": "5.2.0",
+    "@tailwindcss/node": "4.3.3",
+    "@tailwindcss/postcss": "4.3.3",
+    "@vercel/analytics": "2.0.1",
+    "dotenv": "17.4.2",
+    "framer-motion": "13.1.0",
+    "next": "16.3.0",
+    "postcss": "8.5.25",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-markdown": "10.1.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.3",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9.39.5",
-    "eslint-config-next": "16.2.12",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "eslint": "10.8.1",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2"
   }
 }

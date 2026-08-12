@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import ChatWidget from "@/components/ChatWidget";
 
@@ -36,6 +37,7 @@ export default function RootLayout({
         <header className="sr-only"><h1>Tarun Kumar Babbar — AI QA Architect</h1></header>
         {children}
         <ChatWidget />
+        <Analytics />
       </body>
     </html>
   );
