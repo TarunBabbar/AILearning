@@ -38,7 +38,7 @@ export default function Header() {
           href="#"
           className="text-sm font-bold tracking-tight text-text hover:text-amber-600 transition-colors"
         >
-          Tarun<span className="text-amber-600"> Babbar</span>
+          Tarun<span className="text-amber-600"> Kumar Babbar</span>
         </a>
 
         {/* Desktop nav */}

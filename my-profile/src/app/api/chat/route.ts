@@ -35,7 +35,10 @@ function buildWaLink(summary: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { messages?: { role: string; content: string }[] };
+  let body: {
+    messages?: { role: string; content: string }[];
+    mode?: "question" | "message";
+  };
   try {
     body = await req.json();
   } catch {
@@ -58,6 +61,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // "message" mode → forward straight to WhatsApp (user explicitly chose to
+  // message Tarun). "question" mode → the LLM ALWAYS answers; never forward.
+  const explicitMode = body.mode === "message" ? "message" : "question";
+
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (rateLimited(ip)) {
     return NextResponse.json(
@@ -79,6 +86,8 @@ export async function POST(req: NextRequest) {
         type: "error",
         content: "Sorry, I'm unable to chat right now. Please try again later, or message Tarun directly on WhatsApp.",
         waLink: buildWaLink(userMessage.slice(0, 300)),
+        botName: cfg.botName,
+        profileOwner: cfg.profileOwner,
       },
       { status: 200 }
     );
@@ -86,7 +95,12 @@ export async function POST(req: NextRequest) {
 
   if (cfg.freeModels.length === 0) {
     return NextResponse.json(
-      { type: "error", content: "Sorry, I'm unable to chat right now. Please try again later." },
+      {
+        type: "error",
+        content: "Sorry, I'm unable to chat right now. Please try again later.",
+        botName: cfg.botName,
+        profileOwner: cfg.profileOwner,
+      },
       { status: 500 }
     );
   }
@@ -95,6 +109,18 @@ export async function POST(req: NextRequest) {
     { role: "system", content: buildSystemPrompt() },
     ...trimmed,
   ];
+
+  // "message" mode → the user explicitly chose to message Tarun. Forward
+  // directly to WhatsApp — no LLM call, no marker detection.
+  if (explicitMode === "message") {
+    const summary = userMessage.slice(0, 600);
+    return NextResponse.json({
+      type: "forward",
+      content: `Thanks! Your message has been prepared for Tarun. Tap below to send it to him on WhatsApp — he'll get back to you.`,
+      waLink: buildWaLink(summary),
+      summary,
+    });
+  }
 
   try {
     const { content, model, modelName } = await chatCompletionWithFallback(llmMessages, cfg.freeModels);

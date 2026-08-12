@@ -14,24 +14,20 @@ type ApiResponse = {
   summary?: string;
 };
 
+type ChatMode = "question" | "message" | null;
+
 const WELCOME: ChatMsg = {
   role: "assistant",
   content:
     "Hi! I'm **Tarun's AI Assistant** — here to help you learn about Tarun's experience, projects, skills, or how to get in touch. If I can't answer, I'll ping Tarun on WhatsApp for you. 🤖",
 };
 
-const quickReplies = [
-  "What is Tarun's experience?",
-  "Tell me about his projects",
-  "What are his skills?",
-  "How can I contact him?",
-];
-
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<ChatMode>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,11 +44,16 @@ export default function ChatWidget() {
     setInput("");
     setLoading(true);
 
+    const currentMode = mode ?? "question";
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...history, { role: "user", content: trimmed }] }),
+        body: JSON.stringify({
+          messages: [...history, { role: "user", content: trimmed }],
+          mode: currentMode,
+        }),
       });
       const data: ApiResponse = await res.json();
 
@@ -100,11 +101,38 @@ export default function ChatWidget() {
                 🤖
               </div>
               <div className="flex-1">
-                <div className="text-sm font-bold leading-tight">Tarun's AI Assistant</div>
+                <div className="text-sm font-bold leading-tight">Tarun Kumar Babbar</div>
                 <div className="text-[11px] text-white/80 leading-tight">
                   AI assistant · answers from the profile
                 </div>
               </div>
+
+              {/* Mode switch — flip between Ask / Message Tarun */}
+              {mode !== null && (
+                <div className="flex items-center rounded-lg bg-white/20 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setMode("question")}
+                    title="Ask the AI a question"
+                    className={`rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                      mode === "question" ? "bg-white text-amber-700" : "text-white/80 hover:text-white"
+                    }`}
+                  >
+                    Ask
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("message")}
+                    title="Send a message to Tarun"
+                    className={`rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                      mode === "message" ? "bg-white text-amber-700" : "text-white/80 hover:text-white"
+                    }`}
+                  >
+                    Message
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close chat"
@@ -114,53 +142,96 @@ export default function ChatWidget() {
               </button>
             </div>
 
-            {/* Messages */}
-            <div ref={scrollRef} className="h-80 overflow-y-auto px-4 py-4 space-y-3 bg-cream/60">
-              {messages.map((m, i) => (
-                <MessageBubble key={i} msg={m} />
-              ))}
-              {loading && <TypingBubble />}
-            </div>
+            {/* Welcome screen — pick a mode before chatting */}
+            {mode === null ? (
+              <div className="h-80 overflow-y-auto px-4 py-4 bg-cream/60">
+                <div className="mb-1 text-sm font-semibold text-text">
+                  Hi! 👋 What would you like to do?
+                </div>
+                <p className="mb-3 text-xs leading-relaxed text-text-secondary">
+                  Ask a question and I&apos;ll answer from Tarun&apos;s profile.
+                  Or send a message directly to Tarun — he&apos;ll get back to you
+                  on WhatsApp.
+                </p>
 
-            {/* Quick replies */}
-            {!loading && (
-              <div className="flex flex-wrap gap-1.5 px-4 pb-2 bg-cream/60">
-                {quickReplies.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => send(q)}
-                    className="text-[11px] px-2.5 py-1 rounded-full bg-white border border-border text-text-secondary hover:border-amber-400 hover:text-amber-700 transition-colors"
-                  >
-                    {q}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => setMode("question")}
+                  className="mb-2 w-full flex items-start gap-2.5 rounded-xl border border-border bg-white px-3 py-2.5 text-left transition-colors hover:border-amber-400 hover:bg-amber-50"
+                >
+                  <span className="mt-0.5 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 text-sm">
+                    💬
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-semibold text-text">
+                      Ask a question
+                    </span>
+                    <span className="block text-[11px] text-text-secondary">
+                      About Tarun&apos;s experience, projects, skills, or how to get in touch.
+                    </span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMode("message")}
+                  className="w-full flex items-start gap-2.5 rounded-xl border border-border bg-white px-3 py-2.5 text-left transition-colors hover:border-amber-400 hover:bg-amber-50"
+                >
+                  <span className="mt-0.5 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 text-sm">
+                    ✉️
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-semibold text-text">
+                      Send a message to Tarun
+                    </span>
+                    <span className="block text-[11px] text-text-secondary">
+                      A message, question, or hello — goes straight to his WhatsApp.
+                    </span>
+                  </span>
+                </button>
+
+                <div className="mt-3 rounded-xl bg-white border border-border px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
+                  {WELCOME.content.replace(/\*\*/g, "")}
+                </div>
               </div>
-            )}
+            ) : (
+              <>
+                {/* Messages */}
+                <div ref={scrollRef} className="h-80 overflow-y-auto px-4 py-4 space-y-3 bg-cream/60">
+                  {messages.map((m, i) => (
+                    <MessageBubble key={i} msg={m} />
+                  ))}
+                  {loading && <TypingBubble />}
+                </div>
 
-            {/* Input */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                send(input);
-              }}
-              className="flex items-center gap-2 px-3 py-3 border-t border-border bg-surface"
-            >
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about Tarun…"
-                disabled={loading}
-                className="flex-1 text-sm px-3 py-2 rounded-lg bg-cream border border-border outline-none focus:border-amber-400 disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={loading || !input.trim()}
-                aria-label="Send"
-                className="w-9 h-9 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
-              >
-                ↑
-              </button>
-            </form>
+                {/* Input */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    send(input);
+                  }}
+                  className="flex items-center gap-2 px-3 py-3 border-t border-border bg-surface"
+                >
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={
+                      mode === "message" ? "Message for Tarun…" : "Ask about Tarun…"
+                    }
+                    disabled={loading}
+                    className="flex-1 text-sm px-3 py-2 rounded-lg bg-cream border border-border outline-none focus:border-amber-400 disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !input.trim()}
+                    aria-label="Send"
+                    className="w-9 h-9 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
+                  >
+                    ↑
+                  </button>
+                </form>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -174,7 +245,7 @@ export default function ChatWidget() {
         className="flex items-center gap-2.5 px-4 py-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm shadow-xl shadow-amber-500/30 transition-colors"
       >
         <span className="text-lg">🤖</span>
-        {!open && <span>Ask Tarun</span>}
+        {!open && <span>Have a question?</span>}
       </motion.button>
     </div>
   );

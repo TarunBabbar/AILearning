@@ -7,31 +7,37 @@ const categories = [
     title: "🛠 Automation & Testing",
     top: ["Selenium WebDriver", "Playwright", "SpecFlow / BDD"],
     rest: ["Cypress", "Appium", "REST Assured", "Postman", "TestNG / JUnit", "Pytest", "Performance (k6, JMeter)"],
+    highlight: ["REST Assured", "Postman", "Pytest", "Performance (k6, JMeter)"],
   },
   {
     title: "🤖 AI & LLM",
     top: ["RAG Pipelines", "Multi-Agent Orchestration", "LangGraph", "MCP Protocol"],
     rest: ["LLM Evaluation", "Prompt Engineering", "LLM-as-Judge", "Self-Healing Tests", "AI Observability"],
+    highlight: ["Prompt Engineering"],
   },
   {
     title: "🗄 Vector DBs & Data",
     top: ["ChromaDB", "Pinecone"],
     rest: ["pgvector", "PostgreSQL", "SQLite", "Neon", "ETL Testing"],
+    highlight: ["Neon"],
   },
   {
     title: "🔧 Languages",
     top: ["C# .NET", "TypeScript", "Python"],
     rest: ["JavaScript", "Java", "SQL"],
+    highlight: ["JavaScript", "SQL"],
   },
   {
     title: "⚡ CI/CD & DevOps",
     top: ["Azure DevOps", "GitHub Actions"],
     rest: ["Jenkins", "Docker", "Kubernetes", "Git"],
+    highlight: ["Jenkins", "Docker", "Git"],
   },
   {
     title: "🏗 Frameworks & Architecture",
     top: ["Page Object Model", "SOLID Principles"],
     rest: ["Abstract Factory", "Microservices", "Next.js", "FastAPI", "Express"],
+    highlight: ["Abstract Factory"],
   },
 ];
 
@@ -77,14 +83,28 @@ export default function Skills() {
                     {s}
                   </span>
                 ))}
-                {cat.rest.map((s) => (
-                  <span
-                    key={s}
-                    className="px-2.5 py-1 text-xs font-medium bg-white border border-border text-text-secondary rounded-md hover:border-amber-400 hover:text-amber-700 transition-colors"
-                  >
-                    {s}
-                  </span>
-                ))}
+                {/* Highlighted skills first, then the rest */}
+                {[...cat.rest]
+                  .sort((a, b) => {
+                    const ha = cat.highlight?.includes(a) ? 0 : 1;
+                    const hb = cat.highlight?.includes(b) ? 0 : 1;
+                    return ha - hb;
+                  })
+                  .map((s) => {
+                    const highlighted = cat.highlight?.includes(s);
+                    return (
+                      <span
+                        key={s}
+                        className={
+                          highlighted
+                            ? "px-2.5 py-1 text-xs font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-700 rounded-md"
+                            : "px-2.5 py-1 text-xs font-medium bg-white border border-border text-text-secondary rounded-md hover:border-amber-400 hover:text-amber-700 transition-colors"
+                        }
+                      >
+                        {s}
+                      </span>
+                    );
+                  })}
               </div>
             </motion.div>
           ))}
