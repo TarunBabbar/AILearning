@@ -13,7 +13,9 @@ export async function extractPdfText(
 ): Promise<string> {
   const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
 
-  GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.worker.min.mjs`;
+  // Self-hosted worker (served from /public) — no external CDN dependency,
+  // works with the site's CSP, and avoids CDN availability issues.
+  GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
   const arrayBuffer = await file.arrayBuffer();
   const task = getDocument({ data: arrayBuffer });
