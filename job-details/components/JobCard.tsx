@@ -72,8 +72,12 @@ export function MetaChip({
   text,
 }: {
   icon: React.ReactNode;
-  text: string;
+  text: string | null | undefined;
 }) {
+  // Never render a literal "null"/"undefined" — hide the chip instead.
+  if (!text || text === "null" || text === "undefined" || text === "N/A") {
+    return null;
+  }
   return (
     <span className="flex max-w-full items-center gap-0.5 rounded bg-claude-bg px-1.5 py-0.5 text-[10px] text-claude-muted">
       <span className="shrink-0 text-claude-accent/70">{icon}</span>
