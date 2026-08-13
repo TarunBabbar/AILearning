@@ -38,7 +38,10 @@ export function proxy(_req: NextRequest) {
       ].join("; ")
     : [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-eval' https://*.vercel.live https://va.vercel-scripts.com",
+        // Next.js 16 emits inline flight-data scripts without nonces, so
+        // 'unsafe-inline' is required for scripts to hydrate. object-src /
+        // frame-ancestors / base-uri / form-action still locked down.
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.vercel.live https://va.vercel-scripts.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com data:",
         "img-src 'self' data: blob: https:",
