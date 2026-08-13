@@ -34,6 +34,7 @@ export async function GET(req: Request) {
   const company = url.searchParams.get("company")?.trim() || "";
   const location = url.searchParams.get("location")?.trim() || "";
   const sort = url.searchParams.get("sort")?.trim() || "newest";
+  const todayOnly = url.searchParams.get("today") === "1";
   const pageRaw = parseInt(url.searchParams.get("page") || "1", 10);
   const sizeRaw = parseInt(
     url.searchParams.get("pageSize") || String(DEFAULT_PAGE_SIZE),
@@ -66,6 +67,11 @@ export async function GET(req: Request) {
     if (location) {
       filters.push({ location: { equals: location, mode: "insensitive" } });
     }
+    if (todayOnly) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      filters.push({ createdAt: { gte: startOfToday } });
+    }
 
     const where: Prisma.JobWhereInput = { AND: filters };
 
@@ -77,8 +83,10 @@ export async function GET(req: Request) {
           : [{ jobDate: "desc" }, { createdAt: "desc" }];
 
     const skip = (page - 1) * pageSize;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
-    const [candidates, total, companyGroups, sourceGroups] = await Promise.all([
+    const [candidates, total, companyGroups, sourceGroups, todayCount] = await Promise.all([
       prisma.job.findMany({
         where,
         orderBy,
@@ -111,6 +119,7 @@ export async function GET(req: Request) {
         where,
         _count: true,
       }),
+      prisma.job.count({ where: { createdAt: { gte: startOfToday } } }),
     ]);
 
     const sanitized = candidates.map((j) =>
@@ -138,6 +147,7 @@ export async function GET(req: Request) {
         counts: {},
         companyCount,
         sourceCount,
+        todayCount,
         filters: { search, status, company, location, sort },
       },
       {
@@ -155,6 +165,7 @@ export async function GET(req: Request) {
       pageSize,
       pageCount: 0,
       counts: {},
+      todayCount: 0,
       filters: { search, status, company, location, sort },
       dbError: true,
     });

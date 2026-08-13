@@ -42,6 +42,19 @@ export function formatShortDate(iso: string | null | undefined): string {
   });
 }
 
+/** True if the job was added to the board today (by createdAt). */
+export function isNewToday(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 export function scoreColor(score: number): string {
   if (score >= 60) return "text-[#3d7a3d]";
   if (score >= 30) return "text-[#9a7b2d]";
@@ -101,9 +114,16 @@ export default function JobCard({
             {initials(job.company)}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 min-h-[36px] text-[13px] font-semibold leading-snug text-claude-text">
-              {job.title}
-            </h3>
+            <div className="flex items-start gap-1.5">
+              <h3 className="line-clamp-2 min-h-[36px] flex-1 text-[13px] font-semibold leading-snug text-claude-text">
+                {job.title}
+              </h3>
+              {isNewToday(job.createdAt) && (
+                <span className="mt-0.5 shrink-0 rounded bg-claude-accent px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                  New
+                </span>
+              )}
+            </div>
             <div className="mt-0.5 flex items-center gap-1 text-xs text-claude-muted">
               <Building2 size={11} className="shrink-0 text-claude-accent/70" />
               <span className="truncate font-medium text-claude-text/80">

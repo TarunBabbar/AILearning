@@ -109,6 +109,7 @@ export default function ScoreJobsPage() {
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [todayOnly, setTodayOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "score" | "company" | "location">(
     "newest"
   );
@@ -133,6 +134,7 @@ export default function ScoreJobsPage() {
       company?: string;
       location?: string;
       remote?: boolean;
+      today?: boolean;
       sort?: "newest" | "score" | "company" | "location";
       order?: "asc" | "desc";
       page?: number;
@@ -147,6 +149,7 @@ export default function ScoreJobsPage() {
         const company = overrides?.company ?? companyFilter;
         const location = overrides?.location ?? locationFilter;
         const remote = overrides?.remote ?? remoteOnly;
+        const today = overrides?.today ?? todayOnly;
         const sort = overrides?.sort ?? sortBy;
         const order = overrides?.order ?? sortOrder;
         const pageNo = overrides?.page ?? page;
@@ -156,6 +159,7 @@ export default function ScoreJobsPage() {
         if (company.trim()) params.set("company", company.trim());
         if (location.trim()) params.set("location", location.trim());
         if (remote) params.set("remote", "1");
+        if (today) params.set("today", "1");
         params.set("sort", sort);
         params.set("order", order);
         params.set("page", String(pageNo));
@@ -190,6 +194,7 @@ export default function ScoreJobsPage() {
       companyFilter,
       locationFilter,
       remoteOnly,
+      todayOnly,
       sortBy,
       sortOrder,
       page,
@@ -251,11 +256,13 @@ export default function ScoreJobsPage() {
       setLocationFilter(next.location);
       setSortBy(sort);
       setSortOrder(order);
+      setTodayOnly(next.today === true);
       setPage(1);
       loadMatches({
         search: next.search,
         company: next.company,
         location: next.location,
+        today: next.today === true,
         sort,
         order,
         page: 1,
@@ -270,6 +277,7 @@ export default function ScoreJobsPage() {
     location: locationFilter,
     sort: sortBy,
     order: sortOrder,
+    today: todayOnly,
   };
 
   async function handleAuth(e: React.FormEvent) {

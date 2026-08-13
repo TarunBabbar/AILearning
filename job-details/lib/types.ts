@@ -38,6 +38,7 @@ export type JobLike = {
   experience: string | null;
   description: string | null;
   jobDate: string | null;
+  createdAt?: string | null;
 };
 
 export type JobsResponse = {
@@ -49,6 +50,7 @@ export type JobsResponse = {
   counts: Record<string, number>;
   companyCount?: number;
   sourceCount?: number;
+  todayCount?: number;
   filters: { search: string; status: string; company: string; sort: string };
   dbError?: boolean;
 };

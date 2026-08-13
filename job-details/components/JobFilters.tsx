@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, ArrowUpDown, Building2, MapPin, RotateCcw } from "lucide-react";
+import { Search, X, ArrowUpDown, Building2, MapPin, RotateCcw, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type FilterOption = {
@@ -15,6 +15,7 @@ export type JobFilterValue = {
   location: string;
   sort: string;
   order?: "asc" | "desc";
+  today?: boolean;
 };
 
 const DEFAULT_SORT_OPTIONS = [
@@ -57,14 +58,16 @@ export default function JobFilters({
     value.search.trim() !== "" ||
     value.company !== "" ||
     value.location !== "" ||
+    value.today === true ||
     value.sort !== sortOptions[0]?.value;
 
   const activeCount = useMemo(
     () =>
       (value.search.trim() ? 1 : 0) +
       (value.company ? 1 : 0) +
-      (value.location ? 1 : 0),
-    [value.search, value.company, value.location]
+      (value.location ? 1 : 0) +
+      (value.today ? 1 : 0),
+    [value.search, value.company, value.location, value.today]
   );
 
   const handleSearch = (next: string) => {
@@ -84,6 +87,7 @@ export default function JobFilters({
       location: "",
       sort: sortOptions[0]?.value ?? "newest",
       order: undefined,
+      today: false,
     });
     onReset?.();
   };
@@ -170,6 +174,22 @@ export default function JobFilters({
           className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
         />
       </div>
+
+      {/* Today's Jobs toggle */}
+      <button
+        type="button"
+        onClick={() => onChange({ ...value, today: !value.today })}
+        className={cn(
+          "inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-sm font-medium transition-colors",
+          value.today
+            ? "border-claude-accent bg-claude-accent text-white"
+            : "border-claude-border bg-white text-claude-muted hover:bg-claude-accent/5 hover:text-claude-accent"
+        )}
+        title="Show only jobs added today"
+      >
+        <Sparkles size={12} />
+        Today&apos;s Jobs
+      </button>
 
       {/* Sort */}
       <div className="relative shrink-0">

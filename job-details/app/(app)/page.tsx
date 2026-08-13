@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [company, setCompany] = useState("");
   const [location, setLocation] = useState("");
   const [sort, setSort] = useState("newest");
+  const [today, setToday] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -41,7 +42,7 @@ export default function Dashboard() {
   // Any filter / sort change → back to page 1
   useEffect(() => {
     setPage(1);
-  }, [search, company, location, sort]);
+  }, [search, company, location, sort, today]);
 
   // New page → scroll list back to top
   useEffect(() => {
@@ -54,10 +55,11 @@ export default function Dashboard() {
     if (company) params.set("company", company);
     if (location) params.set("location", location);
     if (sort) params.set("sort", sort);
+    if (today) params.set("today", "1");
     params.set("page", String(page));
     params.set("pageSize", String(PAGE_SIZE));
     return `/api/jobs?${params.toString()}`;
-  }, [search, company, location, sort, page]);
+  }, [search, company, location, sort, today, page]);
 
   const { data, error: swrError, isLoading } = useListSWR<JobsResponse>(jobsKey);
   const loading = isLoading && !data;
@@ -95,13 +97,14 @@ export default function Dashboard() {
 
   const pageCount = data?.pageCount ?? 1;
 
-  const filterValue: JobFilterValue = { search, company, location, sort };
+  const filterValue: JobFilterValue = { search, company, location, sort, today };
 
   const handleFilters = useCallback((next: JobFilterValue) => {
     setSearch(next.search);
     setCompany(next.company);
     setLocation(next.location);
     setSort(next.sort);
+    setToday(next.today === true);
   }, []);
 
   const openJob = useCallback(async (job: Job) => {
@@ -141,6 +144,12 @@ export default function Dashboard() {
                 <FileText size={12} />
                 {stats.sources.toLocaleString()} sources
               </span>
+              {data?.todayCount != null && data.todayCount > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-semibold text-claude-accent">
+                  <Sparkles size={12} />
+                  {data.todayCount.toLocaleString()} new today
+                </span>
+              )}
             </div>
           </div>
 

@@ -50,6 +50,7 @@ export async function GET(req: Request) {
     const remoteOnly =
       url.searchParams.get("remote") === "1" ||
       url.searchParams.get("remote") === "true";
+    const todayOnly = url.searchParams.get("today") === "1";
     const sortRaw = (url.searchParams.get("sort") || "newest").toLowerCase();
     const sort: "score" | "company" | "location" | "newest" =
       sortRaw === "score" ||
@@ -94,6 +95,11 @@ export async function GET(req: Request) {
           location: { contains: p, mode: "insensitive" as const },
         })),
       });
+    }
+    if (todayOnly) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      jobAnd.push({ createdAt: { gte: startOfToday } });
     }
 
     const where: Prisma.JobScoreWhereInput = {
@@ -146,6 +152,7 @@ export async function GET(req: Request) {
           email: job.email,
           description: job.description,
           jobDate: job.jobDate,
+          createdAt: job.createdAt,
         },
       };
     });
