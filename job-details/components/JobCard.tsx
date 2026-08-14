@@ -123,8 +123,8 @@ export default function JobCard({
                 {job.title}
               </h3>
               {isNewToday(job.createdAt) && (
-                <span className="mt-0.5 shrink-0 rounded bg-claude-accent px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                  New
+                <span className="mt-0.5 shrink-0 animate-pulse rounded-full bg-gradient-to-r from-claude-accent to-[#5a8fd6] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm">
+                  ✦ New
                 </span>
               )}
             </div>
