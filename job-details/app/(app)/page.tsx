@@ -147,7 +147,7 @@ export default function Dashboard() {
               {data?.todayCount != null && data.todayCount > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-semibold text-claude-accent">
                   <Sparkles size={12} />
-                  {data.todayCount.toLocaleString()} new today
+                  {data.todayCount.toLocaleString()} new jobs today
                 </span>
               )}
             </div>
