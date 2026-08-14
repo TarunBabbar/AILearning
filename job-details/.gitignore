@@ -38,3 +38,4 @@ prisma/dev.db
 # debug scratch files
 _resolve_out.log
 scripts/_check_prod.sql
+scripts/_tmp_*

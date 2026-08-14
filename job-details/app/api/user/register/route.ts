@@ -7,6 +7,7 @@ import {
 } from "@/lib/user-auth";
 import { logUserAction } from "@/lib/action-log";
 import { rateLimited, clientIp } from "@/lib/rate-limit";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
 
@@ -71,6 +72,24 @@ export async function POST(req: Request) {
       "register",
       "new account created"
     );
+
+    // Fire-and-forget welcome email — never block registration on SMTP.
+    sendWelcomeEmail(user.email, user.name || "there").then((r) => {
+      if (!r.ok) {
+        console.error("[register] welcome email failed:", r.error);
+        logUserAction(
+          { id: user.id, email: user.email, name: user.name },
+          "email.welcome",
+          `failed: ${r.error}`
+        );
+      } else {
+        logUserAction(
+          { id: user.id, email: user.email, name: user.name },
+          "email.welcome",
+          "sent"
+        );
+      }
+    });
 
     const token = signUserToken(user.id);
     const res = NextResponse.json({

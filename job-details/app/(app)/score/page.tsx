@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   LogIn,
   UserPlus,
@@ -661,6 +662,16 @@ export default function ScoreJobsPage() {
               {authBusy ? <Loader2 size={14} className="animate-spin" /> : null}
               {authMode === "login" ? "Sign in" : "Create account"}
             </button>
+            {authMode === "login" && (
+              <p className="text-center text-xs text-claude-muted">
+                <Link
+                  href="/forgot-password"
+                  className="font-medium text-claude-accent hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </p>
+            )}
           </form>
         </div>
       </div>

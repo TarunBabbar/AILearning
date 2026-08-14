@@ -72,6 +72,34 @@ export async function requireUserId(): Promise<string | null> {
   return getSessionUserId();
 }
 
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/** Sign a one-time password-reset token for a user. */
+export function signResetToken(userId: string): string {
+  const payload = `reset:${userId}:${Date.now()}`;
+  return `${Buffer.from(payload).toString("base64url")}.${hmac(payload)}`;
+}
+
+/**
+ * Verify a password-reset token. Returns the userId if valid (and not
+ * expired), else null.
+ */
+export function verifyResetToken(token: string | undefined): string | null {
+  if (!token) return null;
+  if (!sessionSecret()) return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const payload = Buffer.from(parts[0], "base64url").toString("utf8");
+  if (!safeEqual(parts[1], hmac(payload))) return null;
+  const segments = payload.split(":");
+  if (segments.length !== 3 || segments[0] !== "reset") return null;
+  const userId = segments[1];
+  const ts = Number(segments[2]);
+  if (!userId || !Number.isFinite(ts)) return null;
+  if (Date.now() - ts > RESET_TOKEN_TTL_MS) return null;
+  return userId;
+}
+
 export function userCookieOptions(token: string) {
   return {
     name: USER_COOKIE,

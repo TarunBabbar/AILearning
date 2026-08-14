@@ -16,21 +16,36 @@ function sweep(now: number) {
 }
 
 /**
+ * Rate limit check that also reports how many attempts remain in the window.
+ * Returns { blocked, remaining } — blocked=true when over the limit.
+ * @param key unique key, e.g. `ip:${ip}` or `user:${userId}`
+ * @param limit max requests per window
+ * @param windowMs window length in ms
+ */
+export function rateLimitCheck(
+  key: string,
+  limit: number,
+  windowMs: number
+): { blocked: boolean; remaining: number } {
+  const now = Date.now();
+  sweep(now);
+  const b = buckets.get(key);
+  if (!b || b.resetAt <= now) {
+    buckets.set(key, { count: 1, resetAt: now + windowMs });
+    return { blocked: false, remaining: limit - 1 };
+  }
+  b.count += 1;
+  return { blocked: b.count > limit, remaining: Math.max(0, limit - b.count) };
+}
+
+/**
  * Returns true if the key is over its limit (caller should reject with 429).
  * @param key unique key, e.g. `ip:${ip}` or `user:${userId}`
  * @param limit max requests per window
  * @param windowMs window length in ms
  */
 export function rateLimited(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  sweep(now);
-  const b = buckets.get(key);
-  if (!b || b.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return false;
-  }
-  b.count += 1;
-  return b.count > limit;
+  return rateLimitCheck(key, limit, windowMs).blocked;
 }
 
 /** Best-effort client IP extraction from common proxy headers. */

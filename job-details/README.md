@@ -102,6 +102,44 @@
 - Large runs (≥100 jobs) show a time warning; scoring can be resumed (unscored-only).
 - Admin list of accounts: `GET /api/users` — requires non-empty `USERS_ADMIN_API_KEY`, passed as `x-api-key` or `Authorization: Bearer …`.
 
+### 🔒 Login-gated Recruiter Contacts
+- Recruiter Contacts are only visible to **logged-in users** — `/api/contacts` returns `401` without a session, and the sidebar link + page are hidden for logged-out visitors.
+- The sidebar and contacts page share a session key (`/api/user/me` via SWR) so the section appears **instantly on login/logout** — no refresh needed.
+
+### ✨ Today's Jobs (NEW badge + filter)
+- Jobs added today get an eye-catching **gradient "✦ NEW" badge** (with a subtle pulse) on their card.
+- A **"Today's Jobs"** toggle in the filter bar (QA Jobs + Match by Resume) filters to jobs added today (`createdAt >= start of day`).
+- The dashboard header shows **"X new jobs today"**.
+- The badge is date-based — a job shows NEW only on the calendar day it was added.
+
+### 💬 AI Chat Assistant (Match by Resume)
+- Floating chat widget on the Match by Resume page (logged-in users only).
+- **Welcome screen** with two choices: **Ask a question** (AI answers from project knowledge + the user's own job data) or **Send a message to Tarun** (forwards to Telegram). An Ask/Message toggle in the header lets users switch modes anytime.
+- User context (job counts, top matches, companies, locations) is **pre-loaded once** when the chat opens and cached in the browser — fast answers with no per-message DB query.
+- Forwarded messages to Telegram include the requester's **name, email, timestamp, and full conversation history**.
+
+### 📧 Email notifications (welcome + password reset)
+- **Welcome email** — branded "QA Jobs Portal" HTML email sent automatically on registration (fire-and-forget; never blocks signup).
+- **Password reset flow** — "Forgot password?" link on the login form → email with a **one-time reset link** (expires in 1 hour) → set a new password on `/reset-password`.
+- Emails send via **Gmail SMTP app password** (`SMTP_*` env vars).
+- The forgot-password response is **generic** whether or not the email is registered (prevents account enumeration) and reminds users to check spam; the rate limit is configurable via `RATE_LIMIT_FORGOT_PASSWORD`.
+
+### 🕐 Background job enrichment (cron)
+- A daily cron (`/api/cron/enrich-jobs`, every day at 1am) finds jobs with **missing fields** (description / location / experience / email) and re-runs the LLM to fill them.
+- **Smart scoping**: if ≤ 30 jobs are incomplete, it enriches them all; if hundreds are missing data, it restricts to **today's new jobs** so the run doesn't burn LLM quota on the backlog.
+- Protected by `CRON_SECRET` bearer token; can also be triggered manually via curl.
+
+### 🛡 Security hardening
+- `DELETE /api/jobs/[id]` and `POST /api/companies/resolve` now require **admin auth**.
+- Session tokens reject **empty/hardcoded secrets** (no more `jobdetails-dev-secret` fallback).
+- **Rate limiting** (in-memory per-IP/user) on login, register, admin login, chat, and forgot-password.
+- **Security headers** via `proxy.ts`: CSP, HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy.
+- **Server-side upload size cap** (5MB text) and self-hosted pdf.js worker (no CDN).
+- Every user action is logged with **who** did it (`lib/action-log.ts`).
+
+### 📊 Vercel Analytics
+- Visitor analytics (daily unique visitors, page views, top paths, referrers, devices) via `@vercel/analytics`, enabled on the Vercel dashboard.
+
 ---
 
 ## 🛠 Tech stack
@@ -127,46 +165,58 @@ job-details/
 ├─ app/
 │  ├─ (app)/                    # sidebar-wrapped pages (SWRProvider + PageChrome)
 │  │  ├─ page.tsx               # QA Jobs — filtered cards + centered detail modal
-│  │  ├─ contacts/              # Recruiter emails by company (paginated)
+│  │  ├─ contacts/              # Recruiter emails by company (login-gated)
 │  │  ├─ score/                 # Match by Resume — auth, upload, scoring, results
 │  │  └─ upload/                # multi-file upload + extraction (admin)
+│  ├─ forgot-password/          # forgot-password form (emails reset link)
+│  ├─ reset-password/           # set new password via emailed token
 │  ├─ api/
 │  │  ├─ upload/                # POST — extract + persist jobs
 │  │  ├─ jobs/                  # GET (list/search/filters, Cache-Control) · DELETE
-│  │  ├─ jobs/[id]/             # GET · DELETE single job
+│  │  ├─ jobs/[id]/             # GET · DELETE single job (admin)
 │  │  ├─ jobs/filters/          # GET — distinct company/location dropdown options
 │  │  ├─ companies/             # GET list
-│  │  ├─ companies/resolve/     # POST — resolve company info from emails
-│  │  ├─ contacts/              # GET emails by company (page, pageSize)
-│  │  ├─ user/                  # register · login · logout · me · resume · score · matches
+│  │  ├─ companies/resolve/     # POST — resolve company info (admin)
+│  │  ├─ contacts/              # GET emails by company (login required)
+│  │  ├─ user/                  # register · login · logout · me · resume · score · matches · forgot/reset-password
 │  │  ├─ users/                 # GET admin user list (USERS_ADMIN_API_KEY)
+│  │  ├─ chat/                  # POST chat assistant · GET context snapshot
+│  │  ├─ cron/enrich-jobs/      # POST — daily LLM fill of missing job fields (CRON_SECRET)
 │  │  ├─ settings/              # GET — config status (key configured, model)
 │  │  └─ extract-preview/       # POST — word count for pasted text
-│  ├─ layout.tsx                # root layout (font, metadata)
+│  ├─ layout.tsx                # root layout (font, metadata, Analytics)
 │  ├─ not-found.tsx
 │  └─ globals.css               # Claude beige theme tokens
+├─ proxy.ts                     # security headers (CSP, HSTS, X-Frame-Options, …)
 ├─ components/
-│  ├─ Sidebar.tsx               # left navigation
+│  ├─ Sidebar.tsx               # left navigation (auth-aware — hides Contacts when logged out)
 │  ├─ SWRProvider.tsx           # shared SWRConfig for list pages
 │  ├─ PageChrome.tsx            # fixed page header + scroll body
 │  ├─ ListPagination.tsx        # First / Prev / Next / Last control
 │  ├─ ShowingRange.tsx          # "Showing 1–40 of N" label
-│  ├─ JobCard.tsx               # shared job card (QA Jobs + Match by Resume)
-│  ├─ JobFilters.tsx            # shared search / company / location / sort bar
+│  ├─ JobCard.tsx               # shared job card (QA Jobs + Match by Resume) + NEW badge
+│  ├─ JobFilters.tsx            # shared search / company / location / sort / Today's Jobs bar
 │  ├─ JobDetailModal.tsx        # shared job detail popup
+│  ├─ ChatWidget.tsx            # floating AI chat (Ask / Message Tarun)
+│  ├─ Markdown.tsx              # chat markdown renderer
 │  └─ Skeleton.tsx              # loading placeholders
 ├─ lib/
 │  ├─ client/pdf.ts             # browser-side PDF/DOCX text extraction
 │  ├─ use-list-swr.ts           # SWR hook + ~5 min TTL + upload invalidate
-│  ├─ swr-fetcher.ts            # shared fetcher + Cache-Control constant
+│  ├─ swr-fetcher.ts            # shared fetcher + Cache-Control + SESSION_KEY
 │  ├─ openrouter.ts             # OpenRouter client (retries, JSON parsing)
 │  ├─ extract-jobs.ts           # LLM job extraction + dedupe
+│  ├─ enrich-jobs.ts            # cron LLM fill of missing job fields
 │  ├─ company.ts                # email-domain → company resolution
-│  ├─ config.ts                 # env-var config
+│  ├─ config.ts                 # env-var config (incl. SMTP)
 │  ├─ auth.ts                   # env-only API key resolver
-│  ├─ user-auth.ts              # Match-by-Resume cookie session helpers
+│  ├─ user-auth.ts              # Match-by-Resume cookie sessions + reset tokens
+│  ├─ admin-auth.ts             # admin cookie sessions
+│  ├─ action-log.ts             # user-aware action logging (who did what)
+│  ├─ rate-limit.ts             # in-memory per-IP/user rate limiting
+│  ├─ email.ts                  # SMTP sender + welcome/reset email templates
 │  ├─ db.ts                     # Prisma singleton (driver adapter)
-│  ├─ types.ts / utils.ts / extract.ts
+│  ├─ types.ts / utils.ts / extract.ts / sanitize.ts
 ├─ prisma/
 │  └─ schema.prisma             # Job + Company + User + Resume + JobScore
 ├─ prisma.config.ts             # Prisma 7 config (DB URL for CLI)
@@ -231,8 +281,19 @@ npm run dev
 | `ADMIN_PASSWORD`     | ❌       | Password that unlocks the Upload page — without it, uploads stay locked      | `admin123`                                                    |
 | `USERS_ADMIN_API_KEY`| ❌       | API key for `GET /api/users` (Match-by-Resume account list). Empty = 503.   | `your-secret-key`                                             |
 | `NEXT_PUBLIC_APP_NAME` | ❌     | App name shown in the sidebar                                                | `QA Tracker`                                                  |
-| `NEXT_PUBLIC_APP_URL`  | ❌     | Public app URL (sent to OpenRouter as referer)                               | `https://your-app.vercel.app`                                 |
+| `NEXT_PUBLIC_APP_URL`  | ❌     | Public app URL (used for emailed links + OpenRouter referer)                | `https://your-app.vercel.app`                                 |
 | `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | ❌ | Max upload size per file shown on the Upload page                          | `50`                                                          |
+| `TELEGRAM_BOT_TOKEN` | ❌       | Telegram bot token for chat-widget forwarding to the owner                   | `8887227521:AA…`                                              |
+| `TELEGRAM_CHAT_ID`   | ❌       | Owner's Telegram chat id for forwarded messages                              | `1622727099`                                                  |
+| `CHATBOT_MODEL`      | ❌       | Optional OpenRouter model for chat auto-answers (falls back to `OPENROUTER_MODEL`) | `nvidia/nemotron-nano-9b-v2:free`                     |
+| `SMTP_HOST`          | ❌       | SMTP server for welcome/reset emails (default `smtp.gmail.com`)              | `smtp.gmail.com`                                              |
+| `SMTP_PORT`          | ❌       | SMTP port (default `587`)                                                   | `587`                                                         |
+| `SMTP_USER`          | ❌       | SMTP account (e.g. Gmail address)                                           | `qajobs.portal@gmail.com`                                     |
+| `SMTP_PASS`          | ❌       | SMTP app password (Gmail App Password, not the account password)            | `xxxx xxxx xxxx xxxx`                                         |
+| `SMTP_FROM_NAME`     | ❌       | "From" display name on emails (default `QA Jobs Portal`)                     | `QA Jobs Portal`                                              |
+| `SMTP_FROM_EMAIL`    | ❌       | "From" email (defaults to `SMTP_USER`)                                      | `qajobs.portal@gmail.com`                                     |
+| `CRON_SECRET`        | ❌       | Bearer token protecting `/api/cron/enrich-jobs`                              | `your-secret`                                                 |
+| `RATE_LIMIT_FORGOT_PASSWORD` | ❌ | Max forgot-password requests per IP per 15 min (default `5`)               | `5`                                                           |
 
 ---
 
@@ -391,20 +452,30 @@ a pause takes a few seconds to wake the DB. That's normal.
 
 | Method | Endpoint                 | Description                                        | Query / Body                                        |
 | ------ | ------------------------ | -------------------------------------------------- | --------------------------------------------------- |
-| `GET`  | `/api/jobs`              | List jobs with company info (edge-cached 60s)       | `search`, `status`, `company`, `location`, `sort`   |
+| `GET`  | `/api/jobs`              | List jobs with company info (edge-cached 60s)       | `search`, `status`, `company`, `location`, `sort`, `today` |
 | `GET`  | `/api/jobs/:id`          | Single job + company info                           | —                                                   |
-| `DELETE` | `/api/jobs`            | Clear all jobs                                      | —                                                   |
-| `DELETE` | `/api/jobs/:id`        | Delete one job                                      | —                                                   |
+| `DELETE` | `/api/jobs`            | Clear all jobs (admin)                              | —                                                   |
+| `DELETE` | `/api/jobs/:id`        | Delete one job (admin)                              | —                                                   |
 | `GET`  | `/api/jobs/filters`      | Distinct company/location dropdown options (edge-cached 60s) | `search`, `company`, `location`          |
 | `POST` | `/api/upload`            | Extract + persist jobs from text                    | `{ fileName, text, model? }`                        |
 | `GET`  | `/api/companies`         | List companies with job counts                      | —                                                   |
-| `GET`  | `/api/contacts`          | Recruiter emails by company (edge-cached 60s)       | `search`, `page`, `pageSize`                        |
-| `POST` | `/api/companies/resolve` | Resolve/backfill company info in batches (~10 domains/call). Repeat until `remaining` is 0. | `{ model?, limit? }` |
+| `GET`  | `/api/contacts`          | Recruiter emails by company (login required)        | `search`, `page`, `pageSize`                        |
+| `POST` | `/api/companies/resolve` | Resolve/backfill company info in batches (admin). Repeat until `remaining` is 0. | `{ model?, limit? }` |
 | `GET`  | `/api/settings`          | Config status: service configured, default model, app name      | —                                                   |
 | `POST` | `/api/extract-preview`   | Word/char count for pasted text                     | `{ text }`                                          |
-| `GET`  | `/api/user/matches`      | Scored jobs for the logged-in user (searchable/filterable)        | `search`, `company`, `location`, `minScore`, `remote`, `sort`, `order`, `page`, `pageSize` |
+| `POST` | `/api/user/register`     | Create account + send welcome email                 | `{ name, email, password }`                         |
+| `POST` | `/api/user/login`        | Log in (sets httpOnly session cookie)               | `{ email, password }`                               |
+| `POST` | `/api/user/logout`       | Log out                                             | —                                                   |
+| `GET`  | `/api/user/me`           | Current user + resume metadata (or `{user:null}`)   | —                                                   |
+| `POST` | `/api/user/resume`       | Upsert the logged-in user's resume                  | `{ filename, content, mimeType? }`                  |
+| `POST` | `/api/user/forgot-password` | Email a one-time reset link (generic response, no enumeration) | `{ email }`                                  |
+| `POST` | `/api/user/reset-password` | Set a new password via a valid reset token        | `{ token, password }`                               |
+| `GET`  | `/api/user/matches`      | Scored jobs for the logged-in user (searchable/filterable)        | `search`, `company`, `location`, `minScore`, `remote`, `today`, `sort`, `order`, `page`, `pageSize` |
 | `GET`  | `/api/user/score`        | Score preview counts for the logged-in user                       | `search`                                             |
 | `POST` | `/api/user/score`        | Score shared jobs against the user's resume (NDJSON stream)       | `{ scope, search? }`                                |
+| `POST` | `/api/chat`              | Chat assistant — answer a question or forward a message to the owner's Telegram | `{ message, mode?, history?, context? }` |
+| `GET`  | `/api/chat/context`      | User job-data context snapshot (cached client-side)  | —                                                   |
+| `POST` | `/api/cron/enrich-jobs`  | Fill missing job fields via LLM (bearer `CRON_SECRET`) | `{ limit? }`                                      |
 
 > List GET routes that say **edge-cached** return `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. The browser client still uses `cache: "no-store"` so SWR owns freshness after uploads.
 
