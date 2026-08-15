@@ -247,12 +247,6 @@ export default function ChatWidget() {
                   </span>
                 </span>
               </button>
-
-              {messages[0] && messages[0].role === "bot" && (
-                <div className="mt-3 rounded-xl bg-claude-bg px-3 py-2 text-[12px] leading-relaxed text-claude-muted">
-                  {messages[0].text}
-                </div>
-              )}
             </div>
           ) : (
             <>
