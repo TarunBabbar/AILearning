@@ -10,7 +10,6 @@ import {
   Loader2,
   RefreshCw,
   Briefcase,
-  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
@@ -109,7 +108,6 @@ export default function ScoreJobsPage() {
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
-  const [remoteOnly, setRemoteOnly] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "score" | "company" | "location">(
     "newest"
@@ -134,7 +132,6 @@ export default function ScoreJobsPage() {
       search?: string;
       company?: string;
       location?: string;
-      remote?: boolean;
       today?: boolean;
       sort?: "newest" | "score" | "company" | "location";
       order?: "asc" | "desc";
@@ -149,7 +146,6 @@ export default function ScoreJobsPage() {
         const searchQ = overrides?.search ?? search;
         const company = overrides?.company ?? companyFilter;
         const location = overrides?.location ?? locationFilter;
-        const remote = overrides?.remote ?? remoteOnly;
         const today = overrides?.today ?? todayOnly;
         const sort = overrides?.sort ?? sortBy;
         const order = overrides?.order ?? sortOrder;
@@ -159,7 +155,6 @@ export default function ScoreJobsPage() {
         if (searchQ.trim()) params.set("search", searchQ.trim());
         if (company.trim()) params.set("company", company.trim());
         if (location.trim()) params.set("location", location.trim());
-        if (remote) params.set("remote", "1");
         if (today) params.set("today", "1");
         params.set("sort", sort);
         params.set("order", order);
@@ -194,7 +189,6 @@ export default function ScoreJobsPage() {
       search,
       companyFilter,
       locationFilter,
-      remoteOnly,
       todayOnly,
       sortBy,
       sortOrder,
@@ -907,7 +901,7 @@ export default function ScoreJobsPage() {
                   loadMatches({ minScore: v, page: 1 });
                 }}
                 title="Minimum fit score"
-                className="h-7 shrink-0 rounded-md border border-claude-border bg-white px-1.5 text-[11px] text-claude-text outline-none focus:border-claude-accent"
+                className="h-9 shrink-0 cursor-pointer appearance-none rounded-lg border border-claude-border bg-white px-2.5 text-[13px] text-claude-text outline-none focus:border-claude-accent"
               >
                 <option value={0}>Any score</option>
                 <option value={30}>≥ 30%</option>
@@ -915,26 +909,6 @@ export default function ScoreJobsPage() {
                 <option value={70}>≥ 70%</option>
                 <option value={80}>≥ 80%</option>
               </select>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !remoteOnly;
-                  setRemoteOnly(next);
-                  setPage(1);
-                  loadMatches({ remote: next, page: 1 });
-                }}
-                className={cn(
-                  "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium",
-                  remoteOnly
-                    ? "border-claude-accent bg-claude-accent text-white"
-                    : "border-claude-border bg-white text-claude-muted hover:text-claude-text"
-                )}
-                title="Remote / work-from-home / hybrid"
-              >
-                <Home size={11} />
-                Remote
-              </button>
 
               {matchesTotal > 0 && (
                 <ShowingRange
@@ -959,14 +933,14 @@ export default function ScoreJobsPage() {
           <p className="text-sm text-claude-text">
             {scoring
               ? "Scoring in progress…"
-              : minScore || search || companyFilter || locationFilter || remoteOnly
+              : minScore || search || companyFilter || locationFilter
                 ? "No scores match these filters"
                 : "No scores yet"}
           </p>
           <p className="mt-0.5 text-[11px] text-claude-muted">
             {scoring
               ? "Results appear here as they're scored — no need to wait for the full run."
-              : minScore || search || companyFilter || locationFilter || remoteOnly
+              : minScore || search || companyFilter || locationFilter
                 ? "Clear or loosen filters, or score more jobs."
                 : "Upload a resume and run Score to fill this page."}
           </p>

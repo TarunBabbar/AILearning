@@ -24,8 +24,13 @@ const DEFAULT_SORT_OPTIONS = [
   { value: "company", label: "Company A–Z" },
 ];
 
+// Shared control height — every filter control (search, dropdowns, toggles,
+// buttons) uses the same h-9 so the bar looks uniform.
+const CONTROL_H = "h-9";
+
 /**
  * Shared filter bar for QA Jobs and Match by Resume.
+ * All controls are the same height (h-9) for a clean, uniform look.
  * Debounces the search input internally; company/location are exact-match
  * dropdowns driven by server-provided options.
  */
@@ -92,10 +97,17 @@ export default function JobFilters({
     onReset?.();
   };
 
+  // Shared dropdown styling — uniform height, same border/radius/font.
+  const selectClass = cn(
+    CONTROL_H,
+    "cursor-pointer appearance-none rounded-lg border bg-white pl-7 pr-7 text-[13px] outline-none transition-colors focus:border-claude-accent",
+    "max-w-[13rem]"
+  );
+
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       {/* Search */}
-      <div className="relative min-w-[170px] flex-1">
+      <div className={cn("relative min-w-[170px] flex-1", CONTROL_H)}>
         <Search
           size={13}
           className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
@@ -104,7 +116,10 @@ export default function JobFilters({
           value={searchInput}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search title, company, location, email…"
-          className="w-full rounded-lg border border-claude-border bg-white py-1.5 pl-8 pr-7 text-sm outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+          className={cn(
+            CONTROL_H,
+            "w-full rounded-lg border border-claude-border bg-white pl-8 pr-7 text-[13px] outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+          )}
         />
         {searchInput && (
           <button
@@ -127,7 +142,7 @@ export default function JobFilters({
           value={value.company}
           onChange={(e) => onChange({ ...value, company: e.target.value })}
           className={cn(
-            "max-w-[13rem] cursor-pointer appearance-none rounded-lg border bg-white py-1.5 pl-7 pr-7 text-sm outline-none transition-colors focus:border-claude-accent",
+            selectClass,
             value.company
               ? "border-claude-accent text-claude-text"
               : "border-claude-border text-claude-muted"
@@ -156,7 +171,7 @@ export default function JobFilters({
           value={value.location}
           onChange={(e) => onChange({ ...value, location: e.target.value })}
           className={cn(
-            "max-w-[13rem] cursor-pointer appearance-none rounded-lg border bg-white py-1.5 pl-7 pr-7 text-sm outline-none transition-colors focus:border-claude-accent",
+            selectClass,
             value.location
               ? "border-claude-accent text-claude-text"
               : "border-claude-border text-claude-muted"
@@ -175,12 +190,13 @@ export default function JobFilters({
         />
       </div>
 
-      {/* Today's Jobs toggle */}
+      {/* Today's Jobs toggle — same height as the rest */}
       <button
         type="button"
         onClick={() => onChange({ ...value, today: !value.today })}
         className={cn(
-          "inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-sm font-medium transition-colors",
+          CONTROL_H,
+          "inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[13px] font-medium transition-colors",
           value.today
             ? "border-claude-accent bg-claude-accent text-white"
             : "border-claude-border bg-white text-claude-muted hover:bg-claude-accent/5 hover:text-claude-accent"
@@ -191,12 +207,15 @@ export default function JobFilters({
         Today&apos;s Jobs
       </button>
 
-      {/* Sort */}
+      {/* Sort — same height */}
       <div className="relative shrink-0">
         <select
           value={value.sort}
           onChange={(e) => onChange({ ...value, sort: e.target.value })}
-          className="cursor-pointer appearance-none rounded-lg border border-claude-border bg-white py-1.5 pl-3 pr-7 text-sm text-claude-text outline-none transition-colors focus:border-claude-accent"
+          className={cn(
+            CONTROL_H,
+            "cursor-pointer appearance-none rounded-lg border border-claude-border bg-white pl-3 pr-7 text-[13px] text-claude-text outline-none transition-colors focus:border-claude-accent"
+          )}
         >
           {sortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -215,7 +234,10 @@ export default function JobFilters({
         <button
           type="button"
           onClick={reset}
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-claude-border bg-white px-2 py-1.5 text-sm font-medium text-claude-muted transition-colors hover:bg-claude-bg hover:text-claude-text"
+          className={cn(
+            CONTROL_H,
+            "inline-flex shrink-0 items-center gap-1 rounded-lg border border-claude-border bg-white px-2.5 text-[13px] font-medium text-claude-muted transition-colors hover:bg-claude-bg hover:text-claude-text"
+          )}
           title="Reset all filters"
         >
           <RotateCcw size={12} />

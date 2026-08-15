@@ -80,6 +80,16 @@ export async function GET(req: Request) {
         };
       })
       .filter((c) => c.emails.length > 0)
+      // Only keep companies whose DISPLAYED name matches the search — a job
+      // may match via its email domain (e.g. @hcltech.com) while belonging to
+      // a differently-named company; that row would not visibly contain the
+      // search term, so it must be excluded.
+      .filter(
+        (c) =>
+          !search ||
+          c.company.toLowerCase().includes(search.toLowerCase()) ||
+          c.emails.some((e) => e.toLowerCase().includes(search.toLowerCase()))
+      )
       .sort((a, b) => a.company.localeCompare(b.company));
 
     const totalEmails = contactsAll.reduce((s, c) => s + c.emails.length, 0);
