@@ -58,5 +58,9 @@ export function proxy(_req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Exclude /api/* so route handlers keep their own Cache-Control (edge
+  // caching). Security headers still apply to all page (HTML) responses.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api).*)",
+  ],
 };
