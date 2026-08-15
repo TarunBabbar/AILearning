@@ -27,4 +27,4 @@ export function isListCacheKey(key: unknown): boolean {
 export const SESSION_KEY = "/api/user/me";
 
 export const CACHE_CONTROL_LIST =
-  "public, s-maxage=60, stale-while-revalidate=300";
+  "public, s-maxage=300, stale-while-revalidate=600";

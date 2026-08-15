@@ -27,6 +27,8 @@ model Job {
   @@index([companyId])
   @@index([createdAt])
   @@index([jobDate])
+  @@index([company])
+  @@index([fileName])
 }
 
 model Company {
