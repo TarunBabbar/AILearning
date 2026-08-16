@@ -91,7 +91,8 @@ export async function chatCompletion(
     headers: {
       Authorization: `Bearer ${getApiKey()}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://qae2e.vercel.app",
+      // HTTP-Referer is optional; only sent when the app URL is configured.
+      ...(cfg.appUrl ? { "HTTP-Referer": cfg.appUrl } : {}),
       "X-Title": cfg.appName.replace(/[^\x20-\x7E]/g, ""),
     },
     body: JSON.stringify(body),

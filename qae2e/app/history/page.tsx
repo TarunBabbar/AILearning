@@ -11,11 +11,11 @@ import {
   XCircle,
   PauseCircle,
   FileCode2,
-  ArrowLeft,
   ArrowRight,
   Search,
   RefreshCw,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 
 type RunStatus = "success" | "partial" | "failed" | "stopped";
@@ -27,9 +27,10 @@ interface RunListItem {
   status: RunStatus;
   startedAt: string;
   finishedAt: string;
-  counts: { testCases: number; scripts: number; defects: number; releases: number };
+  counts: { testCases: number; scripts: number; defects: number; releases: number; evaluations?: number };
   testRun?: { ok: boolean; passed: number; failed: number; total: number };
   agents: Array<{ code: string; status: string }>;
+  evaluations?: Array<{ agentCode: string; stage: string; precision: number; accuracy: number }>;
 }
 
 const STATUS_FILTERS: Array<{ key: RunStatus | "all"; label: string }> = [
@@ -133,6 +134,12 @@ export default function HistoryPage() {
               <Sparkles size={14} /> Home
             </Link>
             <Link
+              href={`/trends?workspaceId=${encodeURIComponent(workspaceId)}`}
+              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg border border-border text-text-secondary text-sm font-semibold hover:bg-bg-hover transition-colors"
+            >
+              <TrendingUp size={14} /> Trends
+            </Link>
+            <Link
               href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}
               className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
             >
@@ -143,10 +150,6 @@ export default function HistoryPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-amber-700 transition-colors">
-          <ArrowLeft size={14} /> Back to landing
-        </Link>
-
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <div>
             <h1 className="text-2xl font-bold text-text-primary">Run history</h1>
@@ -212,7 +215,12 @@ export default function HistoryPage() {
                   <span className={cn("shrink-0", statusTone(r.status))}>{statusIcon(r.status)}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-text-primary truncate">{r.title}</p>
+                      <Link
+                        href={`/history/${encodeURIComponent(r.id)}?workspaceId=${encodeURIComponent(workspaceId)}`}
+                        className="text-sm font-semibold text-text-primary truncate hover:text-amber-700 hover:underline"
+                      >
+                        {r.title}
+                      </Link>
                       <span className={statusPill(r.status)}>{r.status}</span>
                     </div>
                     <p className="mt-0.5 text-[11px] text-text-muted">
@@ -220,10 +228,15 @@ export default function HistoryPage() {
                       {r.source ? ` · ${r.source}` : ""} · {r.counts.testCases} cases · {r.counts.scripts} scripts · {r.counts.defects} defects
                       {typeof r.testRun?.total === "number" ? ` · tests ${r.testRun.passed}/${r.testRun.total} passed` : ""}
                     </p>
-                    <div className="mt-1.5 flex items-center gap-1">
+                    <div className="mt-1.5 flex items-center gap-1 flex-wrap">
                       {r.agents.map((a) => (
                         <span key={a.code} className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-full border", a.status === "done" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700" : a.status === "error" ? "border-red-500/30 bg-red-500/10 text-red-600" : "border-border bg-bg-surface text-text-muted")}>
                           {a.code}
+                        </span>
+                      ))}
+                      {r.evaluations?.map((ev) => (
+                        <span key={`${ev.agentCode}-${ev.stage}`} title={`${ev.stage} — precision ${ev.precision}% / accuracy ${ev.accuracy}%`} className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700">
+                          {ev.agentCode} P{ev.precision}/A{ev.accuracy}
                         </span>
                       ))}
                     </div>

@@ -1,9 +1,10 @@
-import type { Analysis } from "@/lib/types";
+import type { Analysis, Evaluation } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { FileText } from "lucide-react";
+import { EvaluationCard } from "@/components/workspace/EvaluationCard";
 
-export function AnalysisView({ analysis }: { analysis: Analysis | null }) {
+export function AnalysisView({ analysis, evaluation }: { analysis: Analysis | null; evaluation?: Evaluation | null }) {
   if (!analysis) return null;
   return (
     <Card className="p-6">
@@ -12,6 +13,22 @@ export function AnalysisView({ analysis }: { analysis: Analysis | null }) {
         <h3 className="font-semibold text-text-primary">Requirement Intelligence</h3>
         <span className="text-xs text-text-muted ml-auto font-mono">{analysis.id.slice(0, 8)}</span>
       </div>
+
+      {evaluation && (
+        <div className="mb-4">
+          <EvaluationCard
+            stageLabel="Analyze"
+            precision={evaluation.precision}
+            accuracy={evaluation.accuracy}
+            rationale={evaluation.rationale}
+            overall={evaluation.overall}
+            improvements={evaluation.improvements}
+            verdict={evaluation.verdict}
+            metrics={evaluation.metrics}
+            perItem={evaluation.perItem}
+          />
+        </div>
+      )}
 
       <Section title="Executive summary">
         <p className="text-sm text-text-secondary leading-relaxed">{analysis.summary}</p>
@@ -64,14 +81,23 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Bullets({ items, tone = "default" }: { items: string[]; tone?: "default" | "amber" }) {
+type BulletItem = string | Record<string, unknown>;
+
+function formatItem(item: BulletItem): string {
+  if (typeof item === "string") return item;
+  return Object.entries(item)
+    .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join(" · ");
+}
+
+function Bullets({ items, tone = "default" }: { items: BulletItem[]; tone?: "default" | "amber" }) {
   if (!items.length) return <p className="text-sm text-text-muted">—</p>;
   return (
     <ul className="space-y-1">
       {items.map((item, i) => (
         <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
           <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${tone === "amber" ? "bg-amber-500" : "bg-amber-500/70"}`} />
-          {item}
+          {formatItem(item)}
         </li>
       ))}
     </ul>

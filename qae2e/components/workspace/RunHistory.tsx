@@ -92,7 +92,12 @@ export function RunHistory({ workspaceId = "" }: { workspaceId?: string }) {
               <div key={r.id} className="rounded-lg border border-border bg-bg-page p-3 flex items-center gap-3">
                 <span className={cn("shrink-0", statusTone(r.status))}>{statusIcon(r.status)}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-text-primary truncate">{r.title}</p>
+                  <Link
+                    href={`/history/${encodeURIComponent(r.id)}?workspaceId=${encodeURIComponent(workspaceId)}`}
+                    className="text-sm font-semibold text-text-primary truncate block hover:text-amber-700 hover:underline"
+                  >
+                    {r.title}
+                  </Link>
                   <p className="text-[11px] text-text-muted">
                     {new Date(r.startedAt).toLocaleString()} · {r.counts.testCases} cases · {r.counts.scripts} scripts · {r.counts.defects} defects
                   </p>

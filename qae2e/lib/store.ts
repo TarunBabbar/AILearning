@@ -23,6 +23,7 @@ export type ArtifactKind =
   | "cycles"
   | "defects"
   | "releases"
+  | "evaluations"
   | "exports"
   | "uploads"
   | "extractions";

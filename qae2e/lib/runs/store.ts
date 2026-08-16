@@ -27,7 +27,10 @@ export interface RunRecord {
     cycles: number;
     defects: number;
     releases: number;
+    evaluations: number;
   };
+  // DeepEval-style stage evaluation scores, keyed by agent code (RI/MT/AS/EX/DO/IQ).
+  evaluations?: Array<{ agentCode: string; stage: string; precision: number; accuracy: number }>;
   // Real test-run results from the Docker autofix (if any).
   testRun?: {
     ok: boolean;
@@ -38,6 +41,8 @@ export interface RunRecord {
     attempts: number;
     failures: Array<{ test: string; message: string }>;
     logs: string[];
+    // Per-test outcomes (names + status) — powers flaky detection + trends.
+    results?: Array<{ test: string; status: string; durationMs?: number }>;
   };
   // Generated automation files (code) — included in the download bundle.
   files: Array<{ path: string; code: string }>;
@@ -51,7 +56,7 @@ function runsFile(): string {
 }
 
 function pgConfigured(): boolean {
-  return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_HOST || process.env.POSTGRES_DATABASE);
+  return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_HOST || process.env.POSTGRES_DATABASE || process.env.DATABASE_URL);
 }
 
 async function pgRunTable(): Promise<boolean> {

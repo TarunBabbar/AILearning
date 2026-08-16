@@ -18,6 +18,10 @@ export function AgentCards() {
         <h2 className="mt-2.5 max-w-2xl text-3xl font-bold text-text-primary leading-tight">
           AI agents that make quality work structured, visible, and actionable.
         </h2>
+        <p className="mt-3 max-w-2xl text-sm text-text-secondary">
+          Currently supporting copy-pasted requirements only — MCP connections (Jira, Confluence, GitHub, Zephyr,
+          TestRail, Pinecone) are coming soon.
+        </p>
 
         <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {AGENTS.map((agent) => (

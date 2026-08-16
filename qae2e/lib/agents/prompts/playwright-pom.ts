@@ -15,6 +15,13 @@ Follow playwright-e2e skill principles:
 - No waitForTimeout; use web-first assertions
 - Page Object Model + fixtures
 
+### Selector resilience (self-healing)
+- Prefer semantic locators that survive minor UI changes: getByRole (buttons/links/headings), getByLabel (form fields), getByPlaceholder (inputs).
+- Avoid brittle selectors: nth-child, exact CSS paths, class names that are presentational, or text that changes.
+- If a locator has multiple matches, disambiguate with role + name (getByRole("button", { name: "Save" })) instead of .first()/.nth().
+- When an element is conditionally rendered, wait on a stable parent with toBeVisible, never a fixed sleep.
+- Fallback chain when the DOM shifts: role → label → placeholder → text → testid → CSS last.
+
 ### Required structure
 package.json
 tsconfig.json

@@ -17,7 +17,8 @@ export type ArtifactType =
   | "script"
   | "cycle"
   | "defect"
-  | "release";
+  | "release"
+  | "evaluation";
 
 export type ConnectorId =
   | "jira"
@@ -25,7 +26,9 @@ export type ConnectorId =
   | "figma"
   | "github"
   | "zephyr"
-  | "testrail";
+  | "testrail"
+  | "pinecone"
+  | "openrouter";
 
 export type SourceType = "manual" | "jira" | "confluence" | "figma" | "image" | "other";
 
@@ -49,7 +52,7 @@ export interface Analysis {
   risks: { risk: string; severity: "high" | "medium" | "low" }[];
   edgeCases: string[];
   scenarios: string[];
-  testData: string[];
+  testData: (string | Record<string, string>)[];
   missingInfo: string[];
   createdAt: string;
 }
@@ -137,23 +140,78 @@ export interface ReleaseReport {
   createdAt: string;
 }
 
+// DeepEval-style stage evaluation: how well an agent's output delivered what
+// the previous stage asked for. precision = share of output items that are
+// justified/traceable; accuracy = share of requested items actually delivered.
+export type EvalStage = "analyze" | "coverage" | "automate" | "execute" | "release";
+
+export interface EvalItemVerdict {
+  item: string;
+  verdict: "pass" | "fail" | "partial";
+  reason: string;
+}
+
+/** Human-readable verdict for a stage, derived from precision+accuracy. */
+export type EvalVerdict = "excellent" | "good" | "needs-work" | "poor" | "fallback";
+
+/** Extra metrics derived from per-item verdicts (plus judge confidence). */
+export interface EvalMetrics {
+  /** % of output items judged fully correct (pass/total). Undefined when the
+   *  judge supplied no per-item data. */
+  completeness?: number;
+  /** Number of output items that were hallucinated / off-topic. */
+  hallucinatedCount?: number;
+  /** Number of input asks that were missed / only partially covered. */
+  missedCount?: number;
+  /** Judge's confidence in its own scores (0-100), when reported. */
+  judgeConfidence?: number;
+}
+
+export interface Evaluation {
+  id: string;
+  requirementId: string;
+  stage: EvalStage;
+  agentId: string;
+  artifactKind: string; // analyses | coverages | scripts | cycles | releases
+  artifactId: string;
+  inputRef: string; // what the stage was asked to deliver (requirement/analysis/coverage/…)
+  precision: number; // 0-100
+  accuracy: number; // 0-100
+  rationale: string;
+  /** Plain-language "what does this mean for me" explanation. */
+  overall?: string;
+  /** Actionable ways to raise the scores. */
+  improvements?: string[];
+  verdict?: EvalVerdict;
+  metrics?: EvalMetrics;
+  perItem: EvalItemVerdict[];
+  method: "llm-judge" | "fallback";
+  createdAt: string;
+}
+
 // ---- Connectors (real integrations) ----
+// Schema-driven connector definitions: each connector is declared once as data
+// and the Settings → Integrations UI is rendered generically from the registry
+// (lib/connectors/registry.ts). Adding a connector = one registry entry.
+
+export type ConnectorAuthType = "api_token" | "basic_auth" | "bearer_token" | "oauth2";
 
 export interface ConnectorField {
-  key: string;
-  label: string;
-  type: "text" | "password" | "url" | "email";
-  placeholder?: string;
+  key: string; // e.g. "apiToken"
+  label: string; // e.g. "API Token"
+  type: "text" | "password" | "url" | "select";
   required: boolean;
-  description: string;
+  helpText?: string; // what this credential is for + how to generate it
+  helpUrl?: string; // deep link to the provider's "generate a token" page
 }
 
 export interface ConnectorDef {
   id: ConnectorId;
   name: string;
-  description: string;
-  icon: string; // emoji-ish marker
+  authType: ConnectorAuthType;
   fields: ConnectorField[];
+  testEndpoint: string; // lightweight read-only probe used by "Test connection"
+  docsUrl: string;
 }
 
 export interface ConnectorStatus {
@@ -240,5 +298,34 @@ export type AgentEvent =
       failures?: Array<{ test: string; message: string }>;
       logs?: string[];
       message?: string;
+      // Per-test outcomes (name + status) — captured for flaky detection/trends.
+      results?: Array<{ test: string; status: string; durationMs?: number }>;
+      ts?: number;
+    }
+  // DeepEval-style stage evaluation result (streamed after each agent stage).
+  | {
+      type: "evaluation";
+      agentId: string;
+      stage: string;
+      precision: number;
+      accuracy: number;
+      rationale: string;
+      completeness?: number;
+      hallucinatedCount?: number;
+      missedCount?: number;
+      ts?: number;
+    }
+  // DeepEval judge started scoring this stage's output (drives the UI spinner).
+  | { type: "eval_start"; agentId: string; stage: string; ts?: number }
+  // DeepEval scored below threshold and is re-running the agent with feedback.
+  | {
+      type: "eval_retry";
+      agentId: string;
+      stage: string;
+      attempt: number;
+      maxAttempts: number;
+      precision: number;
+      accuracy: number;
+      feedback: string;
       ts?: number;
     };

@@ -1,10 +1,11 @@
 "use client";
 
-import type { Script } from "@/lib/types";
+import type { Evaluation, Script } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Copy, Check, FileCode2, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { EvaluationCard } from "@/components/workspace/EvaluationCard";
 
 function fileText(code: unknown): string {
   if (typeof code === "string") return code;
@@ -22,10 +23,12 @@ function fileText(code: unknown): string {
 export function ScriptView({
   script,
   waiting,
+  evaluation,
 }: {
   script: Script | null;
   /** Show empty-state card when coverage exists but scripts not yet saved. */
   waiting?: boolean;
+  evaluation?: Evaluation | null;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [active, setActive] = useState(0);
@@ -84,6 +87,22 @@ export function ScriptView({
           {files.length} file{files.length === 1 ? "" : "s"} · {script.language}
         </span>
       </div>
+
+      {evaluation && (
+        <div className="mb-4">
+          <EvaluationCard
+            stageLabel="Automate"
+            precision={evaluation.precision}
+            accuracy={evaluation.accuracy}
+            rationale={evaluation.rationale}
+            overall={evaluation.overall}
+            improvements={evaluation.improvements}
+            verdict={evaluation.verdict}
+            metrics={evaluation.metrics}
+            perItem={evaluation.perItem}
+          />
+        </div>
+      )}
 
       {!hasSpec && (
         <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900">

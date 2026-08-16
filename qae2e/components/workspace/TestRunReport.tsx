@@ -1,8 +1,10 @@
 "use client";
 
+import type { Evaluation } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Container, XCircle } from "lucide-react";
+import { EvaluationCard } from "@/components/workspace/EvaluationCard";
 
 export type TestRunSnapshot = {
   ok: boolean;
@@ -16,7 +18,7 @@ export type TestRunSnapshot = {
   message?: string;
 };
 
-export function TestRunReport({ run }: { run: TestRunSnapshot | null }) {
+export function TestRunReport({ run, evaluation }: { run: TestRunSnapshot | null; evaluation?: Evaluation | null }) {
   if (!run) return null;
 
   return (
@@ -34,6 +36,22 @@ export function TestRunReport({ run }: { run: TestRunSnapshot | null }) {
           </span>
         )}
       </div>
+
+      {evaluation && (
+        <div className="mb-4">
+          <EvaluationCard
+            stageLabel="Execute"
+            precision={evaluation.precision}
+            accuracy={evaluation.accuracy}
+            rationale={evaluation.rationale}
+            overall={evaluation.overall}
+            improvements={evaluation.improvements}
+            verdict={evaluation.verdict}
+            metrics={evaluation.metrics}
+            perItem={evaluation.perItem}
+          />
+        </div>
+      )}
 
       {run.message && <p className="text-sm text-text-secondary mb-4">{run.message}</p>}
 

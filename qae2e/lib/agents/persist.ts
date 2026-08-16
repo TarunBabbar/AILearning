@@ -54,7 +54,7 @@ export async function maybePersistArtifact(
       risks: (parsed.risks as Analysis["risks"]) || [],
       edgeCases: (parsed.edgeCases as string[]) || [],
       scenarios: (parsed.scenarios as string[]) || [],
-      testData: (parsed.testData as string[]) || [],
+      testData: (parsed.testData as Analysis["testData"]) || [],
       missingInfo: (parsed.missingInfo as string[]) || [],
       createdAt: new Date().toISOString(),
     };

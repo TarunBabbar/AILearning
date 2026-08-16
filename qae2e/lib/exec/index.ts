@@ -8,9 +8,8 @@
 
 import { execFile, type ExecFileOptions } from "child_process";
 import { getConfig } from "../config";
-import { insertOne, getOne, updateOne, currentWorkspace } from "../store";
+import { insertOne, getOne, updateOne } from "../store";
 import type { Cycle, ExecutionStatus } from "../types";
-import { jiraCreateDefect, testrailAddResult } from "../connectors/client";
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 
@@ -21,9 +20,7 @@ export interface RunRequest {
   repoUrl?: string;
   command?: string;
   framework?: string;
-  jiraProjectKey?: string;
-  testrailRunId?: number;
-  testrailProjectId?: string;
+  branch?: string;
 }
 
 export interface RunSummary {
@@ -33,6 +30,14 @@ export interface RunSummary {
   total: number;
 }
 
+/** One test's outcome, captured per run so flaky detection / trends can track
+ *  pass/fail history per test name across runs. */
+export interface TestOutcome {
+  test: string; // full title, e.g. "Login › shows error on bad password"
+  status: "passed" | "failed" | "skipped" | "timedOut" | "interrupted";
+  durationMs?: number;
+}
+
 export interface RunResult {
   ok: boolean;
   stdout: string;
@@ -40,6 +45,10 @@ export interface RunResult {
   exitCode: number | null;
   summary: RunSummary;
   failures?: Array<{ test: string; message: string }>;
+  /** Per-test outcomes (populated when the JSON reporter is available). */
+  results?: TestOutcome[];
+  /** Screenshot diff artifacts from visual regression (test-results/**-snapshots). */
+  visualDiffs?: string[];
 }
 
 export interface DetailedFailure {
@@ -113,8 +122,10 @@ async function ensureImage(image: string): Promise<{ ok: boolean; message?: stri
 export function parsePlaywrightJson(raw: string): {
   summary: RunSummary;
   failures: DetailedFailure[];
+  results: TestOutcome[];
 } {
   const failures: DetailedFailure[] = [];
+  const results: TestOutcome[] = [];
   let passed = 0;
   let failed = 0;
   let skipped = 0;
@@ -140,7 +151,7 @@ export function parsePlaywrightJson(raw: string): {
             title?: string;
             tests?: Array<{
               status?: string;
-              results?: Array<{ status?: string; error?: { message?: string } }>;
+              results?: Array<{ status?: string; error?: { message?: string }; duration?: number }>;
               projectName?: string;
             }>;
           }>;
@@ -149,15 +160,19 @@ export function parsePlaywrightJson(raw: string): {
         if (suite.suites?.length) walk(suite.suites, nextPrefix);
         for (const spec of suite.specs || []) {
           for (const t of spec.tests || []) {
-            const status = t.results?.[0]?.status || t.status || "";
+            const first = t.results?.[0];
+            const status = (first?.status || t.status || "").toLowerCase();
             const name = [nextPrefix, spec.title, t.projectName].filter(Boolean).join(" › ");
             if (status === "skipped" || status === "pending") {
-              // counted via stats when present
+              results.push({ test: name || "unknown", status: "skipped", durationMs: first?.duration });
             } else if (status === "failed" || status === "timedOut" || status === "interrupted") {
               failures.push({
                 test: name || "unknown",
-                message: (t.results?.[0]?.error?.message || status).slice(0, 600),
+                message: (first?.error?.message || status).slice(0, 600),
               });
+              results.push({ test: name || "unknown", status, durationMs: first?.duration });
+            } else if (status === "passed") {
+              results.push({ test: name || "unknown", status: "passed", durationMs: first?.duration });
             }
           }
         }
@@ -187,6 +202,7 @@ export function parsePlaywrightJson(raw: string): {
   return {
     summary: { passed, failed, skipped, total: passed + failed + skipped },
     failures,
+    results,
   };
 }
 
@@ -218,21 +234,44 @@ function readResultsJson(repoDir: string): string | null {
 }
 
 export async function runTests(req: RunRequest): Promise<RunResult> {
-  // Merge workspace secrets into env so connector sync (Jira/TestRail) uses
-  // the workspace's own credentials when a workspace context is active.
-  const ws = currentWorkspace();
-  if (ws && ws !== "default") {
+  const cfg = getConfig();
+
+  // Remote runner configured (Vercel/self-hosted): dispatch the suite to the
+  // machine that has Docker instead of running docker locally.
+  if (cfg.testRunnerUrl) {
     try {
-      const { getWorkspaceSecrets } = await import("../db");
-      const secrets = await getWorkspaceSecrets(ws);
-      for (const [k, v] of Object.entries(secrets)) {
-        if (v) process.env[k] = v;
+      const { runRemote } = await import("./remote");
+      const files = await collectSuiteFiles(req.repoDir, req.repoUrl, req.branch);
+      const res = await runRemote({
+        files,
+        command: req.command || cfg.testCommand,
+        image: cfg.dockerImage,
+        requirementId: req.requirementId,
+      });
+      if (req.cycleId) {
+        await recordOnCycle(req.cycleId, req.requirementId, res.summary, res.exitCode);
       }
-    } catch {
-      // ignore — env fallback stays
+      return {
+        ok: res.ok,
+        stdout: res.stdout,
+        stderr: res.stderr,
+        exitCode: res.exitCode,
+        summary: res.summary,
+        failures: res.failures,
+        results: res.results as TestOutcome[] | undefined,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        stdout: "",
+        stderr: `Remote runner failed: ${err instanceof Error ? err.message : String(err)}`,
+        exitCode: 1,
+        summary: { passed: 0, failed: 0, skipped: 0, total: 0 },
+        failures: [],
+      };
     }
   }
-  const cfg = getConfig();
+
   const dockerAvailable = await hasDocker();
   if (!dockerAvailable) {
     return {
@@ -251,7 +290,7 @@ export async function runTests(req: RunRequest): Promise<RunResult> {
     repoDir = join(base, `qae2e-run-${Date.now()}`);
     const { execFileSync } = await import("child_process");
     try {
-      execFileSync("git", ["clone", "--depth", "1", "--branch", cfg.githubBranch, req.repoUrl, repoDir], { stdio: "ignore" });
+      execFileSync("git", ["clone", "--depth", "1", "--branch", req.branch || "main", req.repoUrl, repoDir], { stdio: "ignore" });
     } catch (err) {
       return {
         ok: false,
@@ -309,21 +348,25 @@ export async function runTests(req: RunRequest): Promise<RunResult> {
 
   let summary: RunSummary = { passed: 0, failed: 0, skipped: 0, total: 0 };
   let failures: DetailedFailure[] = [];
+  let results: TestOutcome[] = [];
 
   const jsonRaw = readResultsJson(repoDir);
   if (jsonRaw) {
     const parsed = parsePlaywrightJson(jsonRaw);
     summary = parsed.summary;
     failures = parsed.failures;
+    results = parsed.results;
   } else {
     summary = parsePlaywrightList(stdout + "\n" + stderr);
   }
 
+  // Visual regression: surface screenshot diff file names as evidence (the
+  // JSON reporter already flags the failure; this lists the generated diffs).
+  const visualDiffs = collectScreenshotDiffs(repoDir);
+
   if (req.cycleId) {
     await recordOnCycle(req.cycleId, req.requirementId, summary, exitCode);
   }
-
-  await syncResults(req, summary, exitCode);
 
   return {
     ok: exitCode === 0 && summary.failed === 0,
@@ -332,42 +375,73 @@ export async function runTests(req: RunRequest): Promise<RunResult> {
     exitCode,
     summary,
     failures,
+    results,
+    visualDiffs,
   };
 }
 
-async function syncResults(req: RunRequest, summary: RunSummary, exitCode: number | null) {
-  const cfg = getConfig();
-  const logs: string[] = [];
-
-  if (summary.failed > 0 && (req.jiraProjectKey || cfg.jiraProjectKey)) {
-    const key = req.jiraProjectKey || cfg.jiraProjectKey;
-    const res = await jiraCreateDefect(
-      key,
-      `[QAE2E] ${summary.failed} test(s) failed for requirement ${req.requirementId}`,
-      `Playwright run exit ${exitCode}. Passed: ${summary.passed}, Failed: ${summary.failed}, Skipped: ${summary.skipped}.`
-    );
-    logs.push(`jira: ${res.ok ? "defect created" : `failed ${JSON.stringify(res.data).slice(0, 120)}`}`);
+/**
+ * Collect a runnable suite as a file list for the remote runner. Prefers the
+ * local repoDir when given; otherwise clones repoUrl into a temp dir and walks
+ * it (excluding node_modules/.git/test-results).
+ */
+async function collectSuiteFiles(
+  repoDir?: string,
+  repoUrl?: string,
+  branch?: string
+): Promise<Array<{ path: string; content: string }>> {
+  let dir = repoDir;
+  if (!dir && repoUrl) {
+    const base = process.env.TEMP || process.env.TMP || ".";
+    dir = join(base, `qae2e-remote-${Date.now()}`);
+    const { execFileSync } = await import("child_process");
+    execFileSync("git", ["clone", "--depth", "1", "--branch", branch || "main", repoUrl, dir], { stdio: "ignore" });
   }
+  if (!dir) dir = process.cwd();
 
-  if (req.testrailRunId && req.testrailProjectId) {
-    for (const [label, count, status] of [
-      ["passed", summary.passed, "passed" as const],
-      ["failed", summary.failed, "failed" as const],
-    ] as const) {
-      if (count > 0) {
-        const res = await testrailAddResult(req.testrailRunId, count, status, `[QAE2E] ${label} (${count}) for ${req.requirementId}`);
-        logs.push(`testrail: ${label} → ${res.ok ? "recorded" : `failed ${JSON.stringify(res.data).slice(0, 120)}`}`);
+  const { readdirSync, statSync } = await import("fs");
+  const out: Array<{ path: string; content: string }> = [];
+  const walk = (d: string, rel: string) => {
+    for (const entry of readdirSync(d, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "test-results") continue;
+      const p = join(d, entry.name);
+      if (entry.isDirectory()) walk(p, `${rel}/${entry.name}`);
+      else {
+        try {
+          const st = statSync(p);
+          if (st.size > 2 * 1024 * 1024) continue; // skip huge binaries
+          out.push({ path: `${rel}/${entry.name}`.replace(/^\//, ""), content: readFileSync(p, "utf-8") });
+        } catch {
+          // skip unreadable
+        }
       }
     }
-  }
+  };
+  walk(dir, "");
+  return out;
+}
 
-  if (logs.length) {
-    try {
-      const { appendFileSync } = await import("fs");
-      appendFileSync(join(process.cwd(), "data", "run-sync.log"), `[${new Date().toISOString()}] ${req.requirementId} ${logs.join(" | ")}\n`);
-    } catch {
-      // best effort
-    }
+/** List screenshot diff artifacts from a Playwright run (test-results/**-snapshots).
+ *  Used to surface visual-regression diffs; the files themselves stay in the
+ *  temp repo dir (they're not copied back into the app). */
+function collectScreenshotDiffs(repoDir: string): string[] {
+  try {
+    const { readdirSync } = require("fs") as typeof import("fs");
+    const base = join(repoDir, "test-results");
+    if (!existsSync(base)) return [];
+    const out: string[] = [];
+    const scan = (dir: string, depth: number) => {
+      if (depth > 4) return;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, entry.name);
+        if (entry.isDirectory()) scan(p, depth + 1);
+        else if (/\.(png|jpg|jpeg)$/i.test(entry.name) && /snapshot/i.test(p)) out.push(p);
+      }
+    };
+    scan(base, 0);
+    return out.slice(0, 20).map((p) => p.replace(/\\/g, "/").replace(`${repoDir.replace(/\\/g, "/")}/`, ""));
+  } catch {
+    return [];
   }
 }
 

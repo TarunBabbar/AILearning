@@ -4,7 +4,7 @@
 import { runAgent } from "./runner";
 import { insertOne, listAll, withWorkspace, currentWorkspace } from "../store";
 import { isRunnableAutomation } from "../exec/script-quality";
-import type { AgentEvent, Analysis, Coverage, Cycle, Defect, ReleaseReport, Requirement, Script } from "../types";
+import type { AgentEvent, Analysis, Coverage, Cycle, Defect, Evaluation, ExecutionStatus, ReleaseReport, Requirement, Script } from "../types";
 import type { RunRecord } from "../runs/store";
 
 export interface OrchestrationResult {
@@ -24,7 +24,7 @@ export interface OrchestrationOptions {
   workspaceId?: string;
   // Optional user-provided values collected up front (intake form). Applied as
   // process.env overrides for the duration of the run so the agent tools can
-  // use them. Keys are env var names (e.g. "GITHUB_TOKEN", "GITHUB_OWNER").
+  // use them (DOCKER_IMAGE, OPENAPI_SPEC, BRANCH).
   env?: Record<string, string>;
   // Abort signal — stops the chain between agents when the client disconnects.
   signal?: AbortSignal;
@@ -69,6 +69,7 @@ async function orchestrateInner(
   }
 
   // Apply user-provided intake values for this run (restored afterwards).
+  // Note: no workspace-secret merging — connectors are placeholders now.
   const overrides: Record<string, string | undefined> = {};
   if (opts.env) {
     for (const [k, v] of Object.entries(opts.env)) {
@@ -76,24 +77,6 @@ async function orchestrateInner(
         overrides[k] = process.env[k];
         process.env[k] = v;
       }
-    }
-  }
-  // Merge per-workspace connector secrets so agent-time connector calls
-  // (jira_fetch_issue / confluence_fetch_page / figma_fetch_file during RI)
-  // resolve the workspace's own credentials.
-  const ws = currentWorkspace();
-  if (ws && ws !== "default") {
-    try {
-      const { getWorkspaceSecrets } = await import("../db");
-      const secrets = await getWorkspaceSecrets(ws);
-      for (const [k, v] of Object.entries(secrets)) {
-        if (v && !overrides[k]) {
-          overrides[k] = process.env[k];
-          process.env[k] = v;
-        }
-      }
-    } catch {
-      // ignore — env fallback stays
     }
   }
   const restore = () => {
@@ -104,18 +87,14 @@ async function orchestrateInner(
   };
 
   const allEvents: AgentEvent[] = [];
-  const sourceHint =
-    opts.source && opts.source !== "manual"
-      ? `The requirement came from ${opts.source}${opts.sourceKey ? ` with key/id "${opts.sourceKey}"` : ""}. If the content was not already fetched, call the matching fetch tool (jira_fetch_issue / confluence_fetch_page / figma_fetch_file) to load it before analyzing.`
-      : "";
   const chain: Array<{ id: Parameters<typeof runAgent>[0]["agentId"]; prompt: string }> = [
     {
       id: "requirement-intelligence",
-      prompt: `Analyze requirement ${requirementId}${opts.title ? ` ("${opts.title}")` : ""}. ${sourceHint} Save it if not already saved, then analyze and return full requirement intelligence.`,
+      prompt: `Analyze requirement ${requirementId}${opts.title ? ` ("${opts.title}")` : ""}. The requirement is already saved — call requirement_analyze and return full requirement intelligence.`,
     },
     {
       id: "manual-test-case",
-      prompt: `Design test coverage for requirement ${requirementId}. Load the saved analysis and save coverage via coverage_save. Ground new cases against existing cases with cases_search to avoid duplicates.`,
+      prompt: `Design test coverage for requirement ${requirementId}. Load the saved analysis and save coverage via coverage_save.`,
     },
     {
       id: "automation-script",
@@ -187,6 +166,96 @@ async function orchestrateInner(
         break;
       }
 
+      // DeepEval-style stage evaluation + EVAL-DRIVEN RETRY:
+      // The judge scores this agent's output against what was asked. If the
+      // output doesn't match (precision/accuracy below the threshold), the
+      // agent is re-run with the judge's feedback (rationale + improvements)
+      // so the next attempt is aligned with the requirement. This is the core
+      // "understand → verify → redo until correct" loop.
+      const evalPassThreshold = 60; // precision OR accuracy must be >= this to proceed
+      const maxEvalRetries = 2;
+      let attempts = 0;
+      let ev = await runStageEval(step.id, requirementId, emit, createdCycleId, testResults, lastTestRun);
+      // Retry when the output scored below threshold OR no artifact was
+      // produced at all (agent replied with prose instead of its deliverable).
+      while (attempts < maxEvalRetries && !opts.signal?.aborted && (ev === null || ev.precision < evalPassThreshold || ev.accuracy < evalPassThreshold)) {
+        attempts++;
+        const retryNote = ev
+          ? `AI Evaluation: ${step.id} output scored ${ev.precision}% precision / ${ev.accuracy}% accuracy — re-running with feedback (attempt ${attempts}/${maxEvalRetries}).`
+          : `AI Evaluation: ${step.id} produced no deliverable — re-running (attempt ${attempts}/${maxEvalRetries}).`;
+        emit({ type: "status", agentId: "pipeline", message: retryNote });
+        emit({
+          type: "eval_retry",
+          agentId: step.id,
+          stage: ev?.stage ?? "analyze",
+          attempt: attempts,
+          maxAttempts: maxEvalRetries,
+          precision: ev?.precision ?? 0,
+          accuracy: ev?.accuracy ?? 0,
+          feedback: retryNote,
+        });
+        allEvents.push({
+          type: "eval_retry",
+          agentId: step.id,
+          stage: ev?.stage ?? "analyze",
+          attempt: attempts,
+          maxAttempts: maxEvalRetries,
+          precision: ev?.precision ?? 0,
+          accuracy: ev?.accuracy ?? 0,
+          feedback: retryNote,
+        });
+        const feedback = ev
+          ? [
+              `The AI judge scored your previous output as precision ${ev.precision}% and accuracy ${ev.accuracy}%.`,
+              ev.rationale ? `Judge feedback: ${ev.rationale}` : "",
+              ev.improvements?.length ? `Required fixes:\n${ev.improvements.map((i) => `- ${i}`).join("\n")}` : "",
+              "Re-run your tools and produce a corrected, complete output that fully matches the requirement. Do not repeat the same mistakes.",
+            ]
+              .filter(Boolean)
+              .join("\n\n")
+          : "You did not produce your deliverable. Use your tools and return the required output (analysis / coverage / script / cycle+defects / release report) as instructed. Do not reply with prose alone.";
+        const retryEvents = await runAgent(
+          {
+            agentId: step.id,
+            userPrompt: `${prompt}\n\n${feedback}`,
+            requirementId,
+            lifecycle: { index: i, total },
+            signal: opts.signal,
+          },
+          emit
+        );
+        allEvents.push(...retryEvents);
+        if (opts.signal?.aborted) break;
+        if (retryEvents.some((e) => e.type === "error")) {
+          emit({ type: "status", agentId: "pipeline", message: `Agent ${step.id} retry errored — moving on.` });
+          break;
+        }
+        ev = await runStageEval(step.id, requirementId, emit, createdCycleId, testResults, lastTestRun);
+      }
+      if (ev) {
+        const evalEvent = {
+          type: "evaluation" as const,
+          agentId: step.id,
+          stage: ev.stage,
+          precision: ev.precision,
+          accuracy: ev.accuracy,
+          rationale: ev.rationale,
+          completeness: ev.metrics?.completeness,
+          hallucinatedCount: ev.metrics?.hallucinatedCount,
+          missedCount: ev.metrics?.missedCount,
+        };
+        allEvents.push(evalEvent);
+        // Emit so the client clears the "scoring…" state and shows the score.
+        emit(evalEvent);
+      }
+      if (attempts > 0) {
+        emit({
+          type: "status",
+          agentId: "pipeline",
+          message: `AI Evaluation: ${step.id} finalized at ${ev?.precision ?? 0}% precision / ${ev?.accuracy ?? 0}% accuracy after ${attempts} retr${attempts === 1 ? "y" : "ies"}.`,
+        });
+      }
+
       // After AS generates scripts → run them in Docker with LLM auto-fix,
       // then record the REAL results on a cycle for EX/DO to reference.
       if (step.id === "automation-script") {
@@ -254,11 +323,59 @@ Do NOT call script_save. Do not return prose only.`,
           }
         }
 
+        // API/contract tests: when an OpenAPI spec is provided via env
+        // (OPENAPI_SPEC), parse it and merge generated tests/api specs into the
+        // suite before the Docker run.
+        const openapiSpec = opts.env?.OPENAPI_SPEC;
+        if (openapiSpec && script && script.files.length) {
+          try {
+            const { parseOpenApi, buildApiSpecFiles, mergeApiSpecs, addApiTestScript } = await import("../exec/api-scripts");
+            const { parse } = await import("yaml");
+            let doc: Record<string, unknown> | null = null;
+            const spec = openapiSpec.trim();
+            if (/^https?:\/\//i.test(spec)) {
+              const res = await fetch(spec);
+              if (res.ok) {
+                const text = await res.text();
+                doc = spec.includes("yaml") || spec.includes(".yml") || !text.trim().startsWith("{") ? (parse(text) as Record<string, unknown>) : (JSON.parse(text) as Record<string, unknown>);
+              }
+            } else if (spec.startsWith("{")) {
+              doc = JSON.parse(spec) as Record<string, unknown>;
+            } else {
+              doc = parse(spec) as Record<string, unknown>;
+            }
+            if (doc) {
+              const index = parseOpenApi(doc);
+              const apiFiles = buildApiSpecFiles(index);
+              const merged = mergeApiSpecs(script, apiFiles);
+              // Ensure the suite's package.json exposes test:api.
+              const pkgIdx = merged.findIndex((f) => f.path === "package.json");
+              if (pkgIdx >= 0) merged[pkgIdx] = { ...merged[pkgIdx], code: addApiTestScript(merged[pkgIdx].code) };
+              script = { ...script, files: merged };
+              emit({
+                type: "status",
+                agentId: "pipeline",
+                message: `OpenAPI spec found — merged ${apiFiles.length} API contract spec(s) (${index.operations.length} operations) into the suite.`,
+              });
+            }
+          } catch (err) {
+            emit({
+              type: "status",
+              agentId: "pipeline",
+              message: `Could not parse OpenAPI spec — running UI specs only. (${err instanceof Error ? err.message : String(err)})`,
+            });
+          }
+        }
+
         if (script && script.files.length) {
+          // Note: PR-diff risk-based selection was removed with the GitHub
+          // connector (now a placeholder) — the full suite always runs.
           emit({ type: "status", agentId: "pipeline", message: "Running generated tests in Docker (auto-fix on failure)…" });
           try {
             const { runTestsWithAutofix } = await import("../exec/autofix");
-            const res = await runTestsWithAutofix(script, { emitLog: (l) => emit({ type: "status", agentId: "pipeline", message: l }) });
+            const res = await runTestsWithAutofix(script, {
+              emitLog: (l) => emit({ type: "status", agentId: "pipeline", message: l }),
+            });
             lastTestRun = {
               ok: res.ok,
               passed: res.summary.passed,
@@ -268,6 +385,7 @@ Do NOT call script_save. Do not return prose only.`,
               attempts: res.attempts,
               failures: res.failures,
               logs: res.logs,
+              results: res.results?.map((r) => ({ test: r.test, status: r.status, durationMs: r.durationMs })) || undefined,
             };
             const s = res.summary;
             testResults = `Passed: ${s.passed}, Failed: ${s.failed}, Skipped: ${s.skipped}, Total: ${s.total} (after ${res.attempts} run attempt(s))`;
@@ -282,6 +400,7 @@ Do NOT call script_save. Do not return prose only.`,
               attempts: res.attempts,
               failures: res.failures.slice(0, 10),
               logs: res.logs.slice(-40),
+              results: res.results?.slice(0, 200).map((r) => ({ test: r.test, status: r.status, durationMs: r.durationMs })),
               message: res.ok
                 ? `Tests passed (${s.passed}/${s.total}) after ${res.attempts} attempt(s).`
                 : res.attempts === 0
@@ -301,49 +420,68 @@ Do NOT call script_save. Do not return prose only.`,
             // Persist a cycle whenever Docker actually attempted a run (pass or fail).
             if (res.attempts > 0) {
               const executions: Cycle["executions"] = [];
-              if (s.passed > 0) {
-                executions.push({
-                  id: crypto.randomUUID(),
-                  caseId: "suite-passed",
-                  caseTitle: `Passed (${s.passed})`,
-                  status: "passed",
-                  evidence: "Docker autofix run",
-                  executedBy: "autofix-runner",
-                  executedAt: new Date().toISOString(),
-                });
+              // Prefer per-test detail from the Playwright JSON results so the
+              // cycle (and the AI Evaluation of the execute stage) reflects
+              // every real test instead of one aggregate "Passed (15)" row.
+              if (res.results?.length) {
+                for (const r of res.results) {
+                  const norm = (r.status === "timedOut" || r.status === "interrupted" ? "failed" : r.status) as ExecutionStatus;
+                  executions.push({
+                    id: crypto.randomUUID(),
+                    caseId: crypto.randomUUID(),
+                    caseTitle: r.test,
+                    status: norm,
+                    evidence: `Playwright JSON reporter — ${r.status}${r.durationMs ? ` (${r.durationMs}ms)` : ""}`,
+                    executedBy: "autofix-runner",
+                    executedAt: new Date().toISOString(),
+                  });
+                }
               }
-              if (s.failed > 0) {
-                executions.push({
-                  id: crypto.randomUUID(),
-                  caseId: "suite-failed",
-                  caseTitle: `Failed (${s.failed})`,
-                  status: "failed",
-                  evidence: res.failures.map((f) => f.test + ": " + f.message.slice(0, 80)).join("\n"),
-                  executedBy: "autofix-runner",
-                  executedAt: new Date().toISOString(),
-                });
-              }
-              if (s.skipped > 0) {
-                executions.push({
-                  id: crypto.randomUUID(),
-                  caseId: "suite-skipped",
-                  caseTitle: `Skipped (${s.skipped})`,
-                  status: "skipped",
-                  evidence: "",
-                  executedBy: "autofix-runner",
-                  executedAt: new Date().toISOString(),
-                });
-              }
-              if (executions.length === 0) {
-                executions.push({
-                  id: crypto.randomUUID(),
-                  caseId: "suite-empty",
-                  caseTitle: "Suite completed with no parsed Playwright results",
-                  status: res.ok ? "passed" : "failed",
-                  evidence: res.logs.slice(-5).join("\n"),
-                  executedBy: "autofix-runner",
-                  executedAt: new Date().toISOString(),
-                });
+              if (!executions.length) {
+                if (s.passed > 0) {
+                  executions.push({
+                    id: crypto.randomUUID(),
+                    caseId: "suite-passed",
+                    caseTitle: `Passed (${s.passed})`,
+                    status: "passed",
+                    evidence: "Docker autofix run",
+                    executedBy: "autofix-runner",
+                    executedAt: new Date().toISOString(),
+                  });
+                }
+                if (s.failed > 0) {
+                  executions.push({
+                    id: crypto.randomUUID(),
+                    caseId: "suite-failed",
+                    caseTitle: `Failed (${s.failed})`,
+                    status: "failed",
+                    evidence: res.failures.map((f) => f.test + ": " + f.message.slice(0, 80)).join("\n"),
+                    executedBy: "autofix-runner",
+                    executedAt: new Date().toISOString(),
+                  });
+                }
+                if (s.skipped > 0) {
+                  executions.push({
+                    id: crypto.randomUUID(),
+                    caseId: "suite-skipped",
+                    caseTitle: `Skipped (${s.skipped})`,
+                    status: "skipped",
+                    evidence: "",
+                    executedBy: "autofix-runner",
+                    executedAt: new Date().toISOString(),
+                  });
+                }
+                if (executions.length === 0) {
+                  executions.push({
+                    id: crypto.randomUUID(),
+                    caseId: "suite-empty",
+                    caseTitle: "Suite completed with no parsed Playwright results",
+                    status: res.ok ? "passed" : "failed",
+                    evidence: res.logs.slice(-5).join("\n"),
+                    executedBy: "autofix-runner",
+                    executedAt: new Date().toISOString(),
+                  });
+                }
               }
               const cycle: Cycle = {
                 id: crypto.randomUUID(),
@@ -391,6 +529,102 @@ Do NOT call script_save. Do not return prose only.`,
   return { requirementId, events: allEvents };
 }
 
+/**
+ * DeepEval-style stage evaluation for the agent that just ran. Maps the agent
+ * to its stage, loads the latest artifact and the previous stage's ask, and
+ * scores precision/accuracy. Best-effort — returns null on any failure.
+ */
+async function runStageEval(
+  agentId: string,
+  requirementId: string,
+  emit: (e: AgentEvent) => void,
+  createdCycleId: string | undefined,
+  testResults: string | undefined,
+  lastTestRun: RunRecord["testRun"]
+): Promise<Evaluation | null> {
+  try {
+    const { evaluateStage } = await import("../eval/run");
+    const req = (await listAll<Requirement>("requirements")).find((r) => r.id === requirementId);
+    const analysis = (await listAll<Analysis>("analyses")).filter((a) => a.requirementId === requirementId).pop();
+    const coverage = (await listAll<Coverage>("coverages")).filter((c) => c.requirementId === requirementId).pop();
+    const script = (await listAll<Script>("scripts")).filter((s) => s.requirementId === requirementId).pop();
+    const cycle = (await listAll<Cycle>("cycles")).filter((c) => c.requirementId === requirementId).pop();
+    const defects = (await listAll<Defect>("defects")).filter((d) => d.requirementId === requirementId);
+    const release = (await listAll<ReleaseReport>("releases")).filter((r) => r.requirementId === requirementId).pop();
+
+    const stageFor: Record<
+      string,
+      { stage: Evaluation["stage"]; artifact: unknown; inputText: string; outputItems: string[] }
+    > = {
+      "requirement-intelligence": {
+        stage: "analyze",
+        artifact: analysis,
+        inputText: req?.content || "Requirement text",
+        outputItems: analysis
+          ? [
+              ...(analysis.businessRules || []).map(String),
+              ...(analysis.acceptanceCriteria || []).map(String),
+              ...(analysis.edgeCases || []).map(String),
+              ...(analysis.scenarios || []).map(String),
+            ]
+          : [],
+      },
+      "manual-test-case": {
+        stage: "coverage",
+        artifact: coverage,
+        inputText: analysis ? JSON.stringify(analysis).slice(0, 6000) : "Analysis",
+        outputItems: coverage ? coverage.testCases.map((t) => t.title || "") : [],
+      },
+      "automation-script": {
+        stage: "automate",
+        artifact: script,
+        inputText: coverage ? coverage.testCases.map((t) => t.title).join("\n") : "Coverage",
+        outputItems: script ? script.files.map((f) => f.path || "") : [],
+      },
+      "execution-defect": {
+        stage: "execute",
+        artifact: cycle,
+        inputText: testResults || `Cycle: ${createdCycleId || "none"} — ${defects.length} defect(s)`,
+        outputItems: cycle ? cycle.executions.map((e) => `${e.caseTitle} [${e.status}]`) : [],
+      },
+      "devops-execution": {
+        stage: "execute",
+        artifact: cycle,
+        inputText: testResults || `Cycle: ${createdCycleId || "none"} — ${defects.length} defect(s)`,
+        outputItems: cycle ? cycle.executions.map((e) => `${e.caseTitle} [${e.status}]`) : [],
+      },
+      "quality-intelligence": {
+        stage: "release",
+        artifact: release,
+        inputText: JSON.stringify({
+          coverageCases: coverage?.testCases.length || 0,
+          defects: defects.length,
+          testRun: lastTestRun,
+        }).slice(0, 4000),
+        outputItems: release ? [...(release.findings || []), ...(release.recommendations || [])] : [],
+      },
+    };
+
+    const def = stageFor[agentId];
+    if (!def || !def.artifact || !def.outputItems.length) return null;
+    emit({ type: "eval_start", agentId, stage: def.stage });
+    const evaluation = await evaluateStage({
+      requirementId,
+      stage: def.stage,
+      agentId,
+      artifactKind: def.stage === "analyze" ? "analyses" : def.stage === "coverage" ? "coverages" : def.stage === "automate" ? "scripts" : def.stage === "execute" ? "cycles" : "releases",
+      artifactId: (def.artifact as { id: string }).id,
+      inputText: def.inputText,
+      outputItems: def.outputItems,
+      outputText: JSON.stringify(def.artifact).slice(0, 12000),
+    });
+    emit({ type: "artifact", agentId: "pipeline", artifact: "evaluation", id: evaluation.id });
+    return evaluation;
+  } catch {
+    return null;
+  }
+}
+
 /** Build + persist a RunRecord from this orchestration. */
 async function saveRunRecord(
   requirementId: string,
@@ -431,6 +665,20 @@ async function saveRunRecord(
       .filter((e) => e.type === "error")
       .map((e) => `Agent ${e.agentId}: ${e.message}`);
 
+    // DeepEval-style stage evaluations from this run (agent code → scores).
+    const evaluations = (events as Array<Record<string, unknown>>)
+      .filter((e) => e.type === "evaluation")
+      .map((e) => {
+        const id = String(e.agentId);
+        const code = id === "pipeline" ? "PIPE" : id.split("-").map((p) => p[0]?.toUpperCase() || "").join("");
+        return {
+          agentCode: code,
+          stage: String(e.stage),
+          precision: Number(e.precision),
+          accuracy: Number(e.accuracy),
+        };
+      });
+
     const record: RunRecord = {
       id: crypto.randomUUID(),
       requirementId,
@@ -448,7 +696,9 @@ async function saveRunRecord(
         cycles: cycleId ? 1 : 0,
         defects: defects.length,
         releases: releases.length,
+        evaluations: evaluations.length,
       },
+      evaluations,
       files: script?.files || [],
       events,
       issues,

@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: APP_NAME,
   description:
     "AI-Powered Quality Engineering. From Requirement to Release Confidence — an agentic QA workspace with six specialist AI agents.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

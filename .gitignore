@@ -9,4 +9,6 @@ __pycache__/
 *.xlsx
 ~$*
 client/dist/
-backups/ 
+backups/
+.vercel
+.env*

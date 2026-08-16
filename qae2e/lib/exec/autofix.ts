@@ -1,8 +1,14 @@
 // Auto-healing test run: materialize generated scripts to a temp dir, run them
 // in Docker, and if tests fail, use the LLM (from .env — free model only) to
 // fix the failing files and re-run. Up to MAX_ATTEMPTS rounds.
+//
+// Self-healing locators: failures whose message matches a selector/locator
+// signature (Timeout waiting for locator, strict mode violation, "resolved to
+// N elements", element not found) get a dedicated locator-repair prompt that
+// follows the POM selector priority chain instead of the generic fix prompt.
 
 import { runTests, hasDocker, type DetailedFailure } from "./index";
+import { remoteRunnerConfigured, runRemote } from "./remote";
 import { chatCompletion, LlmError } from "../llm/openrouter";
 import { getConfig } from "../config";
 import type { Script } from "../types";
@@ -16,9 +22,27 @@ export interface FixRunResult {
   failures: DetailedFailure[];
   logs: string[];
   repoDir: string;
+  results?: Array<{ test: string; status: string; durationMs?: number }>;
 }
 
 const MAX_ATTEMPTS = 3;
+
+/** Heuristic: is this failure a broken/incorrect locator rather than a real
+ *  assertion failure? Matches the error text Playwright emits when a selector
+ *  can't be resolved. */
+function isLocatorFailure(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    /timeout.*(waiting for|locator)/.test(m) ||
+    /waiting for locator/.test(m) ||
+    /locator\('.*'\)/.test(m) ||
+    /strict mode violation/.test(m) ||
+    /resolved to \d+ elements/.test(m) ||
+    /element not found/.test(m) ||
+    /no element found/.test(m) ||
+    /getbyrole|getbylabel|getbytestid|getbytext|getbyplaceholder/.test(m)
+  );
+}
 
 /**
  * Ask the free LLM to fix a failing test file. Returns the fixed file content
@@ -28,12 +52,26 @@ async function llmFixFile(filePath: string, source: string, failures: DetailedFa
   const cfg = getConfig();
   if (!cfg.openrouterApiKey) return null;
 
+  const locatorFailures = failures.filter((f) => isLocatorFailure(f.message));
+  const locatorSection = locatorFailures.length
+    ? `The failures below are SELECTOR/LOCATOR failures — the app's DOM changed or the generated locator is wrong.
+Fix ONLY the locators, using the selector priority chain:
+1. getByRole(name, { role }) — best for buttons/links/headings
+2. getByLabel — form fields
+3. getByPlaceholder — inputs with placeholder text
+4. getByText — visible text
+5. getByTestId — only when a test id exists in the DOM
+6. CSS — absolute last resort
+Never use waitForTimeout. Prefer web-first assertions (toBeVisible, toBeEnabled).
+If the element moved or was renamed, infer the new locator from the page text/semantics in the error's aria snapshot.`
+    : "";
+
   const prompt = `You are fixing a failing Playwright + TypeScript POM automation suite.
 The test command is: ${command}
 
 Failing tests:
 ${failures.map((f) => `- ${f.test}: ${f.message}`).join("\n")}
-
+${locatorSection}
 Here is the current content of ${filePath}:
 \`\`\`
 ${source.slice(0, 8000)}
@@ -100,6 +138,7 @@ export function materializeScripts(script: Script): { repoDir: string; files: { 
         "@playwright/test": "^1.49.0",
         typescript: "^5.7.0",
         "@types/node": "^22.10.0",
+        ...(process.env.ENABLE_A11Y ? { "@axe-core/playwright": "^4.10.0" } : {}),
       },
     };
     const content = JSON.stringify(pkg, null, 2);
@@ -174,13 +213,14 @@ export async function runTestsWithAutofix(
   };
 
   const dockerOk = await hasDocker();
-  if (!dockerOk) {
+  const remote = remoteRunnerConfigured();
+  if (!dockerOk && !remote) {
     return {
       ok: false,
       summary: { passed: 0, failed: 0, skipped: 0, total: 0 },
       attempts: 0,
       failures: [],
-      logs: ["Docker is not running. Start Docker Desktop, then retry."],
+      logs: ["Docker is not running and no remote runner configured (TEST_RUNNER_URL)."],
       repoDir: "",
     };
   }
@@ -192,6 +232,7 @@ export async function runTestsWithAutofix(
 
   let finalSummary = { passed: 0, failed: 0, skipped: 0, total: 0 };
   let finalFailures: DetailedFailure[] = [];
+  let finalResults: Array<{ test: string; status: string; durationMs?: number }> = [];
   let ok = false;
   let attempts = 0;
 
@@ -208,14 +249,37 @@ export async function runTestsWithAutofix(
       writeFileSync(abs, f.content, "utf-8");
     }
 
-    const result = await runTests({
-      requirementId: script.requirementId,
-      repoDir,
-      command,
-    });
+    let result: Awaited<ReturnType<typeof runTests>>;
+    if (remote) {
+      // Remote path: send the current in-memory files directly (they include
+      // any LLM-applied fixes from previous attempts).
+      const remoteResult = await runRemote({
+        files: files.map((f) => ({ path: f.path, content: f.content })),
+        command,
+        image: getConfig().dockerImage,
+        requirementId: script.requirementId,
+      });
+      result = {
+        ok: remoteResult.ok,
+        stdout: remoteResult.stdout,
+        stderr: remoteResult.stderr,
+        exitCode: remoteResult.exitCode,
+        summary: remoteResult.summary,
+        failures: remoteResult.failures,
+        results: remoteResult.results as Awaited<ReturnType<typeof runTests>>["results"],
+        visualDiffs: undefined,
+      };
+    } else {
+      result = await runTests({
+        requirementId: script.requirementId,
+        repoDir,
+        command,
+      });
+    }
 
     finalSummary = result.summary;
     finalFailures = result.failures || [];
+    finalResults = result.results || [];
     if (result.summary.total === 0) {
       log(`Run #${attempt} found 0 tests — suite empty or wrong testDir. Not treating as pass.`);
       break;
@@ -223,6 +287,25 @@ export async function runTestsWithAutofix(
     if (result.ok && result.summary.failed === 0) {
       ok = true;
       log(`Run #${attempt} passed: ${result.summary.passed} passed, ${result.summary.skipped} skipped.`);
+      // Persist repaired files back into the stored Script artifact so the
+      // next run (or GitHub check-in) uses the fixed locators, not the broken ones.
+      if (attempt > 1 && files.length) {
+        try {
+          const { getOne, updateOne } = await import("../store");
+          const stored = await getOne<Script>("scripts", script.id);
+          if (stored) {
+            const byPath = new Map(files.map((f) => [f.path.toLowerCase(), f.content]));
+            const repaired = stored.files.map((f) => {
+              const fixed = byPath.get(f.path.toLowerCase());
+              return fixed !== undefined ? { ...f, code: fixed } : f;
+            });
+            await updateOne("scripts", script.id, { ...stored, files: repaired });
+            log("Persisted repaired files back to the stored script artifact.");
+          }
+        } catch {
+          // best effort — artifact write-back is a convenience, not required
+        }
+      }
       break;
     }
 
@@ -236,7 +319,7 @@ export async function runTestsWithAutofix(
     }
   }
 
-  return { ok, summary: finalSummary, attempts, failures: finalFailures, logs, repoDir };
+  return { ok, summary: finalSummary, attempts, failures: finalFailures, logs, repoDir, results: finalResults.length ? finalResults : undefined };
 }
 
 async function fixFailures(

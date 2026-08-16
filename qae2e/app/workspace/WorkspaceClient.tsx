@@ -3,31 +3,28 @@
 import Link from "next/link";
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ArrowLeft, Play, Loader2, Sparkles, Wand2, GitBranch, ChevronDown, Square, AlertTriangle, RotateCcw, ShieldCheck, Workflow, History, CircleDot, FileText, TestTube2 } from "lucide-react";
+import { Play, Loader2, Sparkles, Wand2, Square, AlertTriangle, RotateCcw, ShieldCheck, Workflow, History, CircleDot, FileText, TestTube2, Settings2, Info, ChevronDown } from "lucide-react";
 import { Stepper, PIPELINE_STEPS } from "@/components/workspace/Stepper";
-import { AgentStream } from "@/components/workspace/AgentStream";
+import { LiveLogs } from "@/components/workspace/LiveLogs";
 import { AnalysisView } from "@/components/workspace/AnalysisView";
 import { TestCasesEditor } from "@/components/workspace/TestCasesEditor";
 import { ScriptView } from "@/components/workspace/ScriptView";
 import { TestRunReport, type TestRunSnapshot } from "@/components/workspace/TestRunReport";
 import { ReleaseGauge } from "@/components/workspace/ReleaseGauge";
 import { TraceabilityRail } from "@/components/workspace/TraceabilityRail";
-import { ConnectorsPanel } from "@/components/workspace/ConnectorsPanel";
-import { GitHubCheckin } from "@/components/workspace/GitHubCheckin";
-import { TestRunner } from "@/components/workspace/TestRunner";
-import { PipelineSetup, type SetupValues } from "@/components/workspace/PipelineSetup";
+import { McpConnectionsCard } from "@/components/workspace/McpConnectionsCard";
+import { PipelineTrace } from "@/components/workspace/PipelineTrace";
 import { PipelineSummary } from "@/components/workspace/PipelineSummary";
-import { RunHistory } from "@/components/workspace/RunHistory";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { readNdjsonStream } from "@/lib/utils";
-import { cn } from "@/lib/utils";
 import type {
   AgentEvent,
   Analysis,
   Coverage,
   Cycle,
   Defect,
+  Evaluation,
   ReleaseReport,
   Requirement,
   Script,
@@ -35,7 +32,7 @@ import type {
 
 const SAMPLE = `Feature: User login with email and password
 
-As a registered user, I want to log in with my email and password so that I can access my account.
+As a registered user, I want to log in with standard_user email and password so that we can access the account.
 
 Acceptance Criteria:
 - Login succeeds with valid email and password
@@ -45,6 +42,8 @@ Acceptance Criteria:
 - After 5 failed attempts, account is locked for 30 minutes
 - "Forgot password" link navigates to reset flow
 - Session expires after 60 minutes of inactivity`;
+
+// Login flow for saucedemo app
 
 // useSearchParams is consumed in this client component; the page module wraps
 // it in a Suspense boundary (see page.tsx).
@@ -74,21 +73,17 @@ export function WorkspacePageInner() {
   }, [router]);
 
   const [requirement, setRequirement] = useState<Requirement | null>(null);
-  const [title, setTitle] = useState("Login flow for web app");
-  const [source, setSource] = useState("manual");
-  const [sourceKey, setSourceKey] = useState("");
+  const [title, setTitle] = useState("Login flow for saucedemo app");
   const [content, setContent] = useState(SAMPLE);
 
   const [running, setRunning] = useState(false);
-  const [fetchingSource, setFetchingSource] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [connectOpen, setConnectOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [doneSteps, setDoneSteps] = useState<Set<string>>(new Set());
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [currentAgent, setCurrentAgent] = useState<{ code: string; name: string; index: number; total: number } | null>(null);
   // Agent that failed (if any) — drives the "Retry from this agent" banner.
   const [failedAgent, setFailedAgent] = useState<{ code: string; name: string; index: number; total: number; message: string } | null>(null);
-  const [devOpsOpen, setDevOpsOpen] = useState(false);
 
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
@@ -97,12 +92,15 @@ export function WorkspacePageInner() {
   const [cycle, setCycle] = useState<Cycle | null>(null);
   const [defects, setDefects] = useState<Defect[]>([]);
   const [release, setRelease] = useState<ReleaseReport | null>(null);
+  // DeepEval-style stage evaluations, keyed by stage (analyze/coverage/automate/execute/release).
+  const [evaluations, setEvaluations] = useState<Record<string, Evaluation>>({});
+  // Stage currently being judged by the DeepEval judge (drives the indicator).
+  const [evaluating, setEvaluating] = useState<{ stage: string; agentCode: string } | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const agentSectionRef = useRef<HTMLDivElement | null>(null);
-  // Last intake values + requirement metadata, so "Retry from failed agent"
-  // can resume with the same env overrides without re-collecting the form.
-  const setupRef = useRef<SetupValues>({});
+  // Last requirement metadata, so "Retry from failed agent" can resume with
+  // the same requirement without re-collecting the form.
   const reqRef = useRef<{ id: string; title: string; source: string; sourceKey?: string; content: string } | null>(null);
 
   const refreshArtifacts = useCallback(async () => {
@@ -118,6 +116,10 @@ export function WorkspacePageInner() {
       if (data.cycle?.length) setCycle(data.cycle[data.cycle.length - 1]);
       if (data.defect?.length) setDefects(data.defect);
       if (data.release?.length) setRelease(data.release[data.release.length - 1]);
+      if (data.evaluation?.length) {
+        const evs = data.evaluation as Evaluation[];
+        setEvaluations(Object.fromEntries(evs.map((e) => [e.stage, e])));
+      }
     } catch {
       // best effort
     }
@@ -137,49 +139,15 @@ export function WorkspacePageInner() {
     }
   };
 
-  const fetchFromSource = async () => {
-    if (!sourceKey) return;
-    setFetchingSource(true);
-    setFetchError(null);
-    try {
-      if (source === "jira") {
-        const res = await fetch("/api/connectors", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "test", connector: "jira", fields: { issueKey: sourceKey } }),
-        });
-        const d = await res.json();
-        // The test endpoint returns ok/detail only — fall back to a clear message.
-        setFetchError(d.ok ? "Jira fetched — check the agent activity for content." : d.detail || "Jira fetch failed");
-        setContent((c) => c); // content comes via the RI agent fetch tool in the pipeline
-      } else if (source === "confluence") {
-        setFetchError("Confluence fetch runs inside the pipeline (RI agent). Paste content or run the pipeline.");
-      } else if (source === "figma") {
-        setFetchError("Figma fetch runs inside the pipeline (RI agent). Paste content or run the pipeline.");
-      } else {
-        setFetchError("Manual/other source — paste the requirement text.");
-      }
-    } catch (err) {
-      setFetchError(String(err));
-    } finally {
-      setFetchingSource(false);
-    }
-  };
-
   // Build the requirement object the pipeline (or a single agent) runs on.
   const buildRequirement = (): Requirement => ({
     id: crypto.randomUUID(),
     title,
-    source: source as Requirement["source"],
-    sourceKey: sourceKey || undefined,
+    source: "manual",
+    sourceKey: undefined,
     content,
     createdAt: new Date().toISOString(),
   });
-
-  const sourceHint =
-    source !== "manual" && sourceKey
-      ? ` The requirement came from ${source} with key/id "${sourceKey}". If the content above was not already fetched, call the matching fetch tool (jira_fetch_issue / confluence_fetch_page / figma_fetch_file) to load it before analyzing.`
-      : "";
 
   // Shared NDJSON handler: appends events, advances the stepper as agents
   // finish, and refreshes artifacts as new ones appear.
@@ -238,10 +206,18 @@ export function WorkspacePageInner() {
         message: e.message,
       });
     }
+    if (e.type === "evaluation") {
+      setEvaluating(null);
+      void refreshArtifactsWith(rid);
+    }
+    if (e.type === "eval_start") {
+      const code = e.agentId.split("-").map((p) => p[0]?.toUpperCase() || "").join("");
+      setEvaluating({ stage: e.stage, agentCode: code });
+    }
   };
 
   // ONE-CLICK: run the full 6-agent chain.
-  const handleRunPipeline = async (setup?: SetupValues) => {
+  const handleRunPipeline = async () => {
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
@@ -257,11 +233,14 @@ export function WorkspacePageInner() {
     setCycle(null);
     setDefects([]);
     setRelease(null);
+    setEvaluations({});
+    setEvaluating(null);
+    // Collapse the intake card so the live pipeline view is front and center.
+    setConnectOpen(false);
 
     const req = buildRequirement();
     setRequirement(req);
-    setupRef.current = setup || {};
-    reqRef.current = { id: req.id, title: req.title, source: req.source, sourceKey: sourceKey || undefined, content: req.content + sourceHint };
+    reqRef.current = { id: req.id, title: req.title, source: req.source, sourceKey: undefined, content: req.content };
 
     // Scroll to the live agent section so the user sees the pipeline started.
     requestAnimationFrame(() => {
@@ -269,29 +248,16 @@ export function WorkspacePageInner() {
     });
 
     try {
-      const env: Record<string, string> = {};
-      if (setup?.githubToken) env.GITHUB_TOKEN = setup.githubToken;
-      if (setup?.githubOwner) env.GITHUB_OWNER = setup.githubOwner;
-      if (setup?.githubRepo) env.GITHUB_REPO = setup.githubRepo;
-      if (setup?.jiraProjectKey) env.JIRA_PROJECT_KEY = setup.jiraProjectKey;
-      if (setup?.testrailRunId) env.TESTRAIL_RUN_ID = setup.testrailRunId;
-      if (setup?.dockerImage) env.DOCKER_IMAGE = setup.dockerImage;
-      if (setup?.sourceKey) {
-        // Non-manual source key: hint RI to fetch from the connector.
-        setSourceKey(setup.sourceKey);
-      }
-
       const res = await fetch("/api/pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           requirementId: req.id,
           title: req.title,
-          source: req.source,
-          sourceKey: setup?.sourceKey || req.sourceKey,
-          content: req.content + sourceHint,
+          source: "manual",
+          sourceKey: undefined,
+          content: req.content,
           workspaceId,
-          env: Object.keys(env).length ? env : undefined,
         }),
         signal: controller.signal,
       });
@@ -313,7 +279,7 @@ export function WorkspacePageInner() {
   /**
    * Resume from the agent that failed: re-run that agent, then automatically
    * continue the remaining agents (the orchestrator's `startFrom` skips the
-   * earlier agents). Uses the same requirement + intake env as the last run.
+   * earlier agents). Uses the same requirement as the last run.
    */
   const resumePipeline = async () => {
     if (!failedAgent || !reqRef.current) return;
@@ -324,17 +290,8 @@ export function WorkspacePageInner() {
     setCurrentAgent(null);
     setFailedAgent(null);
 
-    const setup = setupRef.current;
     const req = reqRef.current;
     try {
-      const env: Record<string, string> = {};
-      if (setup?.githubToken) env.GITHUB_TOKEN = setup.githubToken;
-      if (setup?.githubOwner) env.GITHUB_OWNER = setup.githubOwner;
-      if (setup?.githubRepo) env.GITHUB_REPO = setup.githubRepo;
-      if (setup?.jiraProjectKey) env.JIRA_PROJECT_KEY = setup.jiraProjectKey;
-      if (setup?.testrailRunId) env.TESTRAIL_RUN_ID = setup.testrailRunId;
-      if (setup?.dockerImage) env.DOCKER_IMAGE = setup.dockerImage;
-
       const res = await fetch("/api/pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -342,11 +299,10 @@ export function WorkspacePageInner() {
           requirementId: req.id,
           title: req.title,
           source: req.source,
-          sourceKey: setup?.sourceKey || req.sourceKey,
+          sourceKey: undefined,
           content: req.content,
           startFrom,
           workspaceId,
-          env: Object.keys(env).length ? env : undefined,
         }),
         signal: controller.signal,
       });
@@ -376,6 +332,10 @@ export function WorkspacePageInner() {
       if (data.cycle?.length) setCycle(data.cycle[data.cycle.length - 1]);
       if (data.defect?.length) setDefects(data.defect);
       if (data.release?.length) setRelease(data.release[data.release.length - 1]);
+      if (data.evaluation?.length) {
+        const evs = data.evaluation as Evaluation[];
+        setEvaluations(Object.fromEntries(evs.map((e) => [e.stage, e])));
+      }
     } catch {
       // best effort
     }
@@ -385,6 +345,7 @@ export function WorkspacePageInner() {
     abortRef.current?.abort();
     setRunning(false);
     setCurrentAgent(null);
+    setEvaluating(null);
     // Mark the run as stopped so the UI doesn't look like it's still going.
     setEvents((prev) => [
       ...prev,
@@ -425,6 +386,12 @@ export function WorkspacePageInner() {
             >
               <History size={14} /> History
             </Link>
+            <Link
+              href={`/settings?workspaceId=${encodeURIComponent(workspaceId)}&tab=integrations`}
+              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg border border-border text-text-secondary text-sm font-semibold hover:bg-bg-hover transition-colors"
+            >
+              <Settings2 size={14} /> Settings
+            </Link>
             {running ? (
               <Button
                 variant="secondary"
@@ -458,7 +425,7 @@ export function WorkspacePageInner() {
           {/* Horizontal flow steps (wrap on mobile) */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {[
-              { icon: CircleDot, step: "1", title: "Connect", text: "Paste a requirement or pull it from Jira, Confluence, or Figma." },
+              { icon: CircleDot, step: "1", title: "Connect", text: "Paste a requirement — the current workflow supports copy-pasted requirements only." },
               { icon: Workflow, step: "2", title: "Analyze", text: "RI extracts business rules, acceptance criteria, risks, and edge cases." },
               { icon: FileText, step: "3", title: "Coverage", text: "MT drafts editable manual test cases, grounded in existing ones." },
               { icon: TestTube2, step: "4", title: "Automate", text: "AS generates a Playwright POM suite server-side from your coverage." },
@@ -493,63 +460,64 @@ export function WorkspacePageInner() {
           <div className="space-y-6 min-w-0">
             {/* Step 01 — Connect */}
             <Card className="p-6">
-              <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setConnectOpen((o) => !o)}
+                className="w-full flex items-center gap-2"
+                type="button"
+              >
                 <Wand2 size={16} className="text-amber-600" />
                 <h2 className="font-semibold text-text-primary">1 · Connect your source</h2>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Requirement title"
-                  className="rounded-lg border border-border-input bg-bg-input px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500"
-                />
-                <div className="flex gap-3">
-                  <select
-                    value={source}
-                    onChange={(e) => setSource(e.target.value)}
-                    className="rounded-lg border border-border-input bg-bg-input px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="manual">Manual input</option>
-                    <option value="jira">Jira</option>
-                    <option value="confluence">Confluence</option>
-                    <option value="figma">Figma</option>
-                    <option value="other">Other</option>
-                  </select>
+                {!connectOpen && (
+                  <span className="ml-auto text-xs text-text-muted flex items-center gap-1.5">
+                    {running ? "Pipeline running — watching live logs below" : "Collapsed"}
+                    <ChevronDown size={14} className="transition-transform" />
+                  </span>
+                )}
+                {connectOpen && <ChevronDown size={14} className="ml-auto text-text-muted rotate-180" />}
+              </button>
+
+              {connectOpen && (
+                <>
+                  {/* Copy-paste-only notice */}
+                  <div className="flex items-center gap-3 px-4 py-3 mt-4 mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10">
+                    <Info size={16} className="text-amber-600 shrink-0" />
+                    <p className="text-sm text-text-primary">
+                      Currently supporting <span className="font-bold text-amber-700">copy-pasted requirements</span> only —
+                      MCP connections (Jira / Confluence / GitHub / Zephyr / TestRail / Pinecone) are coming soon.
+                    </p>
+                  </div>
+
                   <input
-                    value={sourceKey}
-                    onChange={(e) => setSourceKey(e.target.value)}
-                    placeholder={source === "jira" ? "Jira issue key (QA-123)" : source === "confluence" ? "Page ID" : source === "figma" ? "Figma file key" : "Source key"}
-                    className="flex-1 rounded-lg border border-border-input bg-bg-input px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Requirement title"
+                    className="rounded-lg border border-border-input bg-bg-input px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500"
                   />
-                </div>
-              </div>
-              <div className="flex items-end gap-2">
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows={10}
-                  placeholder="Paste the requirement text… (or click Fetch from source)"
-                  className="mt-3 w-full rounded-lg border border-border-input bg-bg-input px-3.5 py-3 text-sm leading-relaxed focus:outline-none focus:border-amber-500 font-mono"
-                />
-                <button
-                  onClick={fetchFromSource}
-                  disabled={fetchingSource || running || !sourceKey}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-700 text-xs font-semibold hover:bg-amber-500/15 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {fetchingSource ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-                  {fetchingSource ? "Fetching…" : "Fetch from source"}
-                </button>
-              </div>
-              {fetchError && <p className="mt-2 text-xs text-red-600">{fetchError}</p>}
-              <PipelineSetup onRun={handleRunPipeline} onStop={stopPipeline} running={running} />
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    rows={10}
+                    placeholder="Paste the requirement text…"
+                    className="mt-3 w-full rounded-lg border border-border-input bg-bg-input px-3.5 py-3 text-sm leading-relaxed focus:outline-none focus:border-amber-500 font-mono"
+                  />
+                </>
+              )}
             </Card>
 
-            {/* Running-agent banner + stop */}
+            {/* Status banner — running agent OR AI evaluation judging (never both) */}
             <div ref={agentSectionRef} className="scroll-mt-24 space-y-3">
-            {(running || currentAgent) && (
+            {evaluating ? (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <p className="text-sm text-text-primary flex-1 min-w-0">
+                  <span className="font-bold text-emerald-700">AI Evaluation</span> — checking the{" "}
+                  <span className="font-semibold capitalize">{evaluating.stage}</span> output ({evaluating.agentCode})
+                  against the requirement…
+                </p>
+              </div>
+            ) : (running || currentAgent) ? (
               <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/10">
-                <Loader2 size={16} className="animate-spin text-amber-600 shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
                 <p className="text-sm text-text-primary flex-1 min-w-0">
                   {currentAgent ? (
                     <>
@@ -571,7 +539,7 @@ export function WorkspacePageInner() {
                   </button>
                 )}
               </div>
-            )}
+            ) : null}
             </div>
 
             {/* Retry banner — shown after an agent failed */}
@@ -593,33 +561,17 @@ export function WorkspacePageInner() {
               </div>
             )}
 
-            {/* Live agent stream */}
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">Agent activity</h3>
-                {running && <Loader2 size={14} className="animate-spin text-amber-600" />}
-              </div>
-              <div className="max-h-[320px] overflow-y-auto agent-log-scroll">
-                <AgentStream events={events} />
-              </div>
-            </Card>
+            {/* Live pipeline trace — every stage, tool, artifact, and DeepEval score */}
+            <PipelineTrace events={events} evaluations={evaluations} running={running} evaluating={evaluating} />
 
             {/* Run summary — shown after a run completes */}
             {!running && events.length > 0 && <PipelineSummary events={events} />}
 
             {/* Step artifacts */}
-            {analysis && <AnalysisView analysis={analysis} />}
-            {coverage && <TestCasesEditor coverage={coverage} onEdit={saveCoverage} />}
-            <ScriptView script={script} waiting={Boolean(coverage && !script)} />
-            <TestRunReport run={testRun} />
-            {script && (
-              <TestRunner
-                requirementId={requirement?.id ?? null}
-                coverage={coverage}
-                workspaceId={workspaceId}
-                onRequirementText={(text) => setContent((c) => (text ? `${c}\n\n${text}` : c))}
-              />
-            )}
+            {analysis && <AnalysisView analysis={analysis} evaluation={evaluations.analyze} />}
+            {coverage && <TestCasesEditor coverage={coverage} onEdit={saveCoverage} evaluation={evaluations.coverage} />}
+            <ScriptView script={script} waiting={Boolean(coverage && !script)} evaluation={evaluations.automate} />
+            <TestRunReport run={testRun} evaluation={evaluations.execute} />
             {release && (
               <Card className="p-6">
                 <h3 className="font-semibold text-text-primary mb-3">Release report</h3>
@@ -644,31 +596,14 @@ export function WorkspacePageInner() {
               </Card>
             )}
 
-            {/* Optional GitHub check-in (Docker run is above in main column) */}
-            <div>
-              <button
-                onClick={() => setDevOpsOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-border bg-bg-surface hover:bg-bg-hover transition-colors"
-              >
-                <span className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                  <GitBranch size={15} className="text-amber-600" />
-                  Optional: check in to GitHub
-                </span>
-                <ChevronDown size={16} className={cn("text-text-muted transition-transform", devOpsOpen && "rotate-180")} />
-              </button>
-              {devOpsOpen && (
-                <div className="mt-3">
-                  <GitHubCheckin script={script} requirementId={requirement?.id ?? null} />
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right rail */}
           <div className="space-y-6">
-            <ConnectorsPanel workspaceId={workspaceId} />
-            <ReleaseGauge report={release} />
-            <RunHistory workspaceId={workspaceId} />
+            <McpConnectionsCard />
+            {/* Live logs — everything happening in the run, in a scrolling feed */}
+            <LiveLogs events={events} running={running} />
+            <ReleaseGauge report={release} evaluation={evaluations.release} />
             <TraceabilityRail
               requirement={requirement}
               analysis={analysis}
@@ -681,9 +616,6 @@ export function WorkspacePageInner() {
               currentAgentCode={currentAgent?.code ?? null}
               doneSteps={doneSteps}
             />
-            <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-amber-700 transition-colors">
-              <ArrowLeft size={14} /> Back to landing
-            </Link>
           </div>
         </div>
       </main>

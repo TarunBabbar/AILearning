@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { listAll, getOne, updateOne, withWorkspace } from "@/lib/store";
-import type { Analysis, Coverage, Cycle, Defect, ReleaseReport, Requirement, Script } from "@/lib/types";
+import type { Analysis, Coverage, Cycle, Defect, Evaluation, ReleaseReport, Requirement, Script } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const KEY_MAP: Record<string, "requirements" | "analyses" | "coverages" | "scripts" | "cycles" | "defects" | "releases"> = {
+const KEY_MAP: Record<string, "requirements" | "analyses" | "coverages" | "scripts" | "cycles" | "defects" | "releases" | "evaluations"> = {
   requirement: "requirements",
   analysis: "analyses",
   coverage: "coverages",
@@ -12,6 +12,7 @@ const KEY_MAP: Record<string, "requirements" | "analyses" | "coverages" | "scrip
   cycle: "cycles",
   defect: "defects",
   release: "releases",
+  evaluation: "evaluations",
 };
 
 // GET /api/artifacts?type=analysis&id=...  or  GET /api/artifacts?requirementId=...
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
       cycle: await listAll<Cycle>("cycles"),
       defect: await listAll<Defect>("defects"),
       release: await listAll<ReleaseReport>("releases"),
+      evaluation: await listAll<Evaluation>("evaluations"),
     };
 
     if (type && store[type]) {

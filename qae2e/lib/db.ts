@@ -13,7 +13,8 @@ export interface DbRow {
 }
 
 function pgConfigured(): boolean {
-  return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_HOST || process.env.POSTGRES_DATABASE);
+  // Accept POSTGRES_URL (Vercel/Neon native) or DATABASE_URL (generic Postgres).
+  return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_HOST || process.env.POSTGRES_DATABASE || process.env.DATABASE_URL);
 }
 
 /** Best-effort table bootstrap. Returns true when Postgres is usable. */
@@ -50,9 +51,16 @@ async function ensureTables(): Promise<boolean> {
     )`;
     await sql`CREATE INDEX IF NOT EXISTS idx_artifacts_ws ON artifacts (workspace_id, kind)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_artifacts_req ON artifacts (workspace_id, requirement_id)`;
-    await sql`CREATE TABLE IF NOT EXISTS workspace_secrets (
+    await sql`CREATE TABLE IF NOT EXISTS workspace_settings (
       workspace_id TEXT PRIMARY KEY,
-      secrets JSONB NOT NULL
+      settings JSONB NOT NULL
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS workspace_members (
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (workspace_id, user_id)
     )`;
     await sql`CREATE TABLE IF NOT EXISTS qae2e_runs (
       id TEXT PRIMARY KEY,
@@ -158,6 +166,27 @@ export async function getSession(id: string): Promise<{ id: string; userId: stri
   return all.find((s) => s.id === id);
 }
 
+export async function listSessionsForUser(userId: string): Promise<Array<{ id: string; createdAt: string; expiresAt: string }>> {
+  if (pgConfigured()) {
+    try {
+      await ensureTables();
+      const { sql } = await import("@vercel/postgres");
+      const rows = await sql`SELECT id, created_at, expires_at FROM sessions WHERE user_id = ${userId} ORDER BY created_at DESC`;
+      return (rows.rows || []).map((r) => {
+        const x = r as { id: string; created_at: string; expires_at: string };
+        return { id: x.id, createdAt: x.created_at, expiresAt: x.expires_at };
+      });
+    } catch {
+      // fall through
+    }
+  }
+  const all = await readFileStore<{ id: string; userId: string; createdAt?: string; expiresAt: string }>("sessions");
+  return all
+    .filter((s) => s.userId === userId)
+    .map((s) => ({ id: s.id, createdAt: s.createdAt || s.expiresAt, expiresAt: s.expiresAt }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 export async function deleteSession(id: string): Promise<void> {
   if (pgConfigured()) {
     try {
@@ -216,6 +245,22 @@ export async function listWorkspaces(ownerId: string): Promise<Array<{ id: strin
   }));
 }
 
+/** List every workspace (cron/regression sweep — not user-scoped). */
+export async function listAllWorkspaces(): Promise<Array<{ id: string; name: string }>> {
+  if (pgConfigured()) {
+    try {
+      await ensureTables();
+      const { sql } = await import("@vercel/postgres");
+      const rows = await sql`SELECT id, name FROM workspaces ORDER BY created_at ASC`;
+      return (rows.rows || []).map((r) => ({ id: String((r as { id: unknown }).id), name: String((r as { name: unknown }).name) }));
+    } catch {
+      // fall through
+    }
+  }
+  const all = await readFileStore<Record<string, unknown>>("workspaces");
+  return all.map((w) => ({ id: String(w.id), name: String(w.name || "") }));
+}
+
 export async function getWorkspace(workspaceId: string): Promise<{ id: string; ownerId: string; name: string } | undefined> {
   if (pgConfigured()) {
     try {
@@ -233,38 +278,127 @@ export async function getWorkspace(workspaceId: string): Promise<{ id: string; o
   return all.find((w) => w.id === workspaceId);
 }
 
-// ---- Secrets ----
+// Note: per-workspace connector secrets (workspace_secrets) and the connector
+// audit log were removed with the real connector layer — the current workflow
+// is copy-paste-only with MCP placeholders.
 
-export async function saveWorkspaceSecrets(workspaceId: string, secrets: Record<string, string>): Promise<void> {
+// ---- Workspace settings (flaky quarantine, regression toggles, …) ----
+
+export async function getWorkspaceSettings(workspaceId: string): Promise<Record<string, unknown>> {
   if (pgConfigured()) {
     try {
       await ensureTables();
       const { sql } = await import("@vercel/postgres");
-      await sql`INSERT INTO workspace_secrets (workspace_id, secrets) VALUES (${workspaceId}, ${JSON.stringify(secrets)}::jsonb)
-        ON CONFLICT (workspace_id) DO UPDATE SET secrets = EXCLUDED.secrets`;
+      const rows = await sql`SELECT settings FROM workspace_settings WHERE workspace_id = ${workspaceId} LIMIT 1`;
+      return (rows.rows?.[0]?.settings as Record<string, unknown>) || {};
+    } catch {
+      // fall through
+    }
+  }
+  const all = await readFileStore<Record<string, unknown>>("workspace_settings");
+  return (all.find((x) => x.workspaceId === workspaceId)?.settings as Record<string, unknown>) || {};
+}
+
+export async function saveWorkspaceSettings(workspaceId: string, settings: Record<string, unknown>): Promise<void> {
+  if (pgConfigured()) {
+    try {
+      await ensureTables();
+      const { sql } = await import("@vercel/postgres");
+      await sql`INSERT INTO workspace_settings (workspace_id, settings) VALUES (${workspaceId}, ${JSON.stringify(settings)}::jsonb)
+        ON CONFLICT (workspace_id) DO UPDATE SET settings = EXCLUDED.settings`;
       return;
     } catch {
       // fall through
     }
   }
-  const all = await readFileStore<Record<string, unknown>>("workspace_secrets");
+  const all = await readFileStore<Record<string, unknown>>("workspace_settings");
   const rest = all.filter((x) => x.workspaceId !== workspaceId);
-  await writeFileStore("workspace_secrets", [...rest, { workspaceId, secrets }]);
+  await writeFileStore("workspace_settings", [...rest, { workspaceId, settings }]);
 }
 
-export async function getWorkspaceSecrets(workspaceId: string): Promise<Record<string, string>> {
+// ---- Workspace members (team workspaces) ----
+
+export interface WorkspaceMember {
+  workspaceId: string;
+  userId: string;
+  email: string;
+  name?: string;
+  role: "owner" | "admin" | "member";
+  createdAt: string;
+}
+
+export async function addWorkspaceMember(workspaceId: string, userId: string, role: "owner" | "admin" | "member" = "member"): Promise<void> {
   if (pgConfigured()) {
     try {
       await ensureTables();
       const { sql } = await import("@vercel/postgres");
-      const rows = await sql`SELECT secrets FROM workspace_secrets WHERE workspace_id = ${workspaceId} LIMIT 1`;
-      return (rows.rows?.[0]?.secrets as Record<string, string>) || {};
+      await sql`INSERT INTO workspace_members (workspace_id, user_id, role) VALUES (${workspaceId}, ${userId}, ${role})
+        ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role`;
+      return;
     } catch {
       // fall through
     }
   }
-  const all = await readFileStore<Record<string, unknown>>("workspace_secrets");
-  return (all.find((x) => x.workspaceId === workspaceId)?.secrets as Record<string, string>) || {};
+  const all = await readFileStore<Record<string, unknown>>("workspace_members");
+  const rest = all.filter((m) => m.workspaceId !== workspaceId || m.userId !== userId);
+  await writeFileStore("workspace_members", [...rest, { workspaceId, userId, role, createdAt: new Date().toISOString() }]);
+}
+
+export async function listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
+  if (pgConfigured()) {
+    try {
+      await ensureTables();
+      const { sql } = await import("@vercel/postgres");
+      const rows = await sql`SELECT wm.workspace_id, wm.user_id, wm.role, wm.created_at, u.email, u.name
+        FROM workspace_members wm JOIN users u ON u.id = wm.user_id
+        WHERE wm.workspace_id = ${workspaceId} ORDER BY wm.created_at ASC`;
+      return (rows.rows || []).map((r) => {
+        const x = r as { workspace_id: string; user_id: string; role: string; created_at: string; email: string; name: string | null };
+        return {
+          workspaceId: x.workspace_id,
+          userId: x.user_id,
+          role: x.role as WorkspaceMember["role"],
+          email: x.email,
+          name: x.name || undefined,
+          createdAt: x.created_at,
+        };
+      });
+    } catch {
+      // fall through
+    }
+  }
+  const all = await readFileStore<WorkspaceMember>("workspace_members");
+  return all.filter((m) => m.workspaceId === workspaceId);
+}
+
+export async function getWorkspaceMemberRole(workspaceId: string, userId: string): Promise<"owner" | "admin" | "member" | null> {
+  if (pgConfigured()) {
+    try {
+      await ensureTables();
+      const { sql } = await import("@vercel/postgres");
+      const rows = await sql`SELECT role FROM workspace_members WHERE workspace_id = ${workspaceId} AND user_id = ${userId} LIMIT 1`;
+      return (rows.rows?.[0]?.role as "owner" | "admin" | "member") || null;
+    } catch {
+      // fall through
+    }
+  }
+  const all = await readFileStore<WorkspaceMember>("workspace_members");
+  return all.find((m) => m.workspaceId === workspaceId && m.userId === userId)?.role || null;
+}
+
+export async function removeWorkspaceMember(workspaceId: string, userId: string): Promise<void> {
+  if (pgConfigured()) {
+    try {
+      await ensureTables();
+      const { sql } = await import("@vercel/postgres");
+      await sql`DELETE FROM workspace_members WHERE workspace_id = ${workspaceId} AND user_id = ${userId}`;
+      return;
+    } catch {
+      // fall through
+    }
+  }
+  const all = await readFileStore<WorkspaceMember>("workspace_members");
+  await writeFileStore("workspace_members", all.filter((m) => m.workspaceId !== workspaceId || m.userId !== userId));
 }
 
 // ---- Artifacts ----
@@ -404,7 +538,7 @@ async function filePath(): Promise<string> {
   return join(process.cwd(), getConfig().dataDir, "db.json");
 }
 
-async function readFileStore<T>(kind: string, workspaceId?: string): Promise<T[]> {
+export async function readFileStore<T>(kind: string, workspaceId?: string): Promise<T[]> {
   try {
     const { readFileSync } = await import("fs");
     const all = JSON.parse(readFileSync(await filePath(), "utf-8")) as FileStoreShape;
@@ -416,7 +550,7 @@ async function readFileStore<T>(kind: string, workspaceId?: string): Promise<T[]
   }
 }
 
-async function writeFileStore(kind: string, items: unknown[], workspaceId?: string): Promise<void> {
+export async function writeFileStore(kind: string, items: unknown[], workspaceId?: string): Promise<void> {
   try {
     const { mkdirSync, readFileSync, writeFileSync } = await import("fs");
     const { join } = await import("path");

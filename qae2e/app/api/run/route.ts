@@ -19,8 +19,6 @@ export async function POST(req: NextRequest) {
   const repoDirIn = String(body.repoDir || "");
   const repoUrl = String(body.repoUrl || "");
   const command = String(body.command || "");
-  const jiraProjectKey = String(body.jiraProjectKey || "");
-  const testrailRunId = body.testrailRunId ? Number(body.testrailRunId) : undefined;
   const workspaceId = String(body.workspaceId || "");
   if (!requirementId) return Response.json({ error: "requirementId required" }, { status: 400 });
 
@@ -75,8 +73,6 @@ export async function POST(req: NextRequest) {
             repoDir,
             repoUrl: repoUrl || undefined,
             command: command || undefined,
-            jiraProjectKey: jiraProjectKey || undefined,
-            testrailRunId,
           })
         );
 

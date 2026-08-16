@@ -44,11 +44,17 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
   ];
 
   const isAS = agent.id === "automation-script";
+  const isRI = agent.id === "requirement-intelligence";
+  const isMT = agent.id === "manual-test-case";
   const maxSteps = opts.maxSteps ?? (isAS ? 12 : 10);
   let steps = 0;
   let scriptSaved = false;
   let coverageFetched = false;
+  let analysisSaved = false;
+  let coverageSaved = false;
   let asNudges = 0;
+  let riNudges = 0;
+  let mtNudges = 0;
   const lc = opts.lifecycle || { index: 0, total: 1 };
 
   push({ type: "status", agentId: agent.id, message: `${agent.name} started` });
@@ -67,6 +73,15 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
         } else {
           toolChoice = "required";
         }
+      }
+      // RI: force tool use on the first turn so it analyzes the pre-saved
+      // requirement instead of replying with prose.
+      if (isRI && steps === 1 && !analysisSaved) {
+        toolChoice = { type: "function", function: { name: "requirement_analyze" } };
+      }
+      // MT: force tool use on the first turn so it loads the analysis.
+      if (isMT && steps === 1 && !coverageSaved) {
+        toolChoice = { type: "function", function: { name: "requirement_analyze" } };
       }
 
       const res = await chatCompletion(messages, {
@@ -110,6 +125,34 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
           });
           continue;
         }
+        if (isRI && !analysisSaved && riNudges < 2 && steps < maxSteps) {
+          riNudges++;
+          push({
+            type: "status",
+            agentId: agent.id,
+            message: `RI returned prose without saving an analysis — nudge ${riNudges}/2`,
+          });
+          messages.push({
+            role: "user",
+            content:
+              "STOP writing prose. The requirement is already saved. Call requirement_analyze with the requirementId, then return the full analysis JSON as your final message. Do not ask for the requirement text.",
+          });
+          continue;
+        }
+        if (isMT && !coverageSaved && mtNudges < 2 && steps < maxSteps) {
+          mtNudges++;
+          push({
+            type: "status",
+            agentId: agent.id,
+            message: `MT returned prose without saving coverage — nudge ${mtNudges}/2`,
+          });
+          messages.push({
+            role: "user",
+            content:
+              "STOP writing prose. Call requirement_analyze to load the analysis, then coverage_save with the test cases. Do not return prose only.",
+          });
+          continue;
+        }
         break;
       }
 
@@ -142,6 +185,11 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
           if (tool.name === "coverage_get" && !text.startsWith("ERROR")) {
             coverageFetched = true;
           }
+          if (tool.name === "requirement_analyze" && !text.startsWith("ERROR")) {
+            // RI uses the returned content to produce the analysis; MT uses it
+            // to build coverage. Mark the source loaded so nudges stop.
+            analysisSaved = true;
+          }
           if (
             (tool.name === "automation_framework_generate" || tool.name === "script_save") &&
             text.startsWith("Script saved")
@@ -150,6 +198,7 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
             const id = text.match(/id=([^\s]+)/)?.[1];
             if (id) push({ type: "artifact", agentId: agent.id, artifact: "script", id });
           } else if (tool.name === "coverage_save" && text.startsWith("Coverage saved")) {
+            coverageSaved = true;
             const id = text.match(/id=([^\s]+)/)?.[1];
             if (id) push({ type: "artifact", agentId: agent.id, artifact: "coverage", id });
           }

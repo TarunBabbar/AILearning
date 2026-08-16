@@ -1,18 +1,21 @@
 "use client";
 
-import type { Coverage, TestCase } from "@/lib/types";
+import type { Coverage, Evaluation, TestCase } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Pencil, ListChecks, Download, FileSpreadsheet } from "lucide-react";
 import { useState } from "react";
+import { EvaluationCard } from "@/components/workspace/EvaluationCard";
 
 export function TestCasesEditor({
   coverage,
   onEdit,
+  evaluation,
 }: {
   coverage: Coverage | null;
   onEdit: (coverage: Coverage) => void;
+  evaluation?: Evaluation | null;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -52,9 +55,25 @@ export function TestCasesEditor({
         </div>
       </div>
 
+      {evaluation && (
+        <div className="mb-4">
+          <EvaluationCard
+            stageLabel="Coverage"
+            precision={evaluation.precision}
+            accuracy={evaluation.accuracy}
+            rationale={evaluation.rationale}
+            overall={evaluation.overall}
+            improvements={evaluation.improvements}
+            verdict={evaluation.verdict}
+            metrics={evaluation.metrics}
+            perItem={evaluation.perItem}
+          />
+        </div>
+      )}
+
       <div className="space-y-2">
-        {coverage.testCases.map((tc) => (
-          <div key={tc.id} className="rounded-lg border border-border bg-bg-page overflow-hidden">
+        {coverage.testCases.map((tc, i) => (
+          <div key={tc.id || `tc-${i}`} className="rounded-lg border border-border bg-bg-page overflow-hidden">
             <button
               onClick={() => toggle(tc.id)}
               className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-bg-hover/50 transition-colors"
@@ -65,7 +84,9 @@ export function TestCasesEditor({
                   tc.priority === "high" ? "bg-red-500" : tc.priority === "medium" ? "bg-amber-500" : "bg-emerald-500"
                 )}
               />
-              <span className="flex-1 text-sm font-semibold text-text-primary">{tc.title}</span>
+              <span className="flex-1 text-sm font-semibold text-text-primary">
+                {tc.title || tc.description || tc.steps?.[0]?.action || `Test case ${i + 1}`}
+              </span>
               <Badge tone="default" className="hidden sm:inline-flex">{tc.testType}</Badge>
               <Badge tone={tc.scenarioType === "positive" ? "green" : tc.scenarioType === "negative" ? "red" : "amber"}>
                 {tc.scenarioType || "positive"}

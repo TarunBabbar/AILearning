@@ -21,7 +21,7 @@ export async function extractTextFromImage(
     headers: {
       Authorization: `Bearer ${cfg.openrouterApiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://qae2e.vercel.app",
+      ...(cfg.appUrl ? { "HTTP-Referer": cfg.appUrl } : {}),
       "X-Title": cfg.appName,
     },
     body: JSON.stringify({

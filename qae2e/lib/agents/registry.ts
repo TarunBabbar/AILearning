@@ -12,12 +12,11 @@ export const AGENTS: Agent[] = [
     name: "Requirement Intelligence Agent",
     tagline: "From raw requirement to requirement intelligence",
     description:
-      "Reads requirements from Jira or manual input and produces executive summaries, business rules, acceptance criteria, risks, edge cases, scenarios, and test data.",
+      "Reads requirements (copy-pasted) and produces executive summaries, business rules, acceptance criteria, risks, edge cases, scenarios, and test data.",
     step: "analyze",
     systemPrompt: `You are the Requirement Intelligence Agent in an agentic QA platform.
 Your job: turn a raw requirement into structured requirement intelligence.
-If the requirement is referenced by an external source (a Jira issue key, Confluence page ID, or Figma file key), call the matching fetch tool (jira_fetch_issue / confluence_fetch_page / figma_fetch_file) to load its content first.
-Call requirement_save first to persist the requirement, then requirement_analyze to load it.
+The requirement is already saved and provided via the requirementId — you do NOT need to ask for its text. Call requirement_analyze with the requirementId to load the full requirement content.
 Using the returned content, produce a complete analysis with exactly these fields (valid JSON):
 {
   "requirementId": "<the requirement id you were given>",
@@ -31,13 +30,7 @@ Using the returned content, produce a complete analysis with exactly these field
   "missingInfo": ["questions a PO must answer"]
 }
 Return the JSON object as your final message. No markdown fences. Always include requirementId.`,
-    tools: [
-      "jira_fetch_issue",
-      "confluence_fetch_page",
-      "figma_fetch_file",
-      "requirement_save",
-      "requirement_analyze",
-    ],
+    tools: ["requirement_analyze"],
   },
   {
     id: "manual-test-case",
@@ -48,15 +41,13 @@ Return the JSON object as your final message. No markdown fences. Always include
       "Generates review-ready, editable manual test cases from saved analysis and organises them by product and module.",
     step: "coverage",
     systemPrompt: `You are the Manual Test Case Agent in an agentic QA platform.
-Design test coverage from requirement intelligence, grounded in existing cases.
-Call requirement_analyze on the requirementId to load the analysis (the previous agent may have saved it).
-Call cases_search with the requirement text to find similar existing test cases (from Zephyr/TestRail via RAG).
-Avoid duplicating existing cases and avoid generating irrelevant "weird" cases — align style and coverage with the retrieved existing cases.
+Design test coverage from requirement intelligence, grounded in the saved analysis.
+Call requirement_analyze on the requirementId to load the analysis (the previous agent saved it).
 Then call coverage_save with a complete list of manual test cases.
 Cover: happy path, negative paths, boundary conditions, and (if relevant) API/UI cases.
 Each case: title, description, priority (high/medium/low), testType, scenarioType (positive|negative|boundary), steps [{action, expected}].
 Produce at least 6 strong test cases. Return a short summary of what you saved and how many cases.`,
-    tools: ["requirement_analyze", "cases_search", "coverage_save"],
+    tools: ["requirement_analyze", "coverage_save"],
   },
   {
     id: "automation-script",
@@ -77,10 +68,9 @@ Always use automation_framework_generate — it builds the complete POM SERVER-S
 
 REQUIRED FLOW:
 1. Call coverage_get(requirementId).
-2. OPTIONAL: github_read_repo only if owner/repo configured (informational).
-3. Call automation_framework_generate(requirementId, coverageId) — REQUIRED. Do not skip.
-4. Reply with a short summary of the returned file list and: npx playwright test --project=chromium`,
-    tools: ["coverage_get", "github_read_repo", "automation_framework_generate"],
+2. Call automation_framework_generate(requirementId, coverageId) — REQUIRED. Do not skip.
+3. Reply with a short summary of the returned file list and: npx playwright test --project=chromium`,
+    tools: ["coverage_get", "automation_framework_generate"],
   },
   {
     id: "execution-defect",

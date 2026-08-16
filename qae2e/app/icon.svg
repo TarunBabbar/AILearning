@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#d97706"/>
+  <text x="32" y="42" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="#fff" text-anchor="middle">Q</text>
+  <circle cx="47" cy="17" r="6" fill="#fff" opacity="0.9"/>
+  <path d="M47 23 L47 40 M47 40 L42 48 M47 40 L52 48" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.9"/>
+</svg>
