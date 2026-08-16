@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { PageLoader } from "@/components/ui/PageLoader";
+import { AppFooter } from "@/components/ui/AppFooter";
 import { AnalysisView } from "@/components/workspace/AnalysisView";
 import { TestCasesEditor } from "@/components/workspace/TestCasesEditor";
 import { ScriptView } from "@/components/workspace/ScriptView";
@@ -15,7 +17,7 @@ import { TestRunReport, type TestRunSnapshot } from "@/components/workspace/Test
 import { ReleaseGauge } from "@/components/workspace/ReleaseGauge";
 import { TraceabilityRail } from "@/components/workspace/TraceabilityRail";
 import { EvaluationCard } from "@/components/workspace/EvaluationCard";
-import { Loader2, ArrowLeft, History, FileText, ListChecks, FileCode2, Container, Rocket, Scale } from "lucide-react";
+import { ArrowLeft, History, FileText, ListChecks, FileCode2, Container, Rocket, Scale } from "lucide-react";
 import type {
   Analysis,
   Coverage,
@@ -71,32 +73,43 @@ export function RunDetailPageInner({ id }: { id: string }) {
     }, 20000);
     (async () => {
       try {
-        const res = await fetch(`/api/runs?id=${encodeURIComponent(id)}&workspaceId=${encodeURIComponent(workspaceId)}`);
-        const d = await res.json();
+        // Fetch run metadata + all workspace artifacts in parallel (the
+        // artifacts route returns everything for the workspace; we filter to
+        // this run's requirementId client-side). Faster than a waterfall.
+        const [runRes, artRes] = await Promise.all([
+          fetch(`/api/runs?id=${encodeURIComponent(id)}&workspaceId=${encodeURIComponent(workspaceId)}`),
+          fetch(`/api/artifacts?workspaceId=${encodeURIComponent(workspaceId)}`),
+        ]);
+        const d = await runRes.json();
         if (cancelled) return;
-        if (!res.ok || !d.run) {
+        if (!runRes.ok || !d.run) {
           setError(d.error || "Run not found");
           return;
         }
         const r = d.run as RunDetail;
         setRun(r);
 
-        // Fetch the requirement's artifacts (analysis/coverage/scripts/cycle/defects/release/evaluations).
+        const ad = artRes.ok ? await artRes.json() : {};
+        if (cancelled) return;
         if (r.requirementId) {
-          const art = await fetch(`/api/artifacts?requirementId=${encodeURIComponent(r.requirementId)}&workspaceId=${encodeURIComponent(workspaceId)}`);
-          const ad = await art.json();
-          if (cancelled) return;
-          if (ad.requirement?.length) setReq(ad.requirement[ad.requirement.length - 1]);
-          if (ad.analysis?.length) setAnalysis(ad.analysis[ad.analysis.length - 1]);
-          if (ad.coverage?.length) setCoverage(ad.coverage[ad.coverage.length - 1]);
-          if (ad.script?.length) setScript(ad.script[ad.script.length - 1]);
-          if (ad.cycle?.length) setCycle(ad.cycle[ad.cycle.length - 1]);
-          if (ad.defect?.length) setDefects(ad.defect);
-          if (ad.release?.length) setRelease(ad.release[ad.release.length - 1]);
-          if (ad.evaluation?.length) {
-            const evs = ad.evaluation as Evaluation[];
-            setEvaluations(Object.fromEntries(evs.map((e) => [e.stage, e])));
-          }
+          const pick = <T extends { id?: string; requirementId?: string }>(arr: T[] | undefined): T[] =>
+            (arr || []).filter((x) => x.requirementId === r.requirementId || x.id === r.requirementId);
+          const reqs = pick<Requirement>(ad.requirement);
+          if (reqs.length) setReq(reqs[reqs.length - 1]);
+          const as = pick<Analysis>(ad.analysis);
+          if (as.length) setAnalysis(as[as.length - 1]);
+          const covs = pick<Coverage>(ad.coverage);
+          if (covs.length) setCoverage(covs[covs.length - 1]);
+          const scr = pick<Script>(ad.script);
+          if (scr.length) setScript(scr[scr.length - 1]);
+          const cyc = pick<Cycle>(ad.cycle);
+          if (cyc.length) setCycle(cyc[cyc.length - 1]);
+          const defs = pick<Defect>(ad.defect);
+          if (defs.length) setDefects(defs);
+          const rels = pick<ReleaseReport>(ad.release);
+          if (rels.length) setRelease(rels[rels.length - 1]);
+          const evs = pick<Evaluation>(ad.evaluation);
+          if (evs.length) setEvaluations(Object.fromEntries(evs.map((e) => [e.stage, e])));
         }
         if (r.testRun) {
           setTestRun({
@@ -125,11 +138,7 @@ export function RunDetailPageInner({ id }: { id: string }) {
   }, [id, workspaceId]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-text-muted">
-        <Loader2 size={16} className="animate-spin mr-2" /> Loading run…
-      </div>
-    );
+    return <PageLoader label="Loading run…" />;
   }
 
   if (error || !run) {
@@ -302,6 +311,7 @@ export function RunDetailPageInner({ id }: { id: string }) {
           </div>
         </div>
       </main>
+      <AppFooter />
     </div>
   );
 }

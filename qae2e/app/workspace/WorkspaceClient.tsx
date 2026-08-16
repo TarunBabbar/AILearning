@@ -17,6 +17,7 @@ import { PipelineTrace } from "@/components/workspace/PipelineTrace";
 import { PipelineSummary } from "@/components/workspace/PipelineSummary";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { readNdjsonStream } from "@/lib/utils";
 import type {
   AgentEvent,
@@ -354,11 +355,7 @@ export function WorkspacePageInner() {
   };
 
   if (!authChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-text-muted">
-        <Loader2 size={16} className="animate-spin mr-2" /> Loading workspace…
-      </div>
-    );
+    return <PageLoader label="Loading workspace…" />;
   }
 
   return (

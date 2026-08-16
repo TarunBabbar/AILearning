@@ -40,15 +40,18 @@ completeness) and re-runs with feedback until the output matches the requirement
   missed), plus **completeness**, hallucinated/missed counts, per-item verdicts, and judge confidence.
 - **Eval-driven retry loop** — if a stage scores below threshold, the judge's feedback is fed back to the
   agent and it re-runs (up to 2 retries) until it matches the requirement.
-- **Live pipeline trace + terminal-style live logs** — every stage, tool call, artifact, and evaluation
+- **Live pipeline trace + live logs** — every stage, tool call, artifact, and evaluation
   score streamed to the UI in real time with an app-themed, auto-scrolling log.
+- **Run detail page** — every history entry opens a full artifact view (requirement, analysis,
+  coverage, scripts, test run, release, and per-stage AI evaluation).
 - **Server-side Playwright POM** — AS builds a full runnable suite under `tests/` from coverage via
   `automation_framework_generate` (free LLMs truncate huge `script_save` payloads; quality gates reject
   empty/`{` stubs; orchestrator retries AS then falls back to deterministic scripts).
 - **Local Docker test runner** — runs the generated Playwright suite in a container (auto-pulls the
   image, preflights node/npm/Chromium), parses Playwright JSON results, LLM auto-fix on failure.
 - **Remote Docker runner** — point `TEST_RUNNER_URL` at any machine with Docker (your dev box, a VPS)
-  so Vercel (no Docker) can still run real Playwright suites.
+  so Vercel (no Docker) can still run real Playwright suites. Without Docker or a runner, the pipeline
+  completes but reports "tests were not run" — surfaced clearly in the UI and the execute-stage eval.
 - **Traceability by design** — every artifact links back to one `requirementId`.
 - **Stoppable pipeline** — Stop stays active until the NDJSON stream fully ends.
 - **Free models only** — a hard guard refuses any model without a `:free` suffix. No accidental spend.
@@ -194,7 +197,7 @@ RAG) are **MCP placeholders**: they keep the MCP shape so the surface is stable,
 
 ### Local Docker
 
-The pipeline (and the **Run tests** button in the workspace) runs the generated Playwright suite in a
+The pipeline runs the generated Playwright suite automatically after AS in a
 **local Docker container** using `mcr.microsoft.com/playwright:v1.51.0-jammy`. The runner handles
 everything needed to make the tests actually execute:
 
@@ -226,7 +229,9 @@ TEST_RUNNER_TOKEN=<same token, optional>
 
 The app POSTs the full suite (files + command) to the runner; it materializes, runs in Docker, and
 returns the same normalized result (summary, failures, results). When unset, the local Docker path is
-used; when neither is available, the execution agents report "no real test execution available".
+used; when neither is available, the execution agents report "no real test execution available" and
+the workspace shows a clear "Tests could not run automatically" notice explaining how to enable a
+runner.
 
 ## Getting started
 
@@ -250,7 +255,9 @@ release-confidence gauge with its "why this score" breakdown and per-stage AI ev
 
 - **Auth:** self-contained email + password (scrypt-hashed, httpOnly session cookie). `/signup`,
   `/login`, `/workspaces` dashboard, Sign out in the header.
-- **Workspaces:** personal (single-owner). Every artifact, run, and evaluation is scoped to the
+- **Workspaces:** personal (single-owner). Create one with a **"New workspace" modal** (quick
+  templates show supported automation types: **Playwright UI automation now**; API / integration /
+  database / mobile testing marked "coming soon"). Every artifact, run, and evaluation is scoped to the
   workspace you're in.
 - **Persistence:** Neon Postgres when `POSTGRES_URL` is configured; otherwise `data/db.json` locally.
 
@@ -306,8 +313,10 @@ qae2e/
 │   ├── login/page.tsx, signup/page.tsx  # Auth pages
 │   ├── workspaces/page.tsx            # Workspace dashboard (create / list / open)
 │   ├── history/page.tsx               # User-scoped run history (with eval score chips)
+│   ├── history/[id]/page.tsx          # Run detail (Suspense wrapper)
+│   ├── history/[id]/RunDetailClient.tsx  # Full artifact view of one run + AI eval mapping
 │   ├── workspace/page.tsx             # Suspense wrapper → WorkspaceClient.tsx (pipeline UI)
-│   ├── settings/page.tsx              # Settings (Integrations tab → MCP/DeepEval placeholders)
+│   ├── settings/page.tsx              # Settings (Account + Integrations tabs only)
 │   └── api/
 │       ├── agents/[agentId]/route.ts    # POST → NDJSON event stream per agent
 │       ├── pipeline/route.ts            # POST → NDJSON full 6-agent run (one-click)

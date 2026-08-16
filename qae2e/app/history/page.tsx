@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
+import { AppFooter } from "@/components/ui/AppFooter";
 import { cn } from "@/lib/utils";
 import {
   History,
@@ -201,9 +202,9 @@ export default function HistoryPage() {
         {/* Runs table */}
         <Card className="mt-6 overflow-hidden">
           {loading && !runs ? (
-            <p className="p-6 text-sm text-text-muted flex items-center gap-2">
-              <Loader2 size={14} className="animate-spin" /> Loading runs…
-            </p>
+            <div className="p-8 flex items-center justify-center gap-2 text-sm text-text-muted">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Loading runs…
+            </div>
           ) : !runs || runs.length === 0 ? (
             <p className="p-6 text-sm text-text-muted">No saved runs yet. Run the pipeline to create one.</p>
           ) : filtered.length === 0 ? (
@@ -256,6 +257,7 @@ export default function HistoryPage() {
           )}
         </Card>
       </main>
+      <AppFooter />
     </div>
   );
 }

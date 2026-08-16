@@ -2,22 +2,20 @@ import { Card } from "@/components/ui/Card";
 import { Check } from "lucide-react";
 
 const integrations = [
-  "Jira",
-  "Confluence",
-  "Figma",
-  "GitHub",
-  "Zephyr",
-  "TestRail",
-  "Pinecone",
-  "Docker",
   "Playwright",
+  "Docker",
+  "OpenRouter",
+  "Neon Postgres",
+  "AI Evaluation",
+  "Remote runner",
+  "CSV / XLSX export",
 ];
 
 const pillars = [
-  { code: "PR", title: "Product context", text: "Manage products, modules, requirements, analyses, and coverage in one place instead of scattered documents and spreadsheets." },
-  { code: "TR", title: "Traceability by design", text: "Follow the thread from source requirement to AI analysis, generated tests, execution result, and defect." },
-  { code: "RL", title: "Release intelligence", text: "See test-cycle progress, execution confidence, active risks, and the work that still needs attention." },
-  { code: "AI", title: "Model-flexible intelligence", text: "Run AI analysis with the model strategy that fits your environment, including local and enterprise options." },
+  { code: "PR", title: "Requirement intelligence", text: "Paste a requirement and get business rules, acceptance criteria, risks, edge cases, and test data — scored by an AI judge." },
+  { code: "TR", title: "Traceability by design", text: "Follow the thread from requirement to AI analysis, generated tests, execution result, defect, and release confidence." },
+  { code: "RL", title: "Release intelligence", text: "See precision/accuracy per stage, release confidence, active risks, and the work that still needs attention." },
+  { code: "AI", title: "Free-model AI", text: "Runs entirely on free OpenRouter models — a hard guard refuses paid models. No accidental spend." },
 ];
 
 export function Integrations() {

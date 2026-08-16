@@ -3,20 +3,18 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Sparkles, Settings as SettingsIcon, User, LayoutGrid, Plug, Gauge, LogOut, ChevronLeft } from "lucide-react";
+import { Sparkles, Settings as SettingsIcon, User, Plug, LogOut, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageLoader } from "@/components/ui/PageLoader";
+import { AppFooter } from "@/components/ui/AppFooter";
 import { AccountTab } from "@/components/settings/AccountTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
-import { ApiUsageTab } from "@/components/settings/ApiUsageTab";
-import { WorkspacesTab } from "@/components/settings/WorkspacesTab";
 
-type TabKey = "account" | "workspaces" | "integrations" | "api";
+type TabKey = "account" | "integrations";
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof User }> = [
   { key: "account", label: "Account", icon: User },
-  { key: "workspaces", label: "Workspaces", icon: LayoutGrid },
   { key: "integrations", label: "Integrations", icon: Plug },
-  { key: "api", label: "API usage", icon: Gauge },
 ];
 
 export default function SettingsPage() {
@@ -35,7 +33,7 @@ function SettingsInner() {
   const [me, setMe] = useState<{ id: string; email: string; name?: string } | null | undefined>(undefined);
   const [tab, setTab] = useState<TabKey>(() => {
     const t = searchParams.get("tab");
-    return (t === "account" || t === "workspaces" || t === "integrations" || t === "api" ? t : "account") as TabKey;
+    return (t === "account" || t === "integrations" ? t : "account") as TabKey;
   });
 
   useEffect(() => {
@@ -60,11 +58,7 @@ function SettingsInner() {
   };
 
   if (me === undefined) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-text-muted">
-        <Loader2 size={16} className="animate-spin mr-2" /> Loading settings…
-      </div>
-    );
+    return <PageLoader label="Loading settings…" />;
   }
 
   const pick = (t: TabKey) => {
@@ -144,10 +138,9 @@ function SettingsInner() {
         </div>
 
         {tab === "account" && <AccountTab />}
-        {tab === "workspaces" && <WorkspacesTab />}
         {tab === "integrations" && <IntegrationsTab workspaceId={workspaceId} />}
-        {tab === "api" && <ApiUsageTab />}
       </main>
+      <AppFooter />
     </div>
   );
 }

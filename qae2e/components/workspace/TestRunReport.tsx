@@ -20,22 +20,42 @@ export type TestRunSnapshot = {
 
 export function TestRunReport({ run, evaluation }: { run: TestRunSnapshot | null; evaluation?: Evaluation | null }) {
   if (!run) return null;
+  const notRun = run.attempts === 0;
 
   return (
     <Card className="p-6">
       <div className="flex items-center gap-2 mb-3">
-        <Container size={16} className="text-amber-600" />
-        <h3 className="font-semibold text-text-primary">Local Docker test run</h3>
+        <Container size={16} className={notRun ? "text-text-muted" : "text-amber-600"} />
+        <h3 className="font-semibold text-text-primary">Test execution</h3>
         {run.ok ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 ml-auto">
             <CheckCircle2 size={13} /> Passed
           </span>
+        ) : notRun ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 ml-auto">
+            <XCircle size={13} /> Not run
+          </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 ml-auto">
-            <XCircle size={13} /> {run.attempts === 0 ? "Not run" : "Failed"}
+            <XCircle size={13} /> Failed
           </span>
         )}
       </div>
+
+      {notRun && (
+        <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm text-text-primary">
+            <span className="font-bold text-amber-700">Tests could not run automatically.</span>{" "}
+            {run.message || "No test executor was available."}
+          </p>
+          <p className="mt-1 text-xs text-text-secondary leading-relaxed">
+            The pipeline needs a Docker engine or a configured remote runner to execute the generated Playwright
+            suite. On this deployment, tests were skipped — the execution agents correctly reported no real run.
+            To enable real test execution: run Docker locally, or set <code className="font-mono">TEST_RUNNER_URL</code>{" "}
+            to a machine that has Docker (see README → Remote Docker runner).
+          </p>
+        </div>
+      )}
 
       {evaluation && (
         <div className="mb-4">
@@ -53,7 +73,7 @@ export function TestRunReport({ run, evaluation }: { run: TestRunSnapshot | null
         </div>
       )}
 
-      {run.message && <p className="text-sm text-text-secondary mb-4">{run.message}</p>}
+      {run.message && !notRun && <p className="text-sm text-text-secondary mb-4">{run.message}</p>}
 
       <div className="grid grid-cols-4 gap-2 text-center">
         <Metric label="Passed" value={run.passed} tone="text-emerald-700" />

@@ -55,11 +55,11 @@ export async function Hero() {
           </div>
           <div className="p-6 space-y-3">
             {[
-              { icon: CircleDot, label: "Connect", text: "Jira story QA-123 connected" },
-              { icon: Workflow, label: "Analyze", text: "Requirement Intelligence Agent → 4 business rules, 8 AC, 3 risks" },
-              { icon: Workflow, label: "Coverage", text: "Manual Test Case Agent → 12 editable cases" },
-              { icon: Workflow, label: "Execute", text: "Execution & Defect Agent → 10 passed, 2 failed → 2 defects" },
-              { icon: ShieldCheck, label: "Release", text: "Quality Intelligence → 86% confidence, low risk" },
+              { icon: CircleDot, label: "Paste", text: "Requirement pasted — SauceDemo login flow" },
+              { icon: Workflow, label: "Analyze", text: "Requirement Intelligence Agent → business rules, AC, risks" },
+              { icon: Workflow, label: "Coverage", text: "Manual Test Case Agent → editable test cases" },
+              { icon: Workflow, label: "Execute", text: "Playwright suite → 15 passed / 0 failed in Docker" },
+              { icon: ShieldCheck, label: "Release", text: "AI judge → 86% confidence, low risk" },
             ].map((row, i) => {
               const Icon = row.icon;
               return (

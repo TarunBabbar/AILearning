@@ -3,9 +3,9 @@ import { Card } from "@/components/ui/Card";
 const steps = [
   {
     num: "01",
-    title: "Connect your source",
-    items: ["Jira stories", "Confluence knowledge", "Other requirement tools"],
-    label: "Connected context",
+    title: "Paste your requirement",
+    items: ["Copy-paste requirement text", "SauceDemo-style feature specs", "Any product scenario"],
+    label: "Your input",
   },
   {
     num: "02",
@@ -22,14 +22,14 @@ const steps = [
   {
     num: "04",
     title: "Execute with evidence",
-    items: ["Cycles and modules", "Assigned testers", "Screenshots and results"],
-    label: "Quality execution",
+    items: ["Playwright automation", "Local Docker / remote runner", "Pass/fail results"],
+    label: "AI evaluation",
   },
   {
     num: "05",
     title: "Act on risk",
-    items: ["Live Jira defect status", "Release health", "Executive visibility"],
-    label: "Release confidence",
+    items: ["Release confidence", "Precision & accuracy per stage", "Executive visibility"],
+    label: "Release readiness",
   },
 ];
 
@@ -42,8 +42,9 @@ export function FlowSteps() {
           Every requirement becomes a quality decision — not a document waiting for manual interpretation.
         </h2>
         <p className="mt-3 max-w-2xl text-text-secondary">
-          One AI-assisted path from a Jira story or knowledge page to saved analysis, editable test
-          coverage, execution evidence, and release risk.
+          One AI-assisted path from a pasted requirement to saved analysis, editable test
+          coverage, Playwright automation, execution evidence, and release risk — with an AI
+          judge scoring every stage.
         </p>
 
         <div className="mt-10 grid md:grid-cols-3 lg:grid-cols-5 gap-4">
