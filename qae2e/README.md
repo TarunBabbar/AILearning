@@ -34,16 +34,37 @@ completeness) and re-runs with feedback until the output matches the requirement
 
 ## Screenshots
 
-> Add screenshots under `docs/screenshots/` and reference them below.
+**Landing page**
 
-| View | Screenshot |
-|------|------------|
-| Landing page | `docs/screenshots/landing.png` |
-| Workspaces dashboard + new workspace modal | `docs/screenshots/workspaces.png` |
-| Workspace — pipeline trace, live logs, intake | `docs/screenshots/workspace.png` |
-| AI Evaluation cards (per stage) | `docs/screenshots/evaluation.png` |
-| Run detail — full artifact view + eval mapping | `docs/screenshots/run-detail.png` |
-| Release confidence gauge with "why this score" | `docs/screenshots/release-gauge.png` |
+![Landing page](docs/screenshots/landing.png)
+
+**Login**
+
+![Login](docs/screenshots/login.png)
+
+**Workspaces dashboard**
+
+![Workspaces](docs/screenshots/workspaces.png)
+
+**New workspace modal**
+
+![New workspace modal](docs/screenshots/new-workspace-modal.png)
+
+**Workspace — pipeline trace, live logs, intake**
+
+![Workspace](docs/screenshots/workspace.png)
+
+**Run history**
+
+![Run history](docs/screenshots/history.png)
+
+**Run detail — full artifact view + AI evaluation mapping**
+
+![Run detail](docs/screenshots/run-detail.png)
+
+**Settings**
+
+![Settings](docs/screenshots/settings.png)
 
 ## Highlights
 
