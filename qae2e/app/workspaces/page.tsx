@@ -7,17 +7,18 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageLoader } from "@/components/ui/PageLoader";
 import { AppFooter } from "@/components/ui/AppFooter";
+import { UserMenu } from "@/components/ui/UserMenu";
 import { cn } from "@/lib/utils";
 import {
   Loader2,
   Plus,
   Sparkles,
   ArrowRight,
-  LogOut,
   LayoutGrid,
   History,
   Settings2,
   X,
+  Trash2,
   Smartphone,
   Globe,
   Server,
@@ -66,6 +67,7 @@ export default function WorkspacesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -134,6 +136,26 @@ export default function WorkspacesPage() {
     router.refresh();
   };
 
+  const removeWorkspace = async (id: string) => {
+    if (deletingId) return;
+    if (!window.confirm("Delete this workspace and ALL its data (artifacts, run history, evaluations)? This cannot be undone.")) return;
+    setDeletingId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/workspaces?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "Could not delete workspace");
+        return;
+      }
+      setWorkspaces(d.workspaces || []);
+    } catch {
+      setError("Network error — try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading || me === undefined) {
     return <PageLoader label="Loading workspaces…" />;
   }
@@ -158,21 +180,13 @@ export default function WorkspacesPage() {
             </Link>
             <Link
               href="/settings"
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg border border-border text-text-secondary text-sm font-semibold hover:bg-bg-hover transition-colors"
+              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
             >
               <Settings2 size={14} /> Settings
             </Link>
-            {me?.name && (
-              <span className="inline-flex items-center min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm">
-                {me.name}
-              </span>
+            {me && (
+              <UserMenu name={me.name} email={me.email} onLogout={logout} />
             )}
-            <button
-              onClick={logout}
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
-            >
-              <LogOut size={14} /> Sign out
-            </button>
           </div>
         </div>
       </header>
@@ -253,8 +267,28 @@ export default function WorkspacesPage() {
                   </span>
                 )}
               </div>
-              <div className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                Open workspace <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+              <div className="mt-2 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Open workspace <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void removeWorkspace(w.id);
+                  }}
+                  disabled={deletingId === w.id}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors",
+                    "text-text-muted hover:text-red-600 hover:bg-red-500/10",
+                    "opacity-0 group-hover:opacity-100",
+                    deletingId === w.id && "opacity-100 text-red-600"
+                  )}
+                  title="Delete workspace and all its data"
+                >
+                  {deletingId === w.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  {deletingId === w.id ? "Deleting…" : "Delete"}
+                </button>
               </div>
             </Link>
           ))}

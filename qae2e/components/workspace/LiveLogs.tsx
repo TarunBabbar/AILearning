@@ -250,8 +250,10 @@ export function LiveLogs({ events, running }: { events: AgentEvent[]; running: b
 
   return (
     <Card className="p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <ListTree size={15} className="text-amber-600" />
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-500/10 text-amber-700">
+          <ListTree size={14} />
+        </span>
         <h3 className="text-sm font-semibold text-text-primary">Live logs</h3>
         {running && (
           <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-600 animate-pulse">
@@ -288,8 +290,12 @@ export function LiveLogs({ events, running }: { events: AgentEvent[]; running: b
           Live logs will stream here as soon as you run the pipeline.
         </p>
       ) : (
-        <div ref={scrollRef} onScroll={onScroll} className="h-[320px] overflow-y-auto rounded-lg border border-border bg-bg-page/60 px-3 py-2 space-y-1">
-          {lines.map((l) => (
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="h-[320px] overflow-y-auto rounded-xl border border-border bg-bg-page/70 px-3.5 py-2.5 space-y-1"
+        >
+          {lines.slice(-300).map((l) => (
             <div key={l.id} className="flex gap-2 text-[11.5px] leading-relaxed">
               <span className="text-text-muted/70 shrink-0 select-none tabular-nums">{l.ts}</span>
               <span

@@ -6,10 +6,10 @@ type Variant = "primary" | "secondary" | "ghost";
 
 const styles: Record<Variant, string> = {
   primary:
-    "bg-amber-500 text-white hover:bg-amber-600 shadow-sm border border-transparent",
+    "bg-amber-500 text-white hover:bg-amber-600 active:bg-amber-700 shadow-sm border border-transparent",
   secondary:
-    "bg-transparent text-text-primary border border-border hover:border-amber-500/40 hover:bg-bg-hover",
-  ghost: "bg-transparent text-amber-700 hover:bg-bg-hover border border-transparent",
+    "bg-transparent text-text-primary border border-border hover:border-amber-500/50 hover:bg-bg-hover active:bg-bg-surface",
+  ghost: "bg-transparent text-amber-700 hover:bg-amber-500/10 active:bg-amber-500/15 border border-transparent",
 };
 
 export function Button({
@@ -25,7 +25,9 @@ export function Button({
   className?: string;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const cls = cn(
-    "inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-lg font-semibold text-sm transition-all cursor-pointer",
+    "inline-flex items-center justify-center gap-2 min-h-10 px-4 rounded-lg font-semibold text-sm transition-all cursor-pointer select-none",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page",
+    "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
     styles[variant],
     className
   );

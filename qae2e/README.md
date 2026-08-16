@@ -14,8 +14,61 @@ completeness) and re-runs with feedback until the output matches the requirement
 
 ---
 
+## Problem Statement
+
+Turning a product requirement into tested, release-ready quality is slow and fragmented:
+
+- Requirements live in tickets and docs — nobody extracts the **acceptance criteria, business rules,
+  risks, and edge cases** systematically.
+- Writing manual test cases is manual, inconsistent, and easily drifts from the requirement.
+- Building automation (Playwright, etc.) takes days and often doesn't map back to the coverage.
+- Running tests, capturing results, and judging "is this ready to release?" is disconnected — there's
+  no single source of truth tying **requirement → tests → results → release confidence**.
+
+## Solution
+
+**QAE2E** automates that whole chain with six specialist AI agents and closes the loop with an AI
+judge at every stage:
+
+1. **Requirement intelligence** — the RI agent turns a pasted requirement into structured analysis
+   (summary, business rules, acceptance criteria, risks, edge cases, scenarios, test data).
+2. **Test case generation** — the MT agent drafts editable, review-ready manual test cases.
+3. **Automation coverage** — the AS agent generates a complete Playwright + TypeScript POM suite
+   server-side from that coverage.
+4. **Test execution** — the suite runs in Docker (local or a remote runner) with LLM auto-fix.
+5. **Release confidence** — the IQ agent correlates everything into a confidence score with a
+   transparent "why this score" breakdown.
+6. **AI evaluation after every agent** — an in-app LLM judge scores precision / accuracy /
+   completeness and **re-runs the agent with feedback** until the output matches the requirement.
+
+Every artifact is editable and traceable back to one `requirementId`, so quality is provable end to end.
+
+## Live Demo
+
+**[https://qae2e.vercel.app/](https://qae2e.vercel.app/)**
+
+## Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| **Framework** | Next.js 16 (App Router, Turbopack), React, TypeScript |
+| **AI agents** | Six-agent pipeline (RI / MT / AS / EX / DO / IQ) over an OpenRouter tool-calling loop |
+| **LLM** | Free OpenRouter models only (`:free` guard) — agent model (`LLM_MODEL`) + AI-evaluation judge (`EVAL_MODEL`) |
+| **Automation** | Playwright + TypeScript Page Object Model, generated server-side |
+| **Test execution** | Docker (`mcr.microsoft.com/playwright`), LLM auto-fix, optional remote runner |
+| **Database** | Neon serverless Postgres via `@vercel/postgres` (JSON-file fallback for local dev) |
+| **Persistence** | Users, sessions, workspaces, artifacts (incl. evaluations), run history |
+| **UI** | Tailwind CSS v4 (beige/amber theme), lucide-react icons |
+| **MCP** | Streamable-HTTP MCP server exposing the same agent tools |
+
+---
+
 ## Table of contents
 
+- [Problem Statement](#problem-statement)
+- [Solution](#solution)
+- [Live Demo](#live-demo)
+- [Tech Stack](#tech-stack)
 - [Highlights](#highlights)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -268,7 +321,9 @@ used; when neither is available, the execution agents report "no real test execu
 the workspace shows a clear "Tests could not run automatically" notice explaining how to enable a
 runner.
 
-## Getting started
+## How to Run
+
+### Local development
 
 ```bash
 # 1. Install

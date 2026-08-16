@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { SignOutButton } from "./SignOutButton";
+import { HeaderUserMenu } from "./HeaderUserMenu";
 import { getSessionUser } from "@/lib/auth/session";
 
 // Single shared header-button look, matching the Sign In button (amber primary).
@@ -30,12 +30,7 @@ export async function Header() {
         </nav>
         {user ? (
           <div className="flex items-center gap-2.5">
-            {user.name && (
-              <span className="inline-flex items-center min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm">
-                {user.name}
-              </span>
-            )}
-            <SignOutButton />
+            <HeaderUserMenu />
           </div>
         ) : (
           <Button href="/login" className="min-h-9 px-4">

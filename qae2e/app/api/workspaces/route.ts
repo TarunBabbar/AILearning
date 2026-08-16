@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/guard";
-import { createWorkspace, listWorkspaces, listRuns } from "@/lib/db";
+import { createWorkspace, deleteWorkspace, getWorkspace, listWorkspaces, listRuns } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -49,6 +49,26 @@ export async function POST(req: NextRequest) {
   if (res === "error") {
     return NextResponse.json({ error: "Could not create workspace" }, { status: 500 });
   }
+  const workspaces = await listWorkspaces(auth.user.id);
+  return NextResponse.json({ ok: true, workspaces });
+}
+
+// DELETE /api/workspaces?id=... — delete a workspace and ALL its data
+// (artifacts, run history, settings, members). Owner-only.
+export async function DELETE(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.user) return auth.response;
+  const sp = new URL(req.url).searchParams;
+  const id = sp.get("id") || "";
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const ws = await getWorkspace(id);
+  if (!ws) return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+  if (ws.ownerId !== auth.user.id) {
+    return NextResponse.json({ error: "You don't own this workspace" }, { status: 403 });
+  }
+
+  await deleteWorkspace(id);
   const workspaces = await listWorkspaces(auth.user.id);
   return NextResponse.json({ ok: true, workspaces });
 }

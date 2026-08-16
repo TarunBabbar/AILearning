@@ -261,6 +261,62 @@ export async function listAllWorkspaces(): Promise<Array<{ id: string; name: str
   return all.map((w) => ({ id: String(w.id), name: String(w.name || "") }));
 }
 
+/**
+ * Delete a workspace AND everything scoped to it: artifacts (requirements,
+ * analyses, coverages, scripts, cycles, defects, releases, evaluations,
+ * exports, uploads), run history (qae2e_runs), workspace settings, and
+ * workspace members. Both Postgres and the JSON-file fallback are handled.
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  const ARTIFACT_KINDS = [
+    "requirements",
+    "analyses",
+    "coverages",
+    "scripts",
+    "cycles",
+    "defects",
+    "releases",
+    "evaluations",
+    "exports",
+    "uploads",
+    "extractions",
+  ];
+
+  if (pgConfigured()) {
+    try {
+      await ensureTables();
+      const { sql } = await import("@vercel/postgres");
+      for (const kind of ARTIFACT_KINDS) {
+        await sql`DELETE FROM artifacts WHERE workspace_id = ${workspaceId} AND kind = ${kind}`;
+      }
+      await sql`DELETE FROM qae2e_runs WHERE workspace_id = ${workspaceId}`;
+      await sql`DELETE FROM workspace_settings WHERE workspace_id = ${workspaceId}`;
+      await sql`DELETE FROM workspace_members WHERE workspace_id = ${workspaceId}`;
+      await sql`DELETE FROM workspaces WHERE id = ${workspaceId}`;
+      return;
+    } catch {
+      // fall through to file fallback
+    }
+  }
+
+  // JSON-file fallback: drop every kind keyed by this workspace, plus the
+  // workspace row itself and flat user tables.
+  try {
+    const { readFileSync, writeFileSync } = await import("fs");
+    const path = await filePath();
+    const all = JSON.parse(readFileSync(path, "utf-8")) as FileStoreShape;
+    for (const kind of [...ARTIFACT_KINDS, "runs", "workspace_settings", "workspace_members"]) {
+      if (all[kind]) delete all[kind][workspaceId];
+    }
+    if (all.workspaces?.["__all"]) {
+      all.workspaces["__all"] = (all.workspaces["__all"] as Array<{ id: string }>).filter((w) => w.id !== workspaceId);
+    }
+    writeFileSync(path, JSON.stringify(all, null, 2), "utf-8");
+  } catch {
+    // memory-only mode — drop
+  }
+}
+
 export async function getWorkspace(workspaceId: string): Promise<{ id: string; ownerId: string; name: string } | undefined> {
   if (pgConfigured()) {
     try {

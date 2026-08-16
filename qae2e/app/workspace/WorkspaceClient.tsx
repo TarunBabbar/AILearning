@@ -152,9 +152,24 @@ export function WorkspacePageInner() {
 
   // Shared NDJSON handler: appends events, advances the stepper as agents
   // finish, and refreshes artifacts as new ones appear.
+  //
+  // Events stream in fast (every tool call + result). Instead of a setState per
+  // event (which re-renders the whole tree each time), we batch into a single
+  // array update per microtask — coalescing dozens of events into one render.
+  const eventsRef = useRef<AgentEvent[]>([]);
+  const batchScheduled = useRef(false);
+  const flushEvents = useCallback(() => {
+    batchScheduled.current = false;
+    setEvents(eventsRef.current);
+  }, []);
+
   const handleAgentEvent = (ev: unknown, rid: string) => {
     const e = ev as AgentEvent | { type: "step"; agentId: string; step: string; done: boolean };
-    setEvents((prev) => [...prev, e as AgentEvent]);
+    eventsRef.current = [...eventsRef.current, e as AgentEvent];
+    if (!batchScheduled.current) {
+      batchScheduled.current = true;
+      queueMicrotask(flushEvents);
+    }
 
     if (e.type === "agent_start") {
       setCurrentAgent({ code: e.code, name: e.name, index: e.index, total: e.total });
@@ -186,13 +201,13 @@ export function WorkspacePageInner() {
       setDoneSteps((prev) => new Set(prev).add(e.step));
       const idx = PIPELINE_STEPS.findIndex((s) => s.key === e.step);
       setCurrentStep(Math.max(1, idx + 1));
-      void refreshArtifactsWith(rid);
+      void refreshArtifactsDebounced(rid);
     }
     if (e.type === "artifact" && e.artifact === "requirement") {
-      void refreshArtifactsWith(rid);
+      void refreshArtifactsDebounced(rid);
     }
     if (e.type === "artifact" && (e.artifact === "analysis" || e.artifact === "coverage" || e.artifact === "script" || e.artifact === "release" || e.artifact === "cycle")) {
-      void refreshArtifactsWith(rid);
+      void refreshArtifactsDebounced(rid);
     }
     if (e.type === "test_run") {
       setTestRun({
@@ -209,7 +224,7 @@ export function WorkspacePageInner() {
     }
     if (e.type === "evaluation") {
       setEvaluating(null);
-      void refreshArtifactsWith(rid);
+      void refreshArtifactsDebounced(rid);
     }
     if (e.type === "eval_start") {
       const code = e.agentId.split("-").map((p) => p[0]?.toUpperCase() || "").join("");
@@ -223,6 +238,7 @@ export function WorkspacePageInner() {
     abortRef.current = controller;
     setRunning(true);
     setEvents([]);
+    eventsRef.current = [];
     setDoneSteps(new Set());
     setCurrentStep(0);
     setCurrentAgent(null);
@@ -322,25 +338,44 @@ export function WorkspacePageInner() {
     }
   };
 
-  const refreshArtifactsWith = async (rid: string) => {
-    try {
-      const res = await fetch(`/api/artifacts?requirementId=${rid}&workspaceId=${encodeURIComponent(workspaceId)}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.analysis?.length) setAnalysis(data.analysis[data.analysis.length - 1]);
-      if (data.coverage?.length) setCoverage(data.coverage[data.coverage.length - 1]);
-      if (data.script?.length) setScript(data.script[data.script.length - 1]);
-      if (data.cycle?.length) setCycle(data.cycle[data.cycle.length - 1]);
-      if (data.defect?.length) setDefects(data.defect);
-      if (data.release?.length) setRelease(data.release[data.release.length - 1]);
-      if (data.evaluation?.length) {
-        const evs = data.evaluation as Evaluation[];
-        setEvaluations(Object.fromEntries(evs.map((e) => [e.stage, e])));
+  const refreshArtifactsWith = useCallback(
+    async (rid: string) => {
+      try {
+        const res = await fetch(`/api/artifacts?requirementId=${rid}&workspaceId=${encodeURIComponent(workspaceId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.analysis?.length) setAnalysis(data.analysis[data.analysis.length - 1]);
+        if (data.coverage?.length) setCoverage(data.coverage[data.coverage.length - 1]);
+        if (data.script?.length) setScript(data.script[data.script.length - 1]);
+        if (data.cycle?.length) setCycle(data.cycle[data.cycle.length - 1]);
+        if (data.defect?.length) setDefects(data.defect);
+        if (data.release?.length) setRelease(data.release[data.release.length - 1]);
+        if (data.evaluation?.length) {
+          const evs = data.evaluation as Evaluation[];
+          setEvaluations(Object.fromEntries(evs.map((e) => [e.stage, e])));
+        }
+      } catch {
+        // best effort
       }
-    } catch {
-      // best effort
-    }
-  };
+    },
+    [workspaceId]
+  );
+
+  // Debounced variant for live events — coalesces rapid artifact events into
+  // one refresh instead of one network call + 8 setStates per event.
+  const debouncedRefresh = useRef<{ timer: ReturnType<typeof setTimeout> | null; rid: string }>({ timer: null, rid: "" });
+  const refreshArtifactsDebounced = useCallback(
+    (rid: string) => {
+      const d = debouncedRefresh.current;
+      d.rid = rid;
+      if (d.timer) clearTimeout(d.timer);
+      d.timer = setTimeout(() => {
+        d.timer = null;
+        void refreshArtifactsWith(d.rid);
+      }, 400);
+    },
+    [refreshArtifactsWith]
+  );
 
   const stopPipeline = () => {
     abortRef.current?.abort();
@@ -385,7 +420,7 @@ export function WorkspacePageInner() {
             </Link>
             <Link
               href={`/settings?workspaceId=${encodeURIComponent(workspaceId)}&tab=integrations`}
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg border border-border text-text-secondary text-sm font-semibold hover:bg-bg-hover transition-colors"
+              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
             >
               <Settings2 size={14} /> Settings
             </Link>

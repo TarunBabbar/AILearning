@@ -3,10 +3,11 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Sparkles, Settings as SettingsIcon, User, Plug, LogOut, ChevronLeft } from "lucide-react";
+import { Sparkles, Settings as SettingsIcon, User, Plug, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageLoader } from "@/components/ui/PageLoader";
 import { AppFooter } from "@/components/ui/AppFooter";
+import { UserMenu } from "@/components/ui/UserMenu";
 import { AccountTab } from "@/components/settings/AccountTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 
@@ -92,17 +93,9 @@ function SettingsInner() {
             >
               <Sparkles size={14} /> Home
             </Link>
-            {me?.name && (
-              <span className="inline-flex items-center min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm">
-                {me.name}
-              </span>
+            {me && (
+              <UserMenu name={me.name} email={me.email} onLogout={logout} />
             )}
-            <button
-              onClick={logout}
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
-            >
-              <LogOut size={14} /> Sign out
-            </button>
           </div>
         </div>
       </header>

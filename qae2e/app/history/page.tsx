@@ -136,7 +136,7 @@ export default function HistoryPage() {
             </Link>
             <Link
               href={`/trends?workspaceId=${encodeURIComponent(workspaceId)}`}
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg border border-border text-text-secondary text-sm font-semibold hover:bg-bg-hover transition-colors"
+              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
             >
               <TrendingUp size={14} /> Trends
             </Link>
