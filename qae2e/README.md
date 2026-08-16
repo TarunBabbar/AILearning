@@ -17,6 +17,7 @@ completeness) and re-runs with feedback until the output matches the requirement
 ## Table of contents
 
 - [Highlights](#highlights)
+- [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [The 6 agents](#the-6-agents)
 - [AI Evaluation (LLM judge)](#ai-evaluation-llm-judge)
@@ -30,6 +31,19 @@ completeness) and re-runs with feedback until the output matches the requirement
 - [Roadmap](#roadmap)
 
 ---
+
+## Screenshots
+
+> Add screenshots under `docs/screenshots/` and reference them below.
+
+| View | Screenshot |
+|------|------------|
+| Landing page | `docs/screenshots/landing.png` |
+| Workspaces dashboard + new workspace modal | `docs/screenshots/workspaces.png` |
+| Workspace — pipeline trace, live logs, intake | `docs/screenshots/workspace.png` |
+| AI Evaluation cards (per stage) | `docs/screenshots/evaluation.png` |
+| Run detail — full artifact view + eval mapping | `docs/screenshots/run-detail.png` |
+| Release confidence gauge with "why this score" | `docs/screenshots/release-gauge.png` |
 
 ## Highlights
 
