@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Play, Loader2, Sparkles, Wand2, Square, AlertTriangle, RotateCcw, ShieldCheck, Workflow, History, CircleDot, FileText, TestTube2, Settings2, Info, ChevronDown } from "lucide-react";
+import { Play, Loader2, Sparkles, Wand2, Square, AlertTriangle, RotateCcw, ShieldCheck, Workflow, History, CircleDot, FileText, TestTube2, Settings2, Info, ChevronDown, CheckCircle2, Pencil } from "lucide-react";
 import { Stepper, PIPELINE_STEPS } from "@/components/workspace/Stepper";
 import { LiveLogs } from "@/components/workspace/LiveLogs";
 import { AnalysisView } from "@/components/workspace/AnalysisView";
@@ -18,7 +18,7 @@ import { PipelineSummary } from "@/components/workspace/PipelineSummary";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { readNdjsonStream } from "@/lib/utils";
+import { readNdjsonStream, cn } from "@/lib/utils";
 import type {
   AgentEvent,
   Analysis,
@@ -103,6 +103,57 @@ export function WorkspacePageInner() {
   // Last requirement metadata, so "Retry from failed agent" can resume with
   // the same requirement without re-collecting the form.
   const reqRef = useRef<{ id: string; title: string; source: string; sourceKey?: string; content: string } | null>(null);
+
+  // The workspace's latest (already-completed) requirement, if any. When it
+  // exists the intake fields are shown greyed out with re-run / edit options.
+  const [completedReq, setCompletedReq] = useState<{ id: string; title: string; content: string; createdAt: string } | null>(null);
+  const [editingExisting, setEditingExisting] = useState(false);
+
+  // On mount: load the latest requirement + its artifacts for this workspace so
+  // returning users see their previous run instead of a blank sample.
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/artifacts?workspaceId=${encodeURIComponent(workspaceId)}`);
+        const data = await res.json();
+        if (cancelled) return;
+        const reqs = (data.requirement || []) as Requirement[];
+        if (reqs.length) {
+          const latest = reqs[reqs.length - 1];
+          setRequirement(latest);
+          setTitle(latest.title);
+          setContent(latest.content);
+          setCompletedReq({ id: latest.id, title: latest.title, content: latest.content, createdAt: latest.createdAt });
+        }
+        // Hydrate artifacts for the latest requirement.
+        const rid = reqs.length ? reqs[reqs.length - 1].id : "";
+        if (rid) {
+          const as = (data.analysis || []).filter((a: { requirementId?: string }) => a.requirementId === rid);
+          if (as.length) setAnalysis(as[as.length - 1]);
+          const covs = (data.coverage || []).filter((c: { requirementId?: string }) => c.requirementId === rid);
+          if (covs.length) setCoverage(covs[covs.length - 1]);
+          const scr = (data.script || []).filter((s: { requirementId?: string }) => s.requirementId === rid);
+          if (scr.length) setScript(scr[scr.length - 1]);
+          const cyc = (data.cycle || []).filter((c: { requirementId?: string }) => c.requirementId === rid);
+          if (cyc.length) setCycle(cyc[cyc.length - 1]);
+          const defs = (data.defect || []).filter((d: { requirementId?: string }) => d.requirementId === rid);
+          if (defs.length) setDefects(defs);
+          const rels = (data.release || []).filter((r: { requirementId?: string }) => r.requirementId === rid);
+          if (rels.length) setRelease(rels[rels.length - 1]);
+          const evs = (data.evaluation || []).filter((e: { requirementId?: string }) => e.requirementId === rid);
+          if (evs.length) setEvaluations(Object.fromEntries(evs.map((e: Evaluation) => [e.stage, e])));
+        }
+      } catch {
+        // best effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId]);
 
   const refreshArtifacts = useCallback(async () => {
     const rid = requirement?.id;
@@ -233,7 +284,7 @@ export function WorkspacePageInner() {
   };
 
   // ONE-CLICK: run the full 6-agent chain.
-  const handleRunPipeline = async () => {
+  const handleRunPipeline = async (existingId?: string) => {
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
@@ -255,7 +306,11 @@ export function WorkspacePageInner() {
     // Collapse the intake card so the live pipeline view is front and center.
     setConnectOpen(false);
 
-    const req = buildRequirement();
+    // Re-running an existing requirement reuses its id so all new artifacts
+    // stay linked to the same traceability root; otherwise create a fresh one.
+    const req = existingId
+      ? { ...buildRequirement(), id: existingId }
+      : buildRequirement();
     setRequirement(req);
     reqRef.current = { id: req.id, title: req.title, source: req.source, sourceKey: undefined, content: req.content };
 
@@ -519,18 +574,47 @@ export function WorkspacePageInner() {
                     </p>
                   </div>
 
+                  {completedReq && !editingExisting && (
+                    <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 text-xs font-bold">
+                          <CheckCircle2 size={12} /> Completed
+                        </span>
+                        <span className="text-xs text-text-muted">
+                          {new Date(completedReq.createdAt).toLocaleString()} · re-run it as-is or edit it first
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button onClick={() => handleRunPipeline(completedReq.id)} disabled={running}>
+                          <RotateCcw size={14} /> Re-run existing requirement
+                        </Button>
+                        <Button variant="secondary" onClick={() => setEditingExisting(true)} disabled={running}>
+                          <Pencil size={14} /> Edit requirement
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Requirement title"
-                    className="rounded-lg border border-border-input bg-bg-input px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                    disabled={Boolean(completedReq && !editingExisting)}
+                    className={cn(
+                      "rounded-lg border border-border-input bg-bg-input px-3.5 py-2.5 text-sm focus:outline-none focus:border-amber-500",
+                      completedReq && !editingExisting && "opacity-50 bg-bg-surface cursor-not-allowed select-none"
+                    )}
                   />
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     rows={10}
                     placeholder="Paste the requirement text…"
-                    className="mt-3 w-full rounded-lg border border-border-input bg-bg-input px-3.5 py-3 text-sm leading-relaxed focus:outline-none focus:border-amber-500 font-mono"
+                    disabled={Boolean(completedReq && !editingExisting)}
+                    className={cn(
+                      "mt-3 w-full rounded-lg border border-border-input bg-bg-input px-3.5 py-3 text-sm leading-relaxed focus:outline-none focus:border-amber-500 font-mono",
+                      completedReq && !editingExisting && "opacity-50 bg-bg-surface cursor-not-allowed select-none"
+                    )}
                   />
                 </>
               )}

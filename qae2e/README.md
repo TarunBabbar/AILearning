@@ -52,8 +52,8 @@ Every artifact is editable and traceable back to one `requirementId`, so quality
 | Layer | Tech |
 |-------|------|
 | **Framework** | Next.js 16 (App Router, Turbopack), React, TypeScript |
-| **AI agents** | Six-agent pipeline (RI / MT / AS / EX / DO / IQ) over an OpenRouter tool-calling loop |
-| **LLM** | Free OpenRouter models only (`:free` guard) — agent model (`LLM_MODEL`) + AI-evaluation judge (`EVAL_MODEL`) |
+| **AI agents** | Six-agent pipeline (RI / MT / AS / EX / DO / IQ) over an LLM tool-calling loop |
+| **LLM** | Bring your own model — set the agent model (`LLM_MODEL`) + AI-evaluation judge (`EVAL_MODEL`) |
 | **Automation** | Playwright + TypeScript Page Object Model, generated server-side |
 | **Test execution** | Docker (`mcr.microsoft.com/playwright`), LLM auto-fix, optional remote runner |
 | **Database** | Neon serverless Postgres via `@vercel/postgres` (JSON-file fallback for local dev) |
@@ -122,8 +122,8 @@ Every artifact is editable and traceable back to one `requirementId`, so quality
 ## Highlights
 
 - **6 specialist AI agents**, each with a focused role, tool access, and live streaming logs.
-- **Real agent loop** — OpenRouter tool-calling (`tools` + `tool_calls`), JSON persistence, no SDK needed.
-- **AI Evaluation at every stage** — an in-app LLM judge (free `EVAL_MODEL`) scores each agent's output
+- **Real agent loop** — LLM tool-calling (`tools` + `tool_calls`), JSON persistence, no SDK needed.
+- **AI Evaluation at every stage** — an in-app LLM judge (configured via `EVAL_MODEL`) scores each agent's output
   against the previous stage's ask: **precision** (correct & relevant output), **accuracy** (nothing
   missed), plus **completeness**, hallucinated/missed counts, per-item verdicts, and judge confidence.
 - **Eval-driven retry loop** — if a stage scores below threshold, the judge's feedback is fed back to the
@@ -142,7 +142,7 @@ Every artifact is editable and traceable back to one `requirementId`, so quality
   completes but reports "tests were not run" — surfaced clearly in the UI and the execute-stage eval.
 - **Traceability by design** — every artifact links back to one `requirementId`.
 - **Stoppable pipeline** — Stop stays active until the NDJSON stream fully ends.
-- **Free models only** — a hard guard refuses any model without a `:free` suffix. No accidental spend.
+- **Bring your own LLM** — the agent model and evaluation judge are configured via `LLM_MODEL` / `EVAL_MODEL`; point them at any model you have access to.
 - **Neon/Postgres-backed persistence** — users, sessions, workspaces, artifacts, evaluations, and run
   history live in serverless Postgres (Neon); local dev falls back to `data/db.json`.
 
@@ -195,7 +195,7 @@ agent start/finish, tools called, artifacts saved, evaluation scores, and retrie
 ## AI Evaluation (LLM judge)
 
 > Honest framing: this is **not** the DeepEval Python framework. It is an in-app, TypeScript
-> re-implementation of the same G-Eval/custom-judge approach, powered by a **free OpenRouter model**
+> re-implementation of the same G-Eval/custom-judge approach, powered by the LLM model you configure
 > (`EVAL_MODEL`). The official DeepEval framework requires a Python runtime and is planned as a
 > separate evaluation service (see [Roadmap](#roadmap)).
 
@@ -369,25 +369,22 @@ node scripts/mcp-smoke.mjs
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `OPENROUTER_API_KEY` | — | **Required.** OpenRouter key for agent calls. |
-| `LLM_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | **Free model only.** A model without `:free` is refused at runtime. |
-| `EVAL_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | **Free model only.** AI Evaluation judge (scores each stage). |
-| `VISION_MODEL` | `google/gemma-4-26b-a4b-it:free` | **Free vision model** for image → text extraction. |
+| `OPENROUTER_API_KEY` | — | **Required.** API key for LLM calls. |
+| `LLM_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | The LLM model the agents use — set this to any model you have access to. |
+| `EVAL_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | The LLM model used as the AI-evaluation judge (scores each stage). |
+| `VISION_MODEL` | `google/gemma-4-26b-a4b-it:free` | Vision model for image → text extraction. |
 | `DATA_DIR` | `data` | Where the dev JSON fallback persists (`data/db.json`). |
 | `NEXT_PUBLIC_APP_NAME` | `QAE2E Agentic Quality Engineering` | App name shown in UI/headers. |
-| `NEXT_PUBLIC_APP_URL` | — | Public app URL, sent as the OpenRouter HTTP-Referer (optional). |
+| `NEXT_PUBLIC_APP_URL` | — | Public app URL, sent as the LLM provider's HTTP-Referer (optional). |
 | `POSTGRES_URL` (or `DATABASE_URL`) | — | **Neon/Postgres** connection. When set, all data lives in Postgres; otherwise dev JSON fallback. |
 | `DOCKER_IMAGE` | `mcr.microsoft.com/playwright:v1.51.0-jammy` | Image for Docker test runs (auto-pulled when missing). |
 | `TEST_COMMAND` | `npm test \|\| npx --yes playwright@1.51.0 test --project=chromium` | Command run inside the container **after** preflight. |
 | `TEST_RUNNER_URL` | — | Remote Docker runner endpoint (e.g. `http://192.168.1.50:8787/run`). When set, suites POST here instead of running docker locally. |
 | `TEST_RUNNER_TOKEN` | — | Optional bearer token shared with the remote runner. |
-| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Optional OpenRouter base URL override. |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Optional LLM provider base URL override. |
 
-> **Free-models policy:** `lib/llm/openrouter.ts` hard-refuses any model that does not end in `:free`.
-> You cannot accidentally spend money with a paid model. Verified tool-calling free models (probed
-> 2026-08): `nvidia/nemotron-3-ultra-550b-a55b:free` (default), `openai/gpt-oss-20b:free`,
-> `google/gemma-4-26b-a4b-it:free`, `inclusionai/ling-3.0-flash:free`, `cohere/north-mini-code:free`,
-> `poolside/laguna-s-2.1:free`. See `.env.example` for the full annotated list.
+> **LLM model:** the app calls your configured provider with the model you set in `LLM_MODEL` /
+> `EVAL_MODEL`. Bring any model you have access to — the defaults are just sensible starting points.
 
 > **Removed with the MCP-placeholder refactor** (no longer present): connector REST clients
 > (`lib/connectors/client.ts`, `test.ts`), encrypted secrets storage (`lib/secrets/`), Pinecone RAG
@@ -427,7 +424,7 @@ qae2e/
 │   ├── settings/                      # IntegrationsTab (MCP + DeepEval WIP placeholders)
 │   └── ui/                            # Button, Card, Badge
 ├── lib/
-│   ├── llm/openrouter.ts              # OpenRouter chat + tool-call primitives (free-only guard)
+│   ├── llm/openrouter.ts              # LLM chat + tool-call primitives (model config via env)
 │   ├── eval/                          # metrics.ts (stage rubrics + judge prompt + fallback),
 │   │                                  #   run.ts (judge call, metrics derivation, persistence)
 │   ├── connectors/                    # registry.ts (defs), index.ts (placeholder status), defs.ts
@@ -462,7 +459,7 @@ qae2e/
 
 **Phase 1 — Core pipeline ✅ (built)**
 - ✅ Copy-paste requirement → 6-agent pipeline (RI → MT → AS → EX → DO → IQ)
-- ✅ OpenRouter tool-calling loop (free models only), server-side POM generation, local Docker run
+- ✅ LLM tool-calling loop (bring-your-own model), server-side POM generation, local Docker run
 - ✅ Editable coverage, CSV/XLSX export, release-confidence gauge
 - ✅ User accounts, workspaces, Neon Postgres persistence, run history
 
