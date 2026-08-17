@@ -100,14 +100,14 @@ export default function JobFilters({
   // Shared dropdown styling — uniform height, same border/radius/font.
   const selectClass = cn(
     CONTROL_H,
-    "cursor-pointer appearance-none rounded-lg border bg-white pl-7 pr-7 text-[13px] outline-none transition-colors focus:border-claude-accent",
-    "max-w-[13rem]"
+    "cursor-pointer appearance-none rounded-lg border bg-white pl-6 pr-6 text-[13px] outline-none transition-colors focus:border-claude-accent",
+    "max-w-[10rem]"
   );
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    <div className="flex min-w-0 flex-nowrap items-center gap-1">
       {/* Search */}
-      <div className={cn("relative min-w-[170px] flex-1", CONTROL_H)}>
+      <div className={cn("relative min-w-[120px] flex-1", CONTROL_H)}>
         <Search
           size={13}
           className="absolute left-2.5 top-1/2 -translate-y-1/2 text-claude-muted"
@@ -115,10 +115,10 @@ export default function JobFilters({
         <input
           value={searchInput}
           onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Search title, company, location, email…"
+          placeholder="Search…"
           className={cn(
             CONTROL_H,
-            "w-full rounded-lg border border-claude-border bg-white pl-8 pr-7 text-[13px] outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
+            "w-full rounded-lg border border-claude-border bg-white pl-7 pr-6 text-[13px] outline-none transition-colors placeholder:text-claude-muted focus:border-claude-accent focus:ring-2 focus:ring-claude-accent/15"
           )}
         />
         {searchInput && (

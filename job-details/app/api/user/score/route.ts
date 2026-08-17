@@ -123,6 +123,11 @@ export async function POST(req: Request) {
   }
 
   const encoder = new TextEncoder();
+  // Total already-scored count BEFORE this run, so progress events can report
+  // the cumulative "scored" number (base + newly scored) live to the client.
+  const preRunScored = await prisma.jobScore.count({
+    where: { userId, job: nonGenericEmailWhere() },
+  });
   const stream = new ReadableStream({
     async start(controller) {
       const send = (obj: Record<string, unknown>) => {
@@ -135,6 +140,7 @@ export async function POST(req: Request) {
           attempted: wave.length,
           remainingBefore,
           totalMatching,
+          scored: preRunScored,
         });
 
         const result = await scoreJobsParallel(
@@ -147,6 +153,7 @@ export async function POST(req: Request) {
               type: "progress",
               scoredDelta,
               scoredInWave,
+              scored: preRunScored + scoredInWave,
               remaining: Math.max(0, remainingBefore - scoredInWave),
               totalMatching,
             });

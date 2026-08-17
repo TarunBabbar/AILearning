@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Info, Contact, Target } from "lucide-react";
+import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Info, Contact, Target, FileUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SESSION_KEY, swrFetcher } from "@/lib/swr-fetcher";
 
@@ -14,7 +14,10 @@ const PUBLIC_NAV_ITEMS = [
 ];
 
 // Only shown to logged-in users — recruiter contact details are gated.
-const AUTH_NAV_ITEMS = [{ href: "/contacts", label: "Recruiter Contacts", icon: Contact }];
+const AUTH_NAV_ITEMS = [
+  { href: "/contacts", label: "Recruiter Contacts", icon: Contact },
+  { href: "/resume", label: "Upload Resume", icon: FileUp },
+];
 
 const COLLAPSE_KEY = "jobdetails_sidebar_collapsed";
 

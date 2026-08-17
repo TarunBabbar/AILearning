@@ -6,13 +6,11 @@ import {
   LogIn,
   UserPlus,
   LogOut,
-  Upload,
   Loader2,
   RefreshCw,
   Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { extractFileText } from "@/lib/client/pdf";
 import { Skeleton, JobGridSkeleton } from "@/components/Skeleton";
 import JobCard from "@/components/JobCard";
 import JobFilters, { type JobFilterValue } from "@/components/JobFilters";
@@ -82,10 +80,6 @@ export default function ScoreJobsPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
 
-  const [resumeBusy, setResumeBusy] = useState(false);
-  const [resumeError, setResumeError] = useState<string | null>(null);
-  const [resumeProgress, setResumeProgress] = useState<string | null>(null);
-
   const [scope, setScope] = useState<"unscored" | "all">("unscored");
   const [stats, setStats] = useState<ScoreStats | null>(null);
   const [confirmLarge, setConfirmLarge] = useState(false);
@@ -96,6 +90,8 @@ export default function ScoreJobsPage() {
   const runTotalRef = useRef(1);
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [scoreFailed, setScoreFailed] = useState(0);
+  // Cumulative "scored" count streamed live from the score run (base + new).
+  const [liveScored, setLiveScored] = useState<number | null>(null);
   const liveRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveRefreshPendingRef = useRef(false);
 
@@ -301,6 +297,11 @@ export default function ScoreJobsPage() {
         // the login immediately (no refresh needed).
         await mutate(SESSION_KEY, next, { revalidate: false });
         await Promise.all([loadMatches(), loadStats("")]);
+        // New users land on the Upload Resume page so their first step is
+        // guided, instead of an empty scoring screen.
+        if (authMode === "register" && !next.resume) {
+          window.location.href = "/resume";
+        }
       }
     } finally {
       setAuthBusy(false);
@@ -317,55 +318,6 @@ export default function ScoreJobsPage() {
     setStats(null);
   }
 
-  async function handleResumeFile(file: File | null) {
-    if (!file) return;
-    setResumeBusy(true);
-    setResumeError(null);
-    setResumeProgress("Extracting text…");
-    try {
-      const name = file.name.toLowerCase();
-      if (!name.endsWith(".pdf") && !name.endsWith(".docx") && !name.endsWith(".txt")) {
-        setResumeError("Use PDF or DOCX (Word .docx).");
-        return;
-      }
-      const text = await extractFileText(file, (page, total) => {
-        setResumeProgress(`Extracting page ${page}/${total}…`);
-      });
-      if (!text || text.trim().length < 80) {
-        setResumeError("Could not extract enough text from this file.");
-        return;
-      }
-      setResumeProgress("Saving resume…");
-      const mimeType = name.endsWith(".pdf")
-        ? "application/pdf"
-        : name.endsWith(".docx")
-          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          : "text/plain";
-      const res = await fetch("/api/user/resume", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: file.name,
-          content: text,
-          mimeType,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setResumeError(data.error || "Failed to save resume.");
-        return;
-      }
-      await refreshMe();
-      setMatches([]);
-      await loadStats("");
-    } catch (err) {
-      setResumeError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setResumeBusy(false);
-      setResumeProgress(null);
-    }
-  }
-
   async function runScoring(force = false) {
     setScoreError(null);
     setScoreFailed(0);
@@ -375,6 +327,7 @@ export default function ScoreJobsPage() {
     }
     setConfirmLarge(false);
     setScoring(true);
+    setLiveScored(me?.scoreCount ?? null);
     const totalAtStart = Math.max(1, pendingCount);
     runTotalRef.current = totalAtStart;
     let completed = 0;
@@ -482,6 +435,9 @@ export default function ScoreJobsPage() {
             if (ev.type === "progress") {
               scheduleLiveRefresh();
               const delta = Number(ev.scoredDelta ?? 0);
+              if (Number.isFinite(Number(ev.scored))) {
+                setLiveScored(Number(ev.scored));
+              }
               if (delta > 0) {
                 waveScored += delta;
                 completed += delta;
@@ -489,6 +445,9 @@ export default function ScoreJobsPage() {
               }
             } else if (ev.type === "done") {
               waveDone = Boolean(ev.done);
+              if (Number.isFinite(Number(ev.scored))) {
+                setLiveScored(Number(ev.scored));
+              }
               const reported = Number(ev.scored ?? waveScored);
               if (reported > waveScored) {
                 completed += reported - waveScored;
@@ -522,6 +481,7 @@ export default function ScoreJobsPage() {
     } finally {
       stopLiveRefresh();
       setScoring(false);
+      setLiveScored(null);
       // Clear the progress UI so the next interaction starts clean
       // (no stale "0%" or run counter from a finished run).
       setScorePct(null);
@@ -685,81 +645,6 @@ export default function ScoreJobsPage() {
                 Match Jobs by Resume
               </h1>
 
-              {(me.scoreCount != null || stats) && (
-                <span className="shrink-0 text-[11px] text-claude-muted">
-                  {scoring ? (
-                    <span className="font-medium text-[#3d7a3d]">
-                      {runCompleted.toLocaleString()} processed
-                      <span className="text-claude-border"> · </span>
-                      <span className="font-medium text-[#9a7b2d]">
-                        {Math.max(
-                          0,
-                          runTotalRef.current - runCompleted
-                        ).toLocaleString()}{" "}
-                        remaining
-                      </span>
-                      {scoreFailed > 0 && (
-                        <>
-                          <span className="text-claude-border"> · </span>
-                          <span className="font-medium text-[#a04040]">
-                            {scoreFailed.toLocaleString()} error
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  ) : (
-                    <>
-                      {me.scoreCount != null && (
-                        <span className="font-medium text-[#3d7a3d]">
-                          {me.scoreCount.toLocaleString()} scored
-                        </span>
-                      )}
-                      {me.scoreCount != null && stats && (
-                        <span className="text-claude-border"> · </span>
-                      )}
-                      {stats && (
-                        <span className="font-medium text-[#9a7b2d]">
-                          {pendingCount.toLocaleString()} left
-                        </span>
-                      )}
-                    </>
-                  )}
-                </span>
-              )}
-            </div>
-
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-              <label
-                className={cn(
-                  "inline-flex h-7 max-w-[10rem] cursor-pointer items-center gap-1 truncate rounded-md border border-claude-border bg-white px-1.5 text-[11px] hover:bg-claude-bg/50",
-                  me.resume ? "text-claude-text" : "text-claude-muted"
-                )}
-                title={me.resume?.filename || "Upload resume"}
-              >
-                {resumeBusy ? (
-                  <Loader2
-                    size={11}
-                    className="shrink-0 animate-spin text-claude-accent"
-                  />
-                ) : (
-                  <Upload size={11} className="shrink-0 text-claude-accent" />
-                )}
-                <span className="truncate">
-                  {resumeBusy
-                    ? resumeProgress || "…"
-                    : me.resume
-                      ? me.resume.filename
-                      : "Upload resume"}
-                </span>
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  className="hidden"
-                  disabled={resumeBusy}
-                  onChange={(e) => handleResumeFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
-
               <div className="inline-flex h-7 rounded-md border border-claude-border bg-claude-bg p-0.5">
                 <button
                   type="button"
@@ -814,6 +699,29 @@ export default function ScoreJobsPage() {
                 </div>
               )}
 
+              {/* Confirm prompt — same line, right after the controls */}
+              {confirmLarge && (
+                <span className="inline-flex shrink-0 items-center gap-2 text-[11px] text-claude-text">
+                  <span className="font-medium">Score {pendingCount.toLocaleString()} jobs?</span>
+                  <button
+                    type="button"
+                    onClick={() => runScoring(true)}
+                    className="rounded bg-claude-accent px-2 py-0.5 text-white"
+                  >
+                    Start
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmLarge(false)}
+                    className="rounded px-2 py-0.5 text-claude-muted ring-1 ring-claude-border"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              )}
+            </div>
+
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
               <div
                 className="flex h-7 max-w-[7.5rem] items-center gap-1 rounded-md border border-claude-border bg-white px-1.5"
                 title={me.user.email}
@@ -837,16 +745,63 @@ export default function ScoreJobsPage() {
             </div>
           </div>
 
-          <p className="text-[11px] leading-snug text-claude-muted">
-            Score shared board jobs against your resume. Results show fit % with
-            strengths and gaps — private to your account.
-          </p>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-snug text-claude-muted">
+            {(me.scoreCount != null || stats) && (
+              <span className="shrink-0">
+                {scoring && liveScored != null ? (
+                  <span className="font-medium text-[#3d7a3d]">
+                    {liveScored.toLocaleString()} scored
+                  </span>
+                ) : me.scoreCount != null ? (
+                  <span className="font-medium text-[#3d7a3d]">
+                    {me.scoreCount.toLocaleString()} scored
+                  </span>
+                ) : null}
+                {scoring && (
+                  <>
+                    <span className="text-claude-border"> · </span>
+                    <span className="font-medium text-claude-text">
+                      {runCompleted.toLocaleString()} processed
+                    </span>
+                    <span className="text-claude-border"> · </span>
+                    <span className="font-medium text-[#9a7b2d]">
+                      {Math.max(
+                        0,
+                        runTotalRef.current - runCompleted
+                      ).toLocaleString()}{" "}
+                      remaining
+                    </span>
+                    {scoreFailed > 0 && (
+                      <>
+                        <span className="text-claude-border"> · </span>
+                        <span className="font-medium text-[#a04040]">
+                          {scoreFailed.toLocaleString()} error
+                        </span>
+                      </>
+                    )}
+                  </>
+                )}
+                {!scoring && stats && (
+                  <>
+                    <span className="text-claude-border"> · </span>
+                    <span className="font-medium text-[#9a7b2d]">
+                      {pendingCount.toLocaleString()} left
+                    </span>
+                  </>
+                )}
+                <span className="text-claude-border"> · </span>
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              Score shared board jobs against your resume. Results show fit % with
+              strengths and gaps — private to your account.
+            </span>
+          </div>
         </div>
       }
     >
-      {(resumeError || scoreError || scoreFailed > 0 || confirmLarge || (!me.resume && !resumeBusy)) && (
+      {(scoreError || scoreFailed > 0 || !me.resume) && (
         <div className="space-y-1 text-[11px]">
-          {resumeError && <p className="text-[#a04040]">{resumeError}</p>}
           {scoreError && <p className="text-[#a04040]">{scoreError}</p>}
           {!scoring && scoreFailed > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-[#eadfc2] bg-[#fbf6e9] px-2.5 py-1.5 text-[#6b5a2e]">
@@ -857,41 +812,28 @@ export default function ScoreJobsPage() {
               </span>
             </div>
           )}
-          {!me.resume && !resumeBusy && (
-            <p className="text-claude-muted">Upload a resume to enable scoring.</p>
-          )}
-          {confirmLarge && (
-            <div className="flex flex-wrap items-center gap-2 text-claude-muted">
-              <span>Score {pendingCount.toLocaleString()} jobs?</span>
-              <button
-                type="button"
-                onClick={() => runScoring(true)}
-                className="rounded bg-claude-accent px-2 py-0.5 text-white"
-              >
-                Start
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmLarge(false)}
-                className="rounded px-2 py-0.5 text-claude-muted ring-1 ring-claude-border"
-              >
-                Cancel
-              </button>
-            </div>
+          {!me.resume && (
+            <p className="text-claude-muted">
+              No resume yet —{" "}
+              <Link href="/resume" className="font-medium text-claude-accent hover:underline">
+                upload your resume
+              </Link>{" "}
+              to enable scoring.
+            </p>
           )}
         </div>
       )}
 
       {/* Filter bar — shared with QA Jobs, plus score-only controls */}
-      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-1.5">
-        <JobFilters
-          value={filterValue}
-          onChange={handleFilters}
-          companyOptions={filterOptions.companies}
-          locationOptions={filterOptions.locations}
-          sortOptions={SCORE_SORT_OPTIONS}
-          rightSlot={
-            <>
+      <div className="mb-3 flex min-w-0 flex-nowrap items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <JobFilters
+            value={filterValue}
+            onChange={handleFilters}
+            companyOptions={filterOptions.companies}
+            locationOptions={filterOptions.locations}
+            sortOptions={SCORE_SORT_OPTIONS}
+            rightSlot={
               <select
                 value={minScore}
                 onChange={(e) => {
@@ -909,19 +851,20 @@ export default function ScoreJobsPage() {
                 <option value={70}>≥ 70%</option>
                 <option value={80}>≥ 80%</option>
               </select>
+            }
+          />
+        </div>
 
-              {matchesTotal > 0 && (
-                <ShowingRange
-                  page={page}
-                  pageSize={MATCH_PAGE_SIZE}
-                  itemCount={matches.length}
-                  total={matchesTotal}
-                  className="ml-auto shrink-0"
-                />
-              )}
-            </>
-          }
-        />
+        {/* Showing range — pinned to the far right of the same line */}
+        {matchesTotal > 0 && (
+          <ShowingRange
+            page={page}
+            pageSize={MATCH_PAGE_SIZE}
+            itemCount={matches.length}
+            total={matchesTotal}
+            className="ml-auto shrink-0"
+          />
+        )}
       </div>
 
       {/* Results — shared card grid with score badges */}
@@ -935,14 +878,18 @@ export default function ScoreJobsPage() {
               ? "Scoring in progress…"
               : minScore || search || companyFilter || locationFilter
                 ? "No scores match these filters"
-                : "No scores yet"}
+                : me.resume
+                  ? "No scores yet"
+                  : "No resume yet"}
           </p>
           <p className="mt-0.5 text-[11px] text-claude-muted">
             {scoring
               ? "Results appear here as they're scored — no need to wait for the full run."
               : minScore || search || companyFilter || locationFilter
                 ? "Clear or loosen filters, or score more jobs."
-                : "Upload a resume and run Score to fill this page."}
+                : me.resume
+                  ? "Your resume is ready — click the Score button to match jobs against it."
+                  : "Upload a resume, then score jobs against it."}
           </p>
         </div>
       ) : (

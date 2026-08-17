@@ -20,7 +20,7 @@ export default function ShowingRange({
   const end = (page - 1) * pageSize + itemCount;
 
   return (
-    <span className={cn("text-[11px] text-claude-muted", className)}>
+    <span className={cn("whitespace-nowrap text-[11px] text-claude-muted", className)}>
       Showing{" "}
       <span className="font-medium text-claude-text">
         {start.toLocaleString()}–{end.toLocaleString()}
