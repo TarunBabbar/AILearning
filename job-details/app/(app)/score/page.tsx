@@ -159,12 +159,19 @@ export default function ScoreJobsPage() {
         params.set("pageSize", String(MATCH_PAGE_SIZE));
 
         const url = `/api/user/matches?${params}`;
-        let data: {
+        type MatchesData = {
           matches: MatchRow[];
           total?: number;
           page?: number;
           pageCount?: number;
         };
+        const apply = (data: MatchesData) => {
+          setMatches(data.matches ?? []);
+          setMatchesTotal(data.total ?? data.matches?.length ?? 0);
+          setMatchesPageCount(Math.max(1, data.pageCount ?? 1));
+          if (data.page && data.page !== pageNo) setPage(data.page);
+        };
+
         if (overrides?.silent) {
           const res = await fetch(url, { cache: "no-store" });
           if (!res.ok) {
@@ -173,14 +180,20 @@ export default function ScoreJobsPage() {
             setMatchesPageCount(1);
             return;
           }
-          data = await res.json();
-        } else {
-          data = await cachedListFetch(url);
+          apply(await res.json());
+          return;
         }
-        setMatches(data.matches ?? []);
-        setMatchesTotal(data.total ?? data.matches?.length ?? 0);
-        setMatchesPageCount(Math.max(1, data.pageCount ?? 1));
-        if (data.page && data.page !== pageNo) setPage(data.page);
+
+        // Cache-first: show whatever we have immediately (no DB wait), then
+        // revalidate in the background and update state with fresh data.
+        const cached = await cachedListFetch<MatchesData>(url);
+        apply(cached);
+        try {
+          const res = await fetch(url, { cache: "no-store" });
+          if (res.ok) apply(await res.json());
+        } catch {
+          // keep showing cached data on refresh failure
+        }
       } finally {
         if (!overrides?.silent) setMatchesLoading(false);
       }
