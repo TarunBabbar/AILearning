@@ -21,6 +21,7 @@ import ShowingRange from "@/components/ShowingRange";
 import PageChrome from "@/components/PageChrome";
 import { mutate } from "swr";
 import { SESSION_KEY } from "@/lib/swr-fetcher";
+import { cachedListFetch, invalidateUserListCache } from "@/lib/use-list-swr";
 import type { JobLike, JobFiltersOptions } from "@/lib/types";
 
 type MeResponse = {
@@ -157,21 +158,25 @@ export default function ScoreJobsPage() {
         params.set("page", String(pageNo));
         params.set("pageSize", String(MATCH_PAGE_SIZE));
 
-        const res = await fetch(`/api/user/matches?${params}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          setMatches([]);
-          setMatchesTotal(0);
-          setMatchesPageCount(1);
-          return;
-        }
-        const data = (await res.json()) as {
+        const url = `/api/user/matches?${params}`;
+        let data: {
           matches: MatchRow[];
           total?: number;
           page?: number;
           pageCount?: number;
         };
+        if (overrides?.silent) {
+          const res = await fetch(url, { cache: "no-store" });
+          if (!res.ok) {
+            setMatches([]);
+            setMatchesTotal(0);
+            setMatchesPageCount(1);
+            return;
+          }
+          data = await res.json();
+        } else {
+          data = await cachedListFetch(url);
+        }
         setMatches(data.matches ?? []);
         setMatchesTotal(data.total ?? data.matches?.length ?? 0);
         setMatchesPageCount(Math.max(1, data.pageCount ?? 1));
@@ -478,6 +483,8 @@ export default function ScoreJobsPage() {
         if (!done) await new Promise((r) => setTimeout(r, 200));
       }
       await Promise.all([loadMatches(), loadStats(""), refreshMe()]);
+      // Scoring wrote new rows — clear the match cache so the next load is fresh.
+      invalidateUserListCache();
     } finally {
       stopLiveRefresh();
       setScoring(false);

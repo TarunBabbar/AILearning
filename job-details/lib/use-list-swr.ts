@@ -46,3 +46,29 @@ export async function invalidateListCaches() {
   }
   await mutate(isListCacheKey, undefined, { revalidate: true });
 }
+
+/**
+ * Cached JSON fetch for user-scoped lists (e.g. /api/user/matches).
+ * Within TTL (~5 min) repeated calls with the same URL reuse the in-memory
+ * result instead of hitting the DB — so tab switches on Match by Resume are
+ * as fast as the QA Jobs page. Call `invalidateUserListCache()` after scoring
+ * completes to force a fresh fetch.
+ */
+const userListCache = new Map<string, { at: number; data: unknown }>();
+
+export async function cachedListFetch<T>(url: string): Promise<T> {
+  const cached = userListCache.get(url);
+  if (cached && Date.now() - cached.at < TTL_MS) {
+    return cached.data as T;
+  }
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+  const data = (await res.json()) as T;
+  userListCache.set(url, { at: Date.now(), data });
+  return data;
+}
+
+/** Clear the user-scoped list cache (call after scoring / resume changes). */
+export function invalidateUserListCache() {
+  userListCache.clear();
+}
