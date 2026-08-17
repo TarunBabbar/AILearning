@@ -47,14 +47,15 @@ model Company {
 
 /// End-user account for Score Jobs (separate from admin upload login).
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  resume       Resume?
-  scores       JobScore[]
+  id            String     @id @default(uuid())
+  email         String     @unique
+  passwordHash  String
+  name          String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  resume        Resume?
+  scores        JobScore[]
+  feedback      Feedback[]
 }
 
 /// One resume per user — extracted plain text only (no binary).
@@ -83,4 +84,20 @@ model JobScore {
 
   @@unique([userId, jobId])
   @@index([userId, score])
+}
+
+/// User reviews / feedback about the portal (optional user link).
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String
+  email     String
+  rating    Int
+  message   String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([approved])
 }

@@ -4,9 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Info, Contact, Target, FileUp } from "lucide-react";
+import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Info, Contact, Target, FileUp, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SESSION_KEY, swrFetcher } from "@/lib/swr-fetcher";
+import FeedbackModal from "@/components/FeedbackModal";
 
 const PUBLIC_NAV_ITEMS = [
   { href: "/", label: "QA Jobs", icon: LayoutDashboard },
@@ -19,6 +20,9 @@ const AUTH_NAV_ITEMS = [
   { href: "/resume", label: "Upload Resume", icon: FileUp },
 ];
 
+// Shown last, always — opens the feedback modal AND the reviews page.
+const REVIEWS_ITEM = { href: "/reviews", label: "User Reviews", icon: Star };
+
 const COLLAPSE_KEY = "jobdetails_sidebar_collapsed";
 
 type MeResponse = { user: { id: string } | null };
@@ -26,6 +30,7 @@ type MeResponse = { user: { id: string } | null };
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   // Restore collapsed state from localStorage
   useEffect(() => {
@@ -46,8 +51,8 @@ export default function Sidebar() {
   const loggedIn = Boolean(data?.user);
 
   const navItems = loggedIn
-    ? [...PUBLIC_NAV_ITEMS, ...AUTH_NAV_ITEMS]
-    : PUBLIC_NAV_ITEMS;
+    ? [...PUBLIC_NAV_ITEMS, ...AUTH_NAV_ITEMS, REVIEWS_ITEM]
+    : [...PUBLIC_NAV_ITEMS, REVIEWS_ITEM];
 
   const toggle = useCallback(() => {
     setCollapsed((c) => {
@@ -62,12 +67,13 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <aside
-      className={cn(
-        "flex h-full shrink-0 flex-col border-r border-claude-border bg-[#f5f4ef] transition-all duration-200",
-        collapsed ? "w-14" : "w-60"
-      )}
-    >
+    <>
+      <aside
+        className={cn(
+          "flex h-full shrink-0 flex-col border-r border-claude-border bg-[#f5f4ef] transition-all duration-200",
+          collapsed ? "w-14" : "w-60"
+        )}
+      >
       {/* Brand + collapse toggle */}
       <div className={cn("flex items-center py-4", collapsed ? "justify-center px-2" : "justify-between gap-2 px-4")}>
         <div className={cn("flex items-center gap-3", collapsed && "sr-only")}>
@@ -102,6 +108,10 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => {
+                // Clicking User Reviews opens the share-feedback modal too.
+                if (item.href === REVIEWS_ITEM.href) setFeedbackOpen(true);
+              }}
               title={collapsed ? item.label : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -155,6 +165,10 @@ export default function Sidebar() {
           </div>
         </div>
       )}
-    </aside>
+      </aside>
+
+      {/* Share Feedback modal — opens when User Reviews is clicked */}
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+    </>
   );
 }
