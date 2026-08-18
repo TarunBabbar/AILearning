@@ -39,8 +39,28 @@ with human review checkpoints and a CI webhook for release blocking.
 
 ---
 
+## Problem Statement
+
+Manual QA is slow, inconsistent, and doesn't scale. Teams hand-write test cases from Jira stories,
+maintain them by hand, run them in silos, and rely on gut feel at release time — defects slip through
+and the "why this test exists" traceability is lost.
+
+This platform exists because QA teams need an automated, audit-ready path from **requirement to
+release decision**:
+
+- Test cases derived directly from real requirements (Jira stories + acceptance criteria), code, and
+  existing test suites — not generated in a vacuum.
+- Every test traceable back to its source (ticket / code diff / existing test) so QA can audit *why*
+  it exists.
+- Every run graded on configurable LLM-judge metrics with a **hard/soft release gate**, not a binary
+  pass/fail.
+- Failures feed back into the review queue → test suite → next run (closed loop).
+
+---
+
 ## Table of Contents
 
+- [Problem Statement](#problem-statement)
 - [Tech Stack](#tech-stack)
 - [Repository Layout](#repository-layout)
 - [Quick Start (local)](#quick-start-local)
