@@ -1,0 +1,15 @@
+[project]
+name = "db-mcp-server"
+version = "0.1.0"
+description = "Read-only Database MCP server (Postgres first) — schema discovery + safe SELECT-only queries"
+requires-python = ">=3.11"
+
+dependencies = [
+    "mcp[server]>=1.0",
+    "fastmcp>=2.0",
+    "psycopg2-binary>=2.9",
+    "pydantic>=2.7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

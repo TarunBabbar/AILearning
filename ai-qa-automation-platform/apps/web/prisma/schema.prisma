@@ -1,0 +1,231 @@
+// Prisma schema — workspace-scoped multi-tenant models for Neon Postgres.
+// Every table carries workspaceId — the platform's core isolation invariant.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  picture   String?
+  provider  String   @default("credentials")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships WorkspaceMember[]
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       WorkspaceMember[]
+  connections   Connection[]
+  requirements  Requirement[]
+  testCases     TestCase[]
+  runs          Run[]
+  coverage      CoverageMap[]
+  traces        Trace[]
+  reviewItems   ReviewItem[]
+  settings      WorkspaceSettings?
+}
+
+model WorkspaceMember {
+  id          String   @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        String   @default("qa") // owner | admin | qa
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Connection {
+  id               String   @id @default(uuid())
+  workspaceId      String
+  type             String // github | jira | database
+  status           String   @default("connected") // connected | expired
+  secretCiphertext String // AES-256-GCM encrypted
+  expiresAt        DateTime?
+  scopeConfig      Json     @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model Requirement {
+  id                 String    @id @default(uuid())
+  workspaceId        String
+  sourceKey          String // Jira ticket key
+  title              String
+  description        String?
+  acceptanceCriteria Json      @default("[]")
+  sourceLink         String?
+  rubric             Json?
+  riskTier           String    @default("medium") // high | medium | low
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  testCases TestCase[]
+  coverage  CoverageMap[]
+
+  @@index([workspaceId])
+  @@index([sourceKey])
+}
+
+model TestCase {
+  id           String    @id @default(uuid())
+  workspaceId  String
+  requirementId String?
+  title        String
+  testType     String // ui | api | db | integration
+  status       String    @default("draft") // draft | approved | rejected | archived
+  source       String    @default("ai-generated") // ai-generated | user-provided
+  derivedFrom  String? // traceability: jira key / diff / existing test
+  code         String?
+  tags         Json      @default("[]")
+  priority     String    @default("P2")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requirement Requirement?    @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  coverage    CoverageMap[]
+  results     RunResult[]
+  reviewItems ReviewItem[]
+
+  @@index([workspaceId])
+}
+
+model CoverageMap {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  requirementId String
+  testCaseId    String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  testCase    TestCase   @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model Run {
+  id                String    @id @default(uuid())
+  workspaceId       String
+  trigger           String    @default("manual") // manual | pr | nightly | release
+  status            String    @default("queued") // queued | running | passed | failed | blocked
+  gateVerdict       String? // pass | block
+  thresholdSnapshot Json      @default("{}")
+  traceId           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  results   RunResult[]
+  traces    Trace[]
+
+  @@index([workspaceId])
+}
+
+model RunResult {
+  id          String   @id @default(uuid())
+  runId       String
+  testCaseId  String?
+  workspaceId String
+  status      String   @default("pending") // pending | passed | failed | error | skipped
+  durationMs  Int?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  run       Run          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  testCase  TestCase?    @relation(fields: [testCaseId], references: [id], onDelete: SetNull)
+  metrics   MetricScore[]
+  reviewItems ReviewItem[]
+
+  @@index([runId])
+  @@index([workspaceId])
+}
+
+model MetricScore {
+  id          String   @id @default(uuid())
+  runResultId String
+  workspaceId String
+  metric      String // answer_relevancy | groundedness | completeness | correctness | tool_sequence_accuracy
+  score       Float
+  threshold   Float
+  hardGate    Boolean  @default(false)
+  passed      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  runResult RunResult @relation(fields: [runResultId], references: [id], onDelete: Cascade)
+
+  @@index([runResultId])
+  @@index([workspaceId])
+}
+
+model Trace {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  runId          String?
+  traceId        String
+  artifactKeys   Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run       Run?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+}
+
+model ReviewItem {
+  id          String    @id @default(uuid())
+  workspaceId String
+  kind        String    @default("generated") // generated | defect
+  testCaseId  String?
+  runResultId String?
+  status      String    @default("open") // open | approved | rejected | jira_created
+  reason      String?
+  jiraKey     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  testCase  TestCase? @relation(fields: [testCaseId], references: [id], onDelete: SetNull)
+  runResult RunResult? @relation(fields: [runResultId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+}
+
+model WorkspaceSettings {
+  workspaceId String   @id
+  thresholds  Json     @default("{}")
+  riskTiers   Json     @default("{}")
+  gatePolicy  Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}

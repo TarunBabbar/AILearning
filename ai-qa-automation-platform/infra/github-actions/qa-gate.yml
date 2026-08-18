@@ -1,0 +1,26 @@
+name: QA Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  qa-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger QA run on platform
+        run: |
+          curl -sS -X POST "${{ secrets.QA_PLATFORM_URL }}/api/v1/webhooks/gate/notify" \
+            -H "Authorization: Bearer ${{ secrets.QA_PLATFORM_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"run_id": "${{ github.event.pull_request.head.sha }}"}'
+      - name: Check gate verdict
+        id: gate
+        run: |
+          VERDICT=$(curl -sS "${{ secrets.QA_PLATFORM_URL }}/api/v1/webhooks/gate/${{ github.event.pull_request.head.sha }}" \
+            -H "Authorization: Bearer ${{ secrets.QA_PLATFORM_TOKEN }}")
+          echo "$VERDICT" | jq -r '.gate_verdict' > verdict.txt
+          if [ "$(cat verdict.txt)" = "block" ]; then
+            echo "::error::QA gate blocked the release"
+            exit 1
+          fi
