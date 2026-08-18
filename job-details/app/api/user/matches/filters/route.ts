@@ -73,7 +73,14 @@ export async function GET() {
       .map(([value, count]) => ({ value, count }))
       .sort((a, b) => a.value.localeCompare(b.value));
 
-    return NextResponse.json({ companies, locations });
+    return NextResponse.json(
+      { companies, locations },
+      {
+        // user-specific browser cache — dropdowns don't change often; reloads
+        // within 60s skip the DB.
+        headers: { "Cache-Control": "private, max-age=60" },
+      }
+    );
   } catch (e) {
     console.error("[user/matches/filters]", e);
     return NextResponse.json(

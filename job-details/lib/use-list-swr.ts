@@ -81,10 +81,12 @@ export async function cachedListFetch<T>(url: string): Promise<T> {
     return cached.data as T;
   }
 
-  // No cache → fetch (dedupe concurrent calls for the same URL).
+  // No cache → fetch (dedupe concurrent calls for the same URL). Default
+  // cache mode lets the browser HTTP cache (private, max-age) serve reloads
+  // within the TTL without a DB hit.
   const pending = inFlight.get(url);
   if (pending) return pending as Promise<T>;
-  const p = fetch(url, { cache: "no-store" })
+  const p = fetch(url)
     .then((res) => {
       if (!res.ok) throw new Error(`Failed to load (${res.status})`);
       return res.json();
@@ -105,7 +107,7 @@ export async function cachedListFetch<T>(url: string): Promise<T> {
 async function revalidate(url: string): Promise<void> {
   const pending = inFlight.get(url);
   if (pending) return;
-  const p = fetch(url, { cache: "no-store" })
+  const p = fetch(url)
     .then((res) => {
       if (!res.ok) throw new Error(`Failed to load (${res.status})`);
       return res.json();

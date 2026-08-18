@@ -182,7 +182,10 @@ export async function GET(req: Request) {
         },
       },
       {
-        headers: { "Cache-Control": "private, no-store" },
+        // private (user-specific) browser cache — reloads within 60s don't
+        // hit the DB; combined with the client SWR cache this makes the
+        // Match by Resume page feel instant.
+        headers: { "Cache-Control": "private, max-age=60" },
       }
     );
   } catch (e) {
