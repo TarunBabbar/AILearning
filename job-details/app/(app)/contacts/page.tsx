@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Mail, Search, Copy, Check, X, Building2, LogIn } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { TableSkeleton } from "@/components/Skeleton";
+import { avatarColor, initials } from "@/components/JobCard";
 import ListPagination from "@/components/ListPagination";
 import ShowingRange from "@/components/ShowingRange";
 import PageChrome from "@/components/PageChrome";
@@ -208,8 +210,16 @@ export default function ContactsPage() {
               {data.contacts.map((contact) => (
                 <div
                   key={`${contact.company}|${contact.emails[0] ?? ""}`}
-                  className="grid grid-cols-[minmax(9rem,14rem)_1fr] gap-x-3 px-3.5 py-2.5 hover:bg-claude-bg/30"
+                  className="grid grid-cols-[minmax(2.5rem,2.5rem)_minmax(9rem,14rem)_1fr] gap-x-3 px-3.5 py-2.5 hover:bg-claude-bg/30"
                 >
+                  <span
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-lg text-[11px] font-semibold",
+                      avatarColor(contact.company)
+                    )}
+                  >
+                    {initials(contact.company)}
+                  </span>
                   <div className="truncate text-[13px] font-semibold text-claude-text">
                     {contact.company}
                   </div>
@@ -233,11 +243,16 @@ export default function ContactsPage() {
                         <button
                           type="button"
                           onClick={() => copyEmail(email)}
-                          className="shrink-0 text-claude-muted opacity-0 transition-opacity hover:text-claude-accent group-hover:opacity-100"
+                          className="flex shrink-0 items-center gap-1 text-claude-muted opacity-0 transition-opacity hover:text-claude-accent group-hover:opacity-100"
                           title="Copy email"
                         >
                           {copied === email ? (
-                            <Check size={12} className="text-[#3d7a3d]" />
+                            <>
+                              <Check size={12} className="text-[#3d7a3d]" />
+                              <span className="text-[10px] font-medium text-[#3d7a3d]">
+                                Copied
+                              </span>
+                            </>
                           ) : (
                             <Copy size={12} />
                           )}
