@@ -111,6 +111,7 @@ export default function ScoreJobsPage() {
   );
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selected, setSelected] = useState<MatchRow | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [filterOptions, setFilterOptions] = useState<JobFiltersOptions>({
     companies: [],
     locations: [],
@@ -742,26 +743,59 @@ export default function ScoreJobsPage() {
             </div>
 
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-              <div
-                className="flex h-7 max-w-[7.5rem] items-center gap-1 rounded-md border border-claude-border bg-white px-1.5"
-                title={me.user.email}
-              >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-claude-accent text-[9px] font-semibold text-white">
-                  {userInitials(me.user.name, me.user.email)}
-                </span>
-                <span className="min-w-0 truncate text-[11px] font-medium text-claude-text">
-                  {me.user.name || me.user.email}
-                </span>
+              {/* User chip — click to open dropdown with Log out */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((o) => !o)}
+                  className="flex h-7 items-center gap-1 rounded-md border border-claude-border bg-white pl-1 pr-1.5 transition-colors hover:bg-claude-bg/50"
+                  title={me.user.email}
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-claude-accent text-[9px] font-semibold text-white">
+                    {userInitials(me.user.name, me.user.email)}
+                  </span>
+                  <span className="min-w-0 max-w-[5rem] truncate text-[11px] font-medium text-claude-text">
+                    {me.user.name || me.user.email}
+                  </span>
+                  <svg
+                    className={cn(
+                      "h-3 w-3 shrink-0 text-claude-muted transition-transform",
+                      userMenuOpen && "rotate-180"
+                    )}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+
+                {userMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setUserMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-claude-border bg-white shadow-lg">
+                      <div className="border-b border-claude-border px-3 py-2">
+                        <p className="truncate text-[11px] font-medium text-claude-text">
+                          {me.user.name || "User"}
+                        </p>
+                        <p className="truncate text-[10px] text-claude-muted">{me.user.email}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-claude-muted transition-colors hover:bg-claude-bg hover:text-claude-text"
+                      >
+                        <LogOut size={12} />
+                        Log out
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                title="Log out"
-                className="inline-flex h-7 items-center gap-1 rounded-md border border-claude-border bg-white px-1.5 text-[11px] text-claude-muted hover:bg-claude-bg hover:text-claude-text"
-              >
-                <LogOut size={11} />
-                <span className="hidden sm:inline">Log out</span>
-              </button>
             </div>
           </div>
 
