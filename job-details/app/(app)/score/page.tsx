@@ -340,7 +340,13 @@ export default function ScoreJobsPage() {
   async function runScoring(force = false) {
     setScoreError(null);
     setScoreFailed(0);
-    if (!force && pendingCount >= 100 && !confirmLarge) {
+
+    // Rescore protection: if everything is already scored (unscored === 0),
+    // a "Rescore" run would re-process ALL jobs — warn first so it's a
+    // deliberate action, not accidental.
+    const nothingNew =
+      scope === "all" && (stats?.unscored ?? 0) === 0 && (stats?.totalMatching ?? 0) > 0;
+    if (!force && (nothingNew || (pendingCount >= 100 && !confirmLarge))) {
       setConfirmLarge(true);
       return;
     }
@@ -723,7 +729,11 @@ export default function ScoreJobsPage() {
               {/* Confirm prompt — same line, right after the controls */}
               {confirmLarge && (
                 <span className="inline-flex shrink-0 items-center gap-2 text-[11px] text-claude-text">
-                  <span className="font-medium">Score {pendingCount.toLocaleString()} jobs?</span>
+                  <span className="font-medium">
+                    {scope === "all" && (stats?.unscored ?? 0) === 0
+                      ? `Everything is scored — rescore all ${pendingCount.toLocaleString()} jobs?`
+                      : `Score ${pendingCount.toLocaleString()} jobs?`}
+                  </span>
                   <button
                     type="button"
                     onClick={() => runScoring(true)}
@@ -802,18 +812,8 @@ export default function ScoreJobsPage() {
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-snug text-claude-muted">
             {(me.scoreCount != null || stats) && (
               <span className="shrink-0">
-                {scoring && liveScored != null ? (
-                  <span className="font-medium text-[#3d7a3d]">
-                    {liveScored.toLocaleString()} scored
-                  </span>
-                ) : me.scoreCount != null ? (
-                  <span className="font-medium text-[#3d7a3d]">
-                    {me.scoreCount.toLocaleString()} scored
-                  </span>
-                ) : null}
-                {scoring && (
+                {scoring ? (
                   <>
-                    <span className="text-claude-border"> · </span>
                     <span className="font-medium text-claude-text">
                       {runCompleted.toLocaleString()} processed
                     </span>
@@ -825,22 +825,22 @@ export default function ScoreJobsPage() {
                       ).toLocaleString()}{" "}
                       remaining
                     </span>
-                    {scoreFailed > 0 && (
-                      <>
-                        <span className="text-claude-border"> · </span>
-                        <span className="font-medium text-[#a04040]">
-                          {scoreFailed.toLocaleString()} error
-                        </span>
-                      </>
-                    )}
                   </>
-                )}
-                {!scoring && stats && (
+                ) : (
                   <>
-                    <span className="text-claude-border"> · </span>
-                    <span className="font-medium text-[#9a7b2d]">
-                      {pendingCount.toLocaleString()} left
-                    </span>
+                    {me.scoreCount != null && (
+                      <span className="font-medium text-[#3d7a3d]">
+                        {me.scoreCount.toLocaleString()} scored
+                      </span>
+                    )}
+                    {me.scoreCount != null && stats && (
+                      <span className="text-claude-border"> · </span>
+                    )}
+                    {stats && (
+                      <span className="font-medium text-[#9a7b2d]">
+                        {pendingCount.toLocaleString()} left
+                      </span>
+                    )}
                   </>
                 )}
                 <span className="text-claude-border"> · </span>
@@ -854,17 +854,14 @@ export default function ScoreJobsPage() {
         </div>
       }
     >
-      {(scoreError || scoreFailed > 0 || !me.resume) && (
+      {(!me.resume || scoreError === "Wave scored 0 jobs — stopping. Try again later.") && (
         <div className="space-y-1 text-[11px]">
-          {scoreError && <p className="text-[#a04040]">{scoreError}</p>}
-          {!scoring && scoreFailed > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-[#eadfc2] bg-[#fbf6e9] px-2.5 py-1.5 text-[#6b5a2e]">
-              <span>
-                {scoreFailed.toLocaleString()} job{scoreFailed === 1 ? "" : "s"}{" "}
-                hit an error and couldn&apos;t be scored. The rest are done —
-                click Score again later to retry the failed ones.
-              </span>
-            </div>
+          {/* Only surface a gentle note when NOTHING could be scored; per-job
+              parse errors are logged server-side and not shown to the user. */}
+          {scoreError === "Wave scored 0 jobs — stopping. Try again later." && (
+            <p className="text-claude-muted">
+              Scoring couldn&apos;t process any jobs this round. Please try again in a moment.
+            </p>
           )}
           {!me.resume && (
             <p className="text-claude-muted">
