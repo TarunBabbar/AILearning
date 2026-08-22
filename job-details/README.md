@@ -71,6 +71,7 @@
 
 ### 📇 Recruiter Contacts
 - **Contacts**: company → recruiter email(s), copy / mailto.
+- Each row has a pastel company avatar (initials) matching the JobCard style; the copy button flashes **"Copied"** for instant feedback.
 - Paginated (40 per page) with **Showing 1–40 of N**.
 
 ### 🏢 Company details (inline, no separate tab)
@@ -92,13 +93,15 @@
 
 ### 🎯 Match Jobs by Resume (per-user scoring)
 - Nav: **Match by Resume**. Register/login, upload a resume, score shared board jobs against it.
-- Compact fixed page header (title, scored/left counts, resume chip, Unscored/Rescore, Score, account) plus the privacy blurb under the title.
+- Compact fixed page header (title, scored/left counts, resume chip, Unscored/Rescore, Score) with a **user menu dropdown** — click the chip to see name/email and **Log out** (replaces the old separate logout button).
 - Same shared filter bar as QA Jobs (**search**, **company** / **location** dropdowns, sort by score/company/location) plus score-only controls (min score, Remote) with **Showing 1–40 of N**.
 - Results render as the same job cards as QA Jobs with a **fit % badge** and strengths snippet on each card; 40 cards per page.
 - Click a card for a centered detail popup with strengths, gaps, and full description (header hidden while open).
 - Score shared board jobs via OpenRouter. Each wave lists free `:free` models, then fires **one parallel request per model** with **10 jobs** each. Results upsert to `JobScore` as each chunk returns.
 - Per-model: up to **2 tries**, then blacklist that model for the run and reassign the chunk.
 - Scores keyed by `(userId, jobId)` so users never see each other’s results.
+- **Single status line**: while scoring, live `processed / remaining` progress; when idle, `X scored · Y left`.
+- **Rescore protection**: if everything is already scored, the confirm prompt says *"Everything is scored — rescore all N jobs?"* so a Rescore can’t silently re-process all jobs.
 - Large runs (≥100 jobs) show a time warning; scoring can be resumed (unscored-only).
 - Admin list of accounts: `GET /api/users` — requires non-empty `USERS_ADMIN_API_KEY`, passed as `x-api-key` or `Authorization: Bearer …`.
 
