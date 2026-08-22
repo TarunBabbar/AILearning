@@ -1,0 +1,25 @@
+{
+  "name": "figma-to-playwright-agents",
+  "version": "0.1.0",
+  "description": "AI agent pipeline: Figma design -> test cases -> Playwright+TS automation, driven by OpenRouter LLMs and the official Figma MCP server.",
+  "type": "module",
+  "bin": {
+    "figma2pw": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "pipeline": "npm run build && node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}
