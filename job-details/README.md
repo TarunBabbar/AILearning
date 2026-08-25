@@ -85,6 +85,11 @@
 - The OpenRouter key is read **only** from `OPENROUTER_API_KEY` (`.env` locally, Vercel env vars in production).
 - No settings page, no UI entry, no cookies — the key never reaches the browser.
 
+### ⚠️ Free-model rate limits (HTTP 429)
+- OpenRouter's `:free` models share a single **anonymous pool** per provider — when it's saturated the API returns `429` with `"limit_source":"upstream_provider_shared_pool"`, regardless of the model picked.
+- Fix: add a key at https://openrouter.ai/settings/keys and set it as `OPENROUTER_API_KEY` in Vercel env vars. With `is_byok:true` the request uses **your** rate limit instead of the shared pool (free models still cost $0). Redeploy after changing env vars.
+- If 429s persist, pick a model from a different provider (e.g. switch Google → Nvidia) — free pools are per-provider.
+
 ### ⚡ Client + edge caching (Jobs / Contacts)
 - List pages use **[SWR](https://swr.vercel.app)** so switching tabs reuses in-memory data instead of hitting Neon on every navigation.
 - Soft TTL of **~5 minutes**: within that window, remounting a tab shows cached data with **no network/DB round-trip**.
