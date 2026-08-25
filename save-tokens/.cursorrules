@@ -1,0 +1,57 @@
+# Token-Saving Skill — UI Test Automation + Fixes
+
+Goal: write tests, fix failing elements/locators/asserts — minimum tokens in, minimum tokens out.
+
+## Core rule
+
+**I only look at what I give you. Never read whole files, repo maps, imports, or related specs unless I link them explicitly. If context is short, answer short.**
+
+## Scope of task — I will name it before asking
+
+- `[AUTO]` write/update a test from a spec snippet
+- `[FIX]` element locator unstable / not found
+- `[FIX-ASSERT]` assertion failing
+- `[DEBUG]` test fails but I don't know why yet
+
+## Input format (I paste this)
+
+```
+[type:AUTO|FIX|FIX-ASSERT|DEBUG]
+[file:NAME lines:X-Y]
+[error/assert:<exact line>]
+[locator:<current one if any>]
+[ask: <one specific question>]
+```
+
+## Output contract (hard)
+
+- Only the requested deliverable: changed code snippet OR root cause line. Never both unless `[ask]` asks.
+- `[AUTO]`  → test code only. No explanation.
+- `[FIX]`   → `ROOT CAUSE: <1 line>` then `CHANGED: <snippet>`.
+- `[FIX-ASSERT]` → expected-vs-actual one line, then changed assertion.
+- `[DEBUG]` → ONE hypothesis, ONE probe step. Stop.
+- No refactors, no "while I'm here" cleanup, no doc comments, no alternative approaches, no "your code is good but".
+- Max 10 lines code per answer unless I request more.
+- Markdown essays banned. Bold headers only, then raw snippet.
+
+## Locator strategy when `[type:FIX]` element unstable or not found
+
+Determine first: not-found vs not-visible vs detached — fix differs.
+
+- **Not found** → iframe / shadow-root / different tab / dynamic render → scope to nearest stable container. Show changed root line only.
+- **Not visible** → wrong wait state or wrong expect. Use Playwright auto-wait; explicit `waitFor` only when race proven. No blind `sleep`.
+- **Detached** → re-query locator fresh each use; never cache a stale element handle.
+
+Locator specificity order (fewest fixes):
+`getByRole/getByText/getByTestId` (by-most-specific, matches ONE node) → CSS → XPath.
+Never bare broad selector (`a`, `div`, `[class]`).
+
+## Token-waste causes I avoid as the prompter
+
+1. **Retry loop** — asking "verify and check… what could be the fix" = Cursor re-reads whole context every round trip. Each retry = full snapshot = burn. Ask ONE precise thing per turn.
+2. **Whole-file context** — Cursor injects all open tabs + full file + related files into every request. Keep ONLY the 3-5 relevant lines visible in the tab. Close the rest.
+3. **Vague ask → wide guess** — the model reads more and answers long. Tight `[type]` + exact error kills both.
+
+## My reminder to self
+
+Before sending to Cursor: close unused tabs, keep only the failing block on screen, run the failing test first and paste its real error line, set `[type]`, ask exactly one thing.
