@@ -144,11 +144,12 @@ async function scoreChunkWithModel(
       model,
       maxTokens: 4096,
       temperature: 0.2,
-      // One shot per chunk — keep it short so a flaky free model can't
-      // pin a worker for minutes. maxRetries: 1 = exactly one attempt
-      // (callOpenRouter's loop runs `attempt <= maxRetries`).
+      // Short retry budget: one retry rides out a transient 429/5xx, then
+      // fails fast so a flaky free model can't pin a worker for minutes
+      // (maxRetries: 2 = attempt 1 + one retry).
       timeoutMs: 60_000,
-      maxRetries: 1,
+      maxRetries: 2,
+      maxRetryDelayMs: 15_000,
     }
   );
   const results = parseScores(content, batch);

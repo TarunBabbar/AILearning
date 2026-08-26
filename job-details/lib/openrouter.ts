@@ -27,18 +27,30 @@ export type ChatMessage = {
 
 export class OpenRouterError extends Error {
   status: number;
-  constructor(message: string, status = 500) {
+  retryAfterMs?: number;
+  constructor(message: string, status = 500, retryAfterMs?: number) {
     super(message);
     this.name = "OpenRouterError";
     this.status = status;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
-function retryDelayMs(attempt: number, status: number | undefined, maxDelayMs: number): number {
+function retryDelayMs(
+  attempt: number,
+  status: number | undefined,
+  maxDelayMs: number,
+  retryAfterMs?: number
+): number {
+  // Respect the provider's Retry-After header when present (OpenRouter
+  // returns it for 429s so clients don't hammer the shared free pool).
+  if (retryAfterMs != null) {
+    return Math.min(maxDelayMs, Math.max(0, retryAfterMs));
+  }
   // Rate limits need much longer waits (free shared pools).
   if (status === 429) {
-    // 20s, 40s, 80s, 120s… capped at maxDelayMs
-    return Math.min(maxDelayMs, 20_000 * Math.pow(2, attempt - 1));
+    // 10s, 20s, 40s, 60s… capped at maxDelayMs
+    return Math.min(maxDelayMs, 10_000 * Math.pow(2, attempt - 1));
   }
   // 1.5s, 3s, 6s, 12s — exponential backoff, capped at maxDelayMs
   return Math.min(maxDelayMs, BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1));
@@ -82,7 +94,7 @@ export async function callOpenRouter(
   const temperature = opts.temperature ?? 0.1;
   const timeoutMs = opts.timeoutMs ?? ABORT_TIMEOUT_MS;
   const maxRetries = opts.maxRetries ?? MAX_RETRIES;
-  const maxRetryDelayMs = opts.maxRetryDelayMs ?? 120_000;
+  const maxRetryDelayMs = opts.maxRetryDelayMs ?? 60_000;
   const url = `${cfg.openrouterBaseUrl}/chat/completions`;
   const keyPreview = key.length > 14 ? `${key.slice(0, 11)}…${key.slice(-3)}` : "***";
   const referer = cfg.appUrl || "https://openrouter.ai";
@@ -137,9 +149,15 @@ export async function callOpenRouter(
             402
           );
         }
+        // Capture the provider's retry-after so the backoff can honor it.
+        const retryAfterSec = response.headers.get("retry-after");
+        const retryAfterMs = retryAfterSec
+          ? Number(retryAfterSec) * 1000
+          : undefined;
         throw new OpenRouterError(
           `OpenRouter API ${response.status}: ${detail}`,
-          response.status
+          response.status,
+          Number.isFinite(retryAfterMs) ? retryAfterMs : undefined
         );
       }
 
@@ -173,7 +191,9 @@ export async function callOpenRouter(
       if (!retryable) throw err;
 
       if (attempt < maxRetries) {
-        const delay = retryDelayMs(attempt, status, maxRetryDelayMs);
+        const retryAfterMs =
+          err instanceof OpenRouterError ? err.retryAfterMs : undefined;
+        const delay = retryDelayMs(attempt, status, maxRetryDelayMs, retryAfterMs);
         log.warn(
           "llm",
           `Attempt ${attempt}/${maxRetries} failed (${lastError.message}) — retrying in ${ms(delay)}`,

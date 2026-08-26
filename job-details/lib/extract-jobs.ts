@@ -147,20 +147,24 @@ export async function extractJobsFromText(
   log.info(
     "extract",
     `Starting parallel extraction · ${rawText.length.toLocaleString()} chars → ${totalChunks} chunk(s)`,
-    "each chunk gets a random free model"
+    "chunks rotate starting models round-robin"
   );
 
-  // One shared list of free models; each chunk picks a different random one.
+  // One shared list of free models; each chunk starts on a different model
+  // (round-robin), then falls back through the others on failure.
   const freeModels = await getFreeModelIds(log);
   if (!freeModels.length) {
     log.error("extract", "No free models available", "aborting");
     return [];
   }
 
-  // All chunks start with the fastest model in parallel; if a chunk fails
-  // it falls back to the next-fastest untried model, and so on.
+  // All chunks start in parallel, but each chunk picks a DIFFERENT model as
+  // its first attempt (round-robin with a random offset). If every chunk
+  // started on the same fastest model, N parallel calls would hit one
+  // provider at once and all get rate-limited (429) together.
   const firstModel = freeModels[0];
   if (!firstModel) return [];
+  const startOffset = Math.floor(Math.random() * freeModels.length);
 
   // ── Parallel extraction: one LLM call per chunk, all fired at once ──
   const results = await Promise.all(
@@ -168,7 +172,7 @@ export async function extractJobsFromText(
       const chunkNum = i + 1;
       const prompt = buildExtractionPrompt(chunkText);
       const tried = new Set<string>();
-      let model = firstModel;
+      let model = freeModels[(startOffset + i) % freeModels.length];
 
       opts.onProgress?.({
         phase: "chunk_start",
@@ -190,7 +194,10 @@ export async function extractJobsFromText(
             prompt,
             EXTRACTION_SYSTEM_PROMPT,
             apiKey,
-            { model, maxTokens: 8192 },
+            // Short retry budget: a rate-limited (429) free model should fail
+            // fast so the chunk can switch to a different provider instead of
+            // burning the Vercel function budget on backoff sleeps.
+            { model, maxTokens: 8192, maxRetries: 2, maxRetryDelayMs: 20_000 },
             log
           );
         } catch (e) {
