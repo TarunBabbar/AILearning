@@ -7,6 +7,8 @@ A multi-agent pipeline that solves two problems with one shared foundation:
 
 Both pipelines feed the same Playwright + TypeScript framework and are driven by **six LLM/rule-based agents + one deterministic orchestrator**.
 
+> **Web dashboard (optional):** a Next.js 16 app in `webapp/` wraps the whole pipeline in a browser UI — beige/amber Claude-style left-nav, config editor (API keys / .env), run pipelines & agents with live progress, drift-report viewer, and test-case approval. It runs the existing CLI untouched; see [Web Dashboard](#web-dashboard).
+
 ---
 
 ## Table of Contents
@@ -410,10 +412,47 @@ The LLM codegen prompt (in `agents/automation-codegen/agent.ts`) injects this pr
 
 ---
 
+## Web Dashboard
+
+A **Next.js 16 web application** in `webapp/` that wraps the entire pipeline in a browser UI — **without modifying any existing pipeline file**. It spawns the existing CLI as a child process, reads the existing SQLite store and artifacts, and writes `.env` for you.
+
+### Setup
+
+```bash
+cd webapp
+npm install --include=dev
+npm run dev        # http://localhost:3000
+```
+
+For production: `npm run build && npm run start`.
+
+### Tabs (beige/amber Claude theme, left nav)
+
+| Tab | What it does |
+|-----|--------------|
+| **Dashboard** | Registered screens + state chips + quick Run A / Run B |
+| **Validation (A)** | Pick a screen → run Pipeline A with live SSE log → browse/embed drift reports |
+| **Shift-Left (B)** | Pick a screen → run Pipeline B → see generated test-case files |
+| **Test Review** | Approve / reject / approve-all generated test cases (persisted to YAML) |
+| **Agents** | Run any single agent (design / inspect / validate / testgen / codegen / eval) |
+| **Runs** | Run history from the orchestrator state store |
+| **Reports** | Drift reports (iframe preview) + generated `.spec.ts` source |
+| **Settings** | `.env` editor (OpenRouter key, Figma token/file key, staging URL, mode, DRY_RUN, DeepEval) + pipeline health |
+
+### How it works
+
+- `/api/run` spawns `node --experimental-strip-types scripts/run-pipeline.ts <a|b> --screen <id> [--sample]` with the repo root as cwd — identical behavior to the CLI.
+- `/api/run/stream` streams the CLI stdout to the browser via SSE for live progress.
+- All state/artifacts are read from the existing `data/orchestrator.db`, `specs/`, `reports/`, `tests/generated/`.
+- Settings saves to the repo-root `.env` (gitignored); values take effect on the next run.
+
+---
+
 ## Repository Layout
 
 ```
 figma-ui-automation/
+├── webapp/                  # Next.js 16 dashboard (optional, additive — see Web Dashboard)
 ├── package.json  tsconfig.json  .env.example  .gitignore  README.md
 ├── agents/
 │   ├── orchestrator/        # SQLite state machine + run log (never LLM-driven)
