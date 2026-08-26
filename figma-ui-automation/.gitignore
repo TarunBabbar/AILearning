@@ -1,0 +1,14 @@
+node_modules/
+.env
+dist/
+artifacts/
+reports/
+data/*.db
+data/*.db-*
+tests/test-results/
+tests/playwright-report/
+tests/generated/
+__pycache__/
+*.pyc
+.venv/
+agents/evaluation/.venv/

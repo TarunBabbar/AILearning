@@ -1,0 +1,28 @@
+schemaVersion: 1
+screenId: checkout
+designVersion: v1.0
+generatedAt: '2026-08-26T17:58:20.819Z'
+provider: fallback-rules
+cases:
+  - id: checkout-tc-1
+    title: click on checkout-pay
+    feature: Checkout
+    scenario: click "checkout-pay"
+    steps:
+      - action: click
+        target: checkout-pay
+    expected: Payment is processed and order confirmation is shown
+    priority: P0
+    source: fallback
+    review: approved
+  - id: checkout-tc-2
+    title: input on checkout-card
+    feature: Checkout
+    scenario: input "checkout-card"
+    steps:
+      - action: input
+        target: checkout-card
+    expected: Card number is formatted with spaces every 4 digits
+    priority: P1
+    source: fallback
+    review: approved

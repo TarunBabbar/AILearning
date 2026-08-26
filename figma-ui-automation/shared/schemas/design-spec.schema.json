@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://figma-ui-automation/schemas/design-spec.schema.json",
+  "title": "DesignSpec",
+  "description": "Shared spec shape produced by the Design Extraction agent (from Figma) and the Implementation Inspector agent (from the live DOM). Both sides must validate against this contract so drift diffing is structural.",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "screen", "viewport", "elements", "interactions"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "enum": ["design", "impl"] },
+    "screen": {
+      "type": "object",
+      "required": ["id", "name", "source", "retrievedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "figmaFileKey": { "type": "string" },
+        "frameId": { "type": "string" },
+        "designVersion": { "type": "string" },
+        "retrievedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "deviceScaleFactor": { "type": "number", "minimum": 0.5 }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/element" }
+    },
+    "interactions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/interaction" }
+    }
+  },
+  "definitions": {
+    "element": {
+      "type": "object",
+      "required": ["id", "name", "type", "role", "bounds"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "role": { "type": "string", "enum": ["button", "input", "link", "heading", "text", "image", "icon", "card", "nav", "container", "list", "form", "label", "avatar", "banner", "other"] },
+        "text": { "type": "string" },
+        "bounds": {
+          "type": "object",
+          "required": ["x", "y", "w", "h"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "w": { "type": "number", "minimum": 0 },
+            "h": { "type": "number", "minimum": 0 }
+          }
+        },
+        "styles": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "color": { "type": "string" },
+            "bg": { "type": "string" },
+            "fontSize": { "type": "number" },
+            "fontWeight": { "type": "number" },
+            "fontFamily": { "type": "string" },
+            "radius": { "type": "number" },
+            "border": { "type": "string" },
+            "shadow": { "type": "string" },
+            "spacing": { "type": "number" }
+          }
+        },
+        "a11y": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "label": { "type": "string" },
+            "ariaProps": { "type": "object", "additionalProperties": true }
+          }
+        },
+        "locator": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "css": { "type": "string" },
+            "role": { "type": "string" },
+            "testId": { "type": "string" },
+            "text": { "type": "string" }
+          }
+        },
+        "actual": {
+          "type": "object",
+          "description": "impl-spec only: computed values read from the live DOM",
+          "additionalProperties": true
+        },
+        "masked": { "type": "boolean", "description": "dynamic content (dates, avatars, ads) excluded from pixel diff" }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "required": ["id", "trigger", "target", "expected"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "trigger": { "type": "string", "description": "e.g. click, input, hover, submit" },
+        "target": { "type": "string", "description": "element id or name" },
+        "expected": { "type": "string" },
+        "precondition": { "type": "string" },
+        "context": { "type": "string", "description": "PRD/flow context behind the interaction" }
+      }
+    }
+  }
+}

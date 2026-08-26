@@ -1,0 +1,48 @@
+{
+  "name": "figma-ui-automation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Figma → Playwright multi-agent system: regression validation (Pipeline A) + shift-left test generation (Pipeline B)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "pipeline:a": "node --experimental-strip-types scripts/run-pipeline.ts a",
+    "pipeline:b": "node --experimental-strip-types scripts/run-pipeline.ts b",
+    "extract-design": "node --experimental-strip-types scripts/agent-run.ts design",
+    "inspect-impl": "node --experimental-strip-types scripts/agent-run.ts inspect",
+    "validate": "node --experimental-strip-types scripts/agent-run.ts validate",
+    "generate-tests": "node --experimental-strip-types scripts/agent-run.ts testgen",
+    "review-tests": "node --experimental-strip-types scripts/review.ts",
+    "codegen": "node --experimental-strip-types scripts/agent-run.ts codegen",
+    "eval": "node --experimental-strip-types scripts/agent-run.ts eval",
+    "status": "node --experimental-strip-types scripts/status.ts",
+    "screens": "node --experimental-strip-types scripts/screens.ts",
+    "eval-server": "python -m uvicorn agents.evaluation.main:app --host 127.0.0.1 --port 8010",
+    "test": "node --experimental-strip-types --test tests/**/*.test.ts",
+    "test:pw": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "setup:sample": "node --experimental-strip-types scripts/setup-sample.ts",
+    "pipeline:a:sample": "node --experimental-strip-types scripts/run-pipeline.ts a --screen login --sample",
+    "pipeline:b:sample": "node --experimental-strip-types scripts/run-pipeline.ts b --screen checkout --sample"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "js-yaml": "^4.1.0",
+    "pixelmatch": "^6.0.0",
+    "playwright": "^1.49.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.13.3",
+    "@types/pngjs": "^6.0.5",
+    "typescript": "^5.9.3"
+  }
+}

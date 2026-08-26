@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 1,
+  "kind": "design",
+  "screen": {
+    "id": "checkout",
+    "name": "Checkout",
+    "source": "sample",
+    "figmaFileKey": "sample-file",
+    "frameId": "frame-checkout",
+    "designVersion": "v1.0",
+    "retrievedAt": "2026-08-26T17:58:20.551Z"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "elements": [
+    {
+      "id": "checkout-header",
+      "name": "Page header",
+      "type": "TEXT",
+      "role": "heading",
+      "text": "Checkout",
+      "bounds": {
+        "x": 80,
+        "y": 48,
+        "w": 200,
+        "h": 36
+      },
+      "styles": {
+        "color": "#1f2933",
+        "fontSize": 28,
+        "fontWeight": 700
+      },
+      "a11y": {
+        "label": "Checkout"
+      }
+    },
+    {
+      "id": "checkout-email",
+      "name": "Email input",
+      "type": "INPUT",
+      "role": "input",
+      "text": "",
+      "bounds": {
+        "x": 80,
+        "y": 120,
+        "w": 420,
+        "h": 44
+      },
+      "styles": {
+        "color": "#323f4b",
+        "fontSize": 15,
+        "radius": 6,
+        "border": "1px solid #cbd2d9"
+      },
+      "a11y": {
+        "label": "Email address",
+        "ariaProps": {
+          "type": "email"
+        }
+      }
+    },
+    {
+      "id": "checkout-card",
+      "name": "Card number input",
+      "type": "INPUT",
+      "role": "input",
+      "text": "",
+      "bounds": {
+        "x": 80,
+        "y": 184,
+        "w": 420,
+        "h": 44
+      },
+      "styles": {
+        "color": "#323f4b",
+        "fontSize": 15,
+        "radius": 6,
+        "border": "1px solid #cbd2d9"
+      },
+      "a11y": {
+        "label": "Card number",
+        "ariaProps": {
+          "autocomplete": "cc-number"
+        }
+      }
+    },
+    {
+      "id": "checkout-expiry",
+      "name": "Expiry input",
+      "type": "INPUT",
+      "role": "input",
+      "text": "",
+      "bounds": {
+        "x": 80,
+        "y": 248,
+        "w": 200,
+        "h": 44
+      },
+      "styles": {
+        "color": "#323f4b",
+        "fontSize": 15,
+        "radius": 6,
+        "border": "1px solid #cbd2d9"
+      },
+      "a11y": {
+        "label": "Expiry date"
+      }
+    },
+    {
+      "id": "checkout-cvc",
+      "name": "CVC input",
+      "type": "INPUT",
+      "role": "input",
+      "text": "",
+      "bounds": {
+        "x": 300,
+        "y": 248,
+        "w": 200,
+        "h": 44
+      },
+      "styles": {
+        "color": "#323f4b",
+        "fontSize": 15,
+        "radius": 6,
+        "border": "1px solid #cbd2d9"
+      },
+      "a11y": {
+        "label": "CVC"
+      }
+    },
+    {
+      "id": "checkout-pay",
+      "name": "Pay button",
+      "type": "BUTTON",
+      "role": "button",
+      "text": "Pay $49.00",
+      "bounds": {
+        "x": 80,
+        "y": 336,
+        "w": 420,
+        "h": 48
+      },
+      "styles": {
+        "color": "#ffffff",
+        "bg": "#0f9d58",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "radius": 8
+      },
+      "a11y": {
+        "label": "Pay 49 dollars"
+      }
+    },
+    {
+      "id": "checkout-total",
+      "name": "Order summary card",
+      "type": "RECTANGLE",
+      "role": "card",
+      "text": "",
+      "bounds": {
+        "x": 560,
+        "y": 120,
+        "w": 380,
+        "h": 280
+      },
+      "styles": {
+        "bg": "#f7f9fc",
+        "radius": 12,
+        "border": "1px solid #e4e7eb"
+      },
+      "a11y": {
+        "label": "Order summary"
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "id": "checkout-i1",
+      "trigger": "click",
+      "target": "checkout-pay",
+      "expected": "Payment is processed and order confirmation is shown",
+      "context": "Card fields must be valid before submission"
+    },
+    {
+      "id": "checkout-i2",
+      "trigger": "input",
+      "target": "checkout-card",
+      "expected": "Card number is formatted with spaces every 4 digits",
+      "context": "Formatting requirement from UX annotations"
+    }
+  ]
+}

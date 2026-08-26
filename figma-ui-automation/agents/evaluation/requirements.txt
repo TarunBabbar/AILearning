@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+pydantic
+# DeepEval is optional — without it the sidecar falls back to a heuristic judge.
+# pip install deepeval

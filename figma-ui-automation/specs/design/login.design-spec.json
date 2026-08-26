@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "kind": "design",
+  "screen": {
+    "id": "login",
+    "name": "Login",
+    "source": "sample",
+    "figmaFileKey": "sample-file",
+    "frameId": "frame-login",
+    "designVersion": "v1.0",
+    "retrievedAt": "2026-08-26T17:55:01.600Z"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "elements": [
+    {
+      "id": "login-header",
+      "name": "Page header",
+      "type": "TEXT",
+      "role": "heading",
+      "text": "Welcome back",
+      "bounds": {
+        "x": 120,
+        "y": 120,
+        "w": 320,
+        "h": 40
+      },
+      "styles": {
+        "color": "#1f2933",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "fontFamily": "Inter"
+      },
+      "a11y": {
+        "label": "Welcome back"
+      }
+    },
+    {
+      "id": "login-subheader",
+      "name": "Sub header",
+      "type": "TEXT",
+      "role": "text",
+      "text": "Sign in to continue to your workspace",
+      "bounds": {
+        "x": 120,
+        "y": 168,
+        "w": 360,
+        "h": 22
+      },
+      "styles": {
+        "color": "#52606d",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "fontFamily": "Inter"
+      }
+    },
+    {
+      "id": "login-email",
+      "name": "Email input",
+      "type": "INPUT",
+      "role": "input",
+      "text": "",
+      "bounds": {
+        "x": 120,
+        "y": 224,
+        "w": 400,
+        "h": 44
+      },
+      "styles": {
+        "color": "#323f4b",
+        "fontSize": 15,
+        "radius": 6,
+        "border": "1px solid #cbd2d9"
+      },
+      "a11y": {
+        "label": "Email address",
+        "ariaProps": {
+          "type": "email"
+        }
+      }
+    },
+    {
+      "id": "login-password",
+      "name": "Password input",
+      "type": "INPUT",
+      "role": "input",
+      "text": "",
+      "bounds": {
+        "x": 120,
+        "y": 288,
+        "w": 400,
+        "h": 44
+      },
+      "styles": {
+        "color": "#323f4b",
+        "fontSize": 15,
+        "radius": 6,
+        "border": "1px solid #cbd2d9"
+      },
+      "a11y": {
+        "label": "Password",
+        "ariaProps": {
+          "type": "password"
+        }
+      }
+    },
+    {
+      "id": "login-forgot",
+      "name": "Forgot password link",
+      "type": "TEXT",
+      "role": "link",
+      "text": "Forgot your password?",
+      "bounds": {
+        "x": 120,
+        "y": 344,
+        "w": 180,
+        "h": 20
+      },
+      "styles": {
+        "color": "#3e4c59",
+        "fontSize": 14,
+        "fontWeight": 500
+      },
+      "a11y": {
+        "label": "Forgot your password?"
+      }
+    },
+    {
+      "id": "login-submit",
+      "name": "Sign in button",
+      "type": "BUTTON",
+      "role": "button",
+      "text": "Sign in",
+      "bounds": {
+        "x": 120,
+        "y": 392,
+        "w": 400,
+        "h": 48
+      },
+      "styles": {
+        "color": "#ffffff",
+        "bg": "#1a73e8",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "radius": 8
+      },
+      "a11y": {
+        "label": "Sign in"
+      }
+    },
+    {
+      "id": "login-logo",
+      "name": "Logo",
+      "type": "RECTANGLE",
+      "role": "image",
+      "text": "",
+      "bounds": {
+        "x": 120,
+        "y": 64,
+        "w": 40,
+        "h": 40
+      },
+      "styles": {
+        "radius": 10
+      },
+      "a11y": {
+        "label": "Company logo"
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "id": "login-i1",
+      "trigger": "click",
+      "target": "login-submit",
+      "expected": "Form validates and submits credentials",
+      "context": "Primary CTA; disabled until fields are non-empty"
+    },
+    {
+      "id": "login-i2",
+      "trigger": "click",
+      "target": "login-forgot",
+      "expected": "Navigates to password reset flow",
+      "context": "Supporting link, secondary to primary CTA"
+    }
+  ]
+}

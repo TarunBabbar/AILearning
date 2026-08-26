@@ -1,0 +1,8 @@
+{
+  "designExtraction": "google/gemini-2.5-flash-lite",
+  "implInspection": "google/gemini-2.5-flash-lite",
+  "validationVision": "anthropic/claude-3.5-sonnet",
+  "testCaseGen": "anthropic/claude-3.5-sonnet",
+  "automationCodegen": "anthropic/claude-3.5-sonnet",
+  "evaluation": "google/gemini-2.5-flash-lite"
+}

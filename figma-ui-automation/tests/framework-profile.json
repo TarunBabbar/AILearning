@@ -1,0 +1,19 @@
+{
+  "testDir": "./tests/generated",
+  "baseUrl": "http://localhost:3000",
+  "importFrom": "@playwright/test",
+  "use": {
+    "headless": true,
+    "viewport": { "width": 1440, "height": 900 },
+    "trace": "retain-on-failure",
+    "screenshot": "only-on-failure"
+  },
+  "conventions": {
+    "pageObjects": true,
+    "testNaming": "kebab-case",
+    "dataTestId": "[data-testid]",
+    "assertions": "@playwright/test expect",
+    "exampleSpec": "tests/examples/example.spec.ts"
+  },
+  "_comment": "Drop your real Playwright conventions here (POM layout, fixtures, naming, 2-3 example specs in tests/examples/) and the codegen agent picks them up without code changes."
+}
