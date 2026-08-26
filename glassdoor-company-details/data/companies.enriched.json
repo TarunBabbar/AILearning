@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-25T00:00:00.000Z",
+  "companies": [
+    {
+      "name": "Tata Consultancy Services (TCS)",
+      "slug": "tcs",
+      "industry": "IT Services",
+      "type": "Service",
+      "rating": 3.6,
+      "ratingBreakdown": {
+        "career": 3.5,
+        "comp": 3.1,
+        "management": 3.4,
+        "culture": 3.8
+      },
+      "totalReviews": 124000,
+      "headcount": { "india": "450,000+", "global": "600,000+" },
+      "good": [
+        "Strong brand and job stability",
+        "On-time salary and structured onboarding",
+        "Good learning for freshers and clear internal job postings",
+        "Decent work-life balance in most units"
+      ],
+      "bad": [
+        "Salary hikes lower than industry average",
+        "Slow promotions especially at higher levels",
+        "Bench and utilization pressure in services units"
+      ],
+      "salaries": [
+        { "designation": "Software Engineer", "avgLPA": 7.5, "rangeLPA": "4–12", "sampleSize": 42 },
+        { "designation": "Senior Software Engineer", "avgLPA": 14.2, "rangeLPA": "10–20", "sampleSize": 25 },
+        { "designation": "Project Manager", "avgLPA": 21.0, "rangeLPA": "16–30", "sampleSize": 12 }
+      ],
+      "sourceReviews": 30,
+      "analyzedAt": "2026-08-25T00:00:00.000Z"
+    },
+    {
+      "name": "Google India",
+      "slug": "google",
+      "industry": "Technology / Internet",
+      "type": "Product",
+      "rating": 4.4,
+      "ratingBreakdown": {
+        "career": 4.3,
+        "comp": 4.5,
+        "management": 4.2,
+        "culture": 4.6
+      },
+      "totalReviews": 38000,
+      "headcount": { "india": "8,000+", "global": "180,000+" },
+      "good": [
+        "Top-of-market compensation and perks",
+        "Excellent engineering culture and learning",
+        "Strong brand value for career growth",
+        "Smart, collaborative colleagues"
+      ],
+      "bad": [
+        "Fast-paced, high expectations and pressure",
+        "Promotion bar is very high and slow at senior levels",
+        "Reorgs and shifting priorities can be disruptive"
+      ],
+      "salaries": [
+        { "designation": "Software Engineer", "avgLPA": 65.0, "rangeLPA": "45–90", "sampleSize": 18 },
+        { "designation": "Senior Software Engineer", "avgLPA": 95.0, "rangeLPA": "70–130", "sampleSize": 11 },
+        { "designation": "Product Manager", "avgLPA": 85.0, "rangeLPA": "60–120", "sampleSize": 8 }
+      ],
+      "sourceReviews": 25,
+      "analyzedAt": "2026-08-25T00:00:00.000Z"
+    },
+    {
+      "name": "Accenture India",
+      "slug": "accenture",
+      "industry": "IT Services & Consulting",
+      "type": "Consulting",
+      "rating": 3.8,
+      "ratingBreakdown": {
+        "career": 3.7,
+        "comp": 3.4,
+        "management": 3.6,
+        "culture": 3.9
+      },
+      "totalReviews": 42000,
+      "headcount": { "india": "200,000+", "global": "750,000+" },
+      "good": [
+        "Huge variety of projects and domains",
+        "Good certification and learning ecosystem",
+        "Clear career path and global mobility",
+        "Supportive teams at entry levels"
+      ],
+      "bad": [
+        "Compensation below top product companies",
+        "Work-life balance varies a lot by project/account",
+        "Often tied to client location and hours"
+      ],
+      "salaries": [
+        { "designation": "Software Engineer", "avgLPA": 8.2, "rangeLPA": "5–13", "sampleSize": 30 },
+        { "designation": "Senior Software Engineer", "avgLPA": 16.5, "rangeLPA": "12–24", "sampleSize": 15 },
+        { "designation": "Consultant", "avgLPA": 18.0, "rangeLPA": "13–28", "sampleSize": 9 }
+      ],
+      "sourceReviews": 28,
+      "analyzedAt": "2026-08-25T00:00:00.000Z"
+    },
+    {
+      "name": "Swiggy",
+      "slug": "swiggy",
+      "industry": "Consumer / Food Delivery",
+      "type": "Product",
+      "rating": 3.5,
+      "ratingBreakdown": {
+        "career": 3.4,
+        "comp": 3.6,
+        "management": 3.2,
+        "culture": 3.7
+      },
+      "totalReviews": 6500,
+      "headcount": { "india": "6,000+", "global": "6,000+" },
+      "good": [
+        "Fast-moving startup energy and ownership",
+        "Competitive startup compensation and stock",
+        "Good learning on high-scale consumer systems",
+        "Modern tech stack"
+      ],
+      "bad": [
+        "Poor work-life balance during peak cycles",
+        "Chaotic processes during rapid scale",
+        "Frequent org changes and role ambiguity"
+      ],
+      "salaries": [
+        { "designation": "Software Engineer", "avgLPA": 24.0, "rangeLPA": "16–40", "sampleSize": 12 },
+        { "designation": "Senior Software Engineer", "avgLPA": 48.0, "rangeLPA": "35–70", "sampleSize": 7 }
+      ],
+      "sourceReviews": 20,
+      "analyzedAt": "2026-08-25T00:00:00.000Z"
+    },
+    {
+      "name": "Wipro",
+      "slug": "wipro",
+      "industry": "IT Services",
+      "type": "Service",
+      "rating": 3.3,
+      "ratingBreakdown": {
+        "career": 3.1,
+        "comp": 2.9,
+        "management": 3.0,
+        "culture": 3.4
+      },
+      "totalReviews": 78000,
+      "headcount": { "india": "180,000+", "global": "230,000+" },
+      "good": [
+        "Job security and steady employment",
+        "Wide exposure across industries",
+        "Good on-time salary and benefits",
+        "Work flexibility in many projects"
+      ],
+      "bad": [
+        "Below-average pay hikes and variable pays",
+        "Slow career progression",
+        "Bench culture and resource scheduling issues"
+      ],
+      "salaries": [
+        { "designation": "Software Engineer", "avgLPA": 6.8, "rangeLPA": "4–11", "sampleSize": 35 },
+        { "designation": "Senior Software Engineer", "avgLPA": 12.5, "rangeLPA": "9–18", "sampleSize": 14 }
+      ],
+      "sourceReviews": 26,
+      "analyzedAt": "2026-08-25T00:00:00.000Z"
+    }
+  ]
+}

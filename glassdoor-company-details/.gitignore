@@ -1,0 +1,23 @@
+# deps / build
+/node_modules
+/.next
+/out
+build
+next-env.d.ts
+
+# env — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# logs / os / editor
+npm-debug.log*
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# generated pipeline artifacts (optional to commit; uncomment to keep out of git)
+# data/companies.raw.json
+# data/companies.enriched.json

@@ -1,0 +1,36 @@
+{
+  "name": "glassdoor-company-details",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "scrape": "node scripts/glaze-glassdoor.mjs",
+    "analyze": "node scripts/analyze.mjs",
+    "seed": "node scripts/analyze.mjs --seed-stub"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "next": "^16.3.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "5.8.2"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.54.1"
+  }
+}
