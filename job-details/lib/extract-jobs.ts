@@ -130,7 +130,7 @@ function pickNextModel(models: string[], tried: Set<string>): string | null {
 export async function extractJobsFromText(
   rawText: string,
   apiKey: string,
-  _preferredModel: string,
+  preferredModel: string,
   opts: {
     onProgress?: (p: ExtractProgress) => void;
     log?: Logger;
@@ -145,24 +145,27 @@ export async function extractJobsFromText(
   log.info(
     "extract",
     `Starting parallel extraction · ${rawText.length.toLocaleString()} chars → ${totalChunks} chunk(s)`,
-    "chunks rotate starting models round-robin"
+    `preferred=${preferredModel || "none"}`
   );
 
-  // One shared list of free models; each chunk starts on a different model
-  // (round-robin), then falls back through the others on failure.
+  // Preferred model first (from OPENROUTER_MODEL / upload selection) — every
+  // chunk tries it first. The curated free list follows as fallback.
   const freeModels = await getFreeModelIds(log);
-  if (!freeModels.length) {
+  const fallbackModels = preferredModel
+    ? freeModels.filter((m) => m !== preferredModel)
+    : freeModels;
+  if (!fallbackModels.length && !preferredModel) {
     log.error("extract", "No free models available", "aborting");
     return [];
   }
 
-  // All chunks start in parallel, but each chunk picks a DIFFERENT model as
-  // its first attempt (round-robin with a random offset). If every chunk
-  // started on the same fastest model, N parallel calls would hit one
-  // provider at once and all get rate-limited (429) together.
-  const firstModel = freeModels[0];
+  // All chunks start with the preferred (fast) model; fallback rotation only
+  // kicks in when a chunk fails with it. Without a preferred model, chunks
+  // rotate starting models round-robin so parallel calls don't all hammer
+  // one provider pool at once.
+  const firstModel = preferredModel || fallbackModels[0];
   if (!firstModel) return [];
-  const startOffset = Math.floor(Math.random() * freeModels.length);
+  const startOffset = Math.floor(Math.random() * fallbackModels.length);
 
   // ── Parallel extraction: one LLM call per chunk, all fired at once ──
   const results = await Promise.all(
@@ -170,7 +173,7 @@ export async function extractJobsFromText(
       const chunkNum = i + 1;
       const prompt = buildExtractionPrompt(chunkText);
       const tried = new Set<string>();
-      let model = freeModels[(startOffset + i) % freeModels.length];
+      let model = preferredModel || fallbackModels[(startOffset + i) % fallbackModels.length];
 
       opts.onProgress?.({
         phase: "chunk_start",
@@ -180,10 +183,10 @@ export async function extractJobsFromText(
       });
       log.info("extract", `Chunk ${chunkNum}/${totalChunks} → ${model}`, `${chunkText.length} chars`);
 
-      // Retry each chunk with a different random model until valid JSON.
-      // Max attempts = number of curated models, so every chunk tries ALL
-      // models before being marked a bad chunk.
-      const MAX_ATTEMPTS = freeModels.length;
+      // Retry each chunk with a different model until valid JSON. Max attempts
+      // covers the preferred model (if any) plus every curated fallback, so
+      // each chunk tries ALL models before being marked a bad chunk.
+      const MAX_ATTEMPTS = (preferredModel ? 1 : 0) + fallbackModels.length;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         tried.add(model);
         let content: string;
@@ -214,7 +217,7 @@ export async function extractJobsFromText(
               totalChunks,
               message: `Chunk ${chunkNum}/${totalChunks} hit an error with ${model.replace(":free", "")} — retrying with another model…`,
             });
-            const next = pickNextModel(freeModels, tried);
+            const next = pickNextModel(fallbackModels, tried);
             if (!next) break; // no untried models left — give up on this chunk
             model = next;
             continue;
@@ -250,7 +253,7 @@ export async function extractJobsFromText(
         }
 
         if (attempt < MAX_ATTEMPTS) {
-          const next = pickNextModel(freeModels, tried);
+          const next = pickNextModel(fallbackModels, tried);
           if (!next) break; // no untried models left — give up on this chunk
           const oldModel = model;
           model = next;
