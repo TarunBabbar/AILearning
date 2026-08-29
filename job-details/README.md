@@ -285,7 +285,7 @@ npm run dev
 | -------------------- | -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `DATABASE_URL`       | ✅       | PostgreSQL connection string (used by Prisma CLI **and** runtime)            | `postgresql://user:pass@host:5432/jobdetails?schema=public`  |
 | `OPENROUTER_API_KEY` | ✅       | OpenRouter API key — server-side only, never exposed to the client           | `sk-or-v1-…`                                                  |
-| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload                                | `nvidia/nemotron-nano-9b-v2:free`                             |
+| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload (verified)                     | `nvidia/nemotron-3-ultra-550b-a55b:free`                  |
 | `GENERIC_EMAIL_DOMAINS` | ❌     | Comma-separated personal-email domains hidden from the dashboard             | `gmail.com,yahoo.com,live.com,…`                              |
 | `ADMIN_USERNAME`     | ❌       | Username that unlocks the Upload page (defaults to `admin`)                  | `admin`                                                       |
 | `ADMIN_PASSWORD`     | ❌       | Password that unlocks the Upload page — without it, uploads stay locked      | `admin123`                                                    |
@@ -295,7 +295,7 @@ npm run dev
 | `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | ❌ | Max upload size per file shown on the Upload page                          | `50`                                                          |
 | `TELEGRAM_BOT_TOKEN` | ❌       | Telegram bot token for chat-widget forwarding to the owner                   | `8887227521:AA…`                                              |
 | `TELEGRAM_CHAT_ID`   | ❌       | Owner's Telegram chat id for forwarded messages                              | `1622727099`                                                  |
-| `CHATBOT_MODEL`      | ❌       | Optional OpenRouter model for chat auto-answers (falls back to `OPENROUTER_MODEL`) | `nvidia/nemotron-nano-9b-v2:free`                     |
+| `CHATBOT_MODEL`      | ❌       | Optional OpenRouter model for chat auto-answers (falls back to `OPENROUTER_MODEL`) | `nvidia/nemotron-3-ultra-550b-a55b:free`             |
 | `SMTP_HOST`          | ❌       | SMTP server for welcome/reset emails (default `smtp.gmail.com`)              | `smtp.gmail.com`                                              |
 | `SMTP_PORT`          | ❌       | SMTP port (default `587`)                                                   | `587`                                                         |
 | `SMTP_USER`          | ❌       | SMTP account (e.g. Gmail address)                                           | `qajobs.portal@gmail.com`                                     |
@@ -351,7 +351,7 @@ npx prisma db push
 - Add **Environment Variables** (Project → Settings → Environment Variables):
   - `DATABASE_URL` — the Neon connection string
   - `OPENROUTER_API_KEY` — your OpenRouter key
-  - `OPENROUTER_MODEL` — default `nvidia/nemotron-nano-9b-v2:free`
+  - `OPENROUTER_MODEL` — default `nvidia/nemotron-3-ultra-550b-a55b:free`
   - `GENERIC_EMAIL_DOMAINS` — the comma-separated personal-domain list
   - `ADMIN_USERNAME` / `ADMIN_PASSWORD` — upload page credentials
   - `NEXT_PUBLIC_APP_URL` — `https://<your-project>.vercel.app`
