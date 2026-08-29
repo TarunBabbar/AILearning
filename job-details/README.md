@@ -57,6 +57,7 @@
 
 ### 🧠 LLM extraction (OpenRouter free models)
 - The Upload page loads the **live list of free OpenRouter models** on page load (`GET /api/models`, cached 6h) and lets you pick any of them — no hardcoded model ids.
+- **`OPENROUTER_MODEL` is the default extraction model** — every chunk tries it first; if it fails, extraction falls back through the curated free list (Nvidia + OpenAI — Google gemma models removed due to chronic upstream 429s).
 - Each model chip shows its **context window** (larger = handles bigger files in one pass).
 - A **Custom** option accepts any model id you type (e.g. `openrouter/free`).
 - Large documents are split into overlapping chunks so output never exceeds the model's token limit.
@@ -86,9 +87,10 @@
 - No settings page, no UI entry, no cookies — the key never reaches the browser.
 
 ### ⚠️ Free-model rate limits (HTTP 429)
-- OpenRouter's `:free` models share a single **anonymous pool** per provider — when it's saturated the API returns `429` with `"limit_source":"upstream_provider_shared_pool"`, regardless of the model picked.
+- OpenRouter's `:free` models share a single **anonymous pool** per provider — when it's saturated the API returns `429` with `"limit_source":"upstream_provider_shared_pool"`, regardless of the model picked. Google AI Studio's pool is especially busy, which is why gemma models were dropped from extraction.
 - Fix: add a key at https://openrouter.ai/settings/keys and set it as `OPENROUTER_API_KEY` in Vercel env vars. With `is_byok:true` the request uses **your** rate limit instead of the shared pool (free models still cost $0). Redeploy after changing env vars.
-- If 429s persist, pick a model from a different provider (e.g. switch Google → Nvidia) — free pools are per-provider.
+- If 429s persist, pick a model from a different provider (e.g. Nvidia instead of Google) — free pools are per-provider.
+- Client-side resilience: retries honor OpenRouter's `Retry-After` header (max 60s backoff); extraction chunks rotate starting models so parallel calls don't all hammer one pool; a rate-limited model fails fast (2 tries) and the chunk switches provider.
 
 ### ⚡ Client + edge caching (Jobs / Contacts)
 - List pages use **[SWR](https://swr.vercel.app)** so switching tabs reuses in-memory data instead of hitting Neon on every navigation.
