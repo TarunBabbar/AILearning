@@ -2,6 +2,7 @@ import { callOpenRouter, extractJsonArray } from "./openrouter";
 import { chunkText, parseJobDate } from "./extract";
 import { stripSpamText } from "./sanitize";
 import { createLogger, type Logger } from "./logger";
+import { listFreeOpenRouterModelIds } from "./free-models";
 
 export type ExtractedJob = {
   title: string;
@@ -69,54 +70,46 @@ TEXT:
 ${text}`;
 }
 
-const FREE_MODELS_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h
-let freeModelsCache: { at: number; models: string[] } | null = null;
-
-// Curated free models for extraction, ordered FASTEST → SLOWEST.
-// All chunks start with the first (fastest) model in parallel; if a chunk
-// fails with it, it falls back to the next model in this order, and so on.
-const EXTRACTION_MODELS = [
-  "nvidia/nemotron-nano-9b-v2:free",
-  "nvidia/nemotron-3-nano-30b-a3b:free",
-  "openai/gpt-oss-20b:free",
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
-];
-
 /**
- * Fetch the list of currently-free models that are on the curated
- * EXTRACTION_MODELS allowlist (they must still be free today).
- * Cached for 6 hours.
+ * Build the extraction model pool:
+ *  - preferred model first (from OPENROUTER_MODEL / upload selection)
+ *  - then ALL currently-free OpenRouter models (fastest first), so chunks
+ *    genuinely spread across the whole free pool instead of a hardcoded list.
+ * Falls back to just the preferred model if the live list can't be fetched.
  */
-async function getFreeModelIds(log: Logger): Promise<string[]> {
-  if (freeModelsCache && Date.now() - freeModelsCache.at < FREE_MODELS_CACHE_TTL_MS) {
-    return freeModelsCache.models;
-  }
+async function buildModelPool(preferredModel: string, log: Logger): Promise<string[]> {
+  let freeModels: string[] = [];
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/models", {
-      next: { revalidate: FREE_MODELS_CACHE_TTL_MS },
-    });
-    if (!res.ok) throw new Error(`OpenRouter models ${res.status}`);
-    const data = await res.json();
-    const freeSet = new Set<string>(
-      (data.data || [])
-        .filter(
-          (m: { pricing?: { prompt?: string; completion?: string } }) =>
-            parseFloat(m.pricing?.prompt || "0") === 0 &&
-            parseFloat(m.pricing?.completion || "0") === 0
-        )
-        .map((m: { id: string }) => m.id)
-    );
-    const ids = EXTRACTION_MODELS.filter((id) => freeSet.has(id));
-    if (!ids.length) throw new Error("None of the curated models are free right now");
-    freeModelsCache = { at: Date.now(), models: ids };
-    log.info("extract", `Using ${ids.length} curated model(s)`, ids.join(", "));
-    return ids;
+    freeModels = await listFreeOpenRouterModelIds();
+    if (freeModels.length) {
+      log.info(
+        "extract",
+        `Fetched ${freeModels.length} free model(s) from OpenRouter`,
+        freeModels.slice(0, 8).join(", ") + (freeModels.length > 8 ? "…" : "")
+      );
+    }
   } catch (e) {
-    // Fall back to the curated list as-is if the fetch fails
-    log.warn("extract", "Failed to fetch free models, using curated list", (e as Error).message);
-    return [...EXTRACTION_MODELS];
+    log.warn(
+      "extract",
+      "Failed to fetch free models from OpenRouter",
+      (e as Error).message
+    );
   }
+
+  const pool = preferredModel
+    ? [preferredModel, ...freeModels.filter((m) => m !== preferredModel)]
+    : freeModels;
+  if (!pool.length) {
+    // Last resort: hardcoded known-free models so a network blip doesn't
+    // brick the upload page entirely.
+    log.warn("extract", "No live free models — using hardcoded fallback list");
+    return [
+      "nvidia/nemotron-nano-9b-v2:free",
+      "nvidia/nemotron-3-nano-30b-a3b:free",
+      "openai/gpt-oss-20b:free",
+    ];
+  }
+  return pool;
 }
 
 /**
@@ -148,24 +141,17 @@ export async function extractJobsFromText(
     `preferred=${preferredModel || "none"}`
   );
 
-  // Preferred model first (from OPENROUTER_MODEL / upload selection) — every
-  // chunk tries it first. The curated free list follows as fallback.
-  const freeModels = await getFreeModelIds(log);
-  const fallbackModels = preferredModel
-    ? freeModels.filter((m) => m !== preferredModel)
-    : freeModels;
-  if (!fallbackModels.length && !preferredModel) {
+  // Model pool: preferred (OPENROUTER_MODEL / upload selection) first, then
+  // ALL live free OpenRouter models. Chunks round-robin through the whole
+  // pool so parallel calls spread across every free LLM.
+  const modelPool = await buildModelPool(preferredModel, log);
+  if (!modelPool.length) {
     log.error("extract", "No free models available", "aborting");
     return [];
   }
-
-  // All chunks start with the preferred (fast) model; fallback rotation only
-  // kicks in when a chunk fails with it. Without a preferred model, chunks
-  // rotate starting models round-robin so parallel calls don't all hammer
-  // one provider pool at once.
-  const firstModel = preferredModel || fallbackModels[0];
+  const firstModel = modelPool[0];
   if (!firstModel) return [];
-  const startOffset = Math.floor(Math.random() * fallbackModels.length);
+  const startOffset = Math.floor(Math.random() * modelPool.length);
 
   // ── Parallel extraction: one LLM call per chunk, all fired at once ──
   const results = await Promise.all(
@@ -173,7 +159,7 @@ export async function extractJobsFromText(
       const chunkNum = i + 1;
       const prompt = buildExtractionPrompt(chunkText);
       const tried = new Set<string>();
-      let model = preferredModel || fallbackModels[(startOffset + i) % fallbackModels.length];
+      let model = modelPool[(startOffset + i) % modelPool.length];
 
       opts.onProgress?.({
         phase: "chunk_start",
@@ -184,9 +170,9 @@ export async function extractJobsFromText(
       log.info("extract", `Chunk ${chunkNum}/${totalChunks} → ${model}`, `${chunkText.length} chars`);
 
       // Retry each chunk with a different model until valid JSON. Max attempts
-      // covers the preferred model (if any) plus every curated fallback, so
-      // each chunk tries ALL models before being marked a bad chunk.
-      const MAX_ATTEMPTS = (preferredModel ? 1 : 0) + fallbackModels.length;
+      // covers the whole pool, so each chunk tries ALL free models before
+      // being marked a bad chunk.
+      const MAX_ATTEMPTS = modelPool.length;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         tried.add(model);
         let content: string;
@@ -217,7 +203,7 @@ export async function extractJobsFromText(
               totalChunks,
               message: `Chunk ${chunkNum}/${totalChunks} hit an error with ${model.replace(":free", "")} — retrying with another model…`,
             });
-            const next = pickNextModel(fallbackModels, tried);
+            const next = pickNextModel(modelPool, tried);
             if (!next) break; // no untried models left — give up on this chunk
             model = next;
             continue;
@@ -253,7 +239,7 @@ export async function extractJobsFromText(
         }
 
         if (attempt < MAX_ATTEMPTS) {
-          const next = pickNextModel(fallbackModels, tried);
+          const next = pickNextModel(modelPool, tried);
           if (!next) break; // no untried models left — give up on this chunk
           const oldModel = model;
           model = next;

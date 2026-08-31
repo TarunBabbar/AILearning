@@ -217,18 +217,23 @@ export async function scoreJobsParallel(
   const used = new Set<string>();
   const failedModels = new Set<string>();
 
-  const chunks = chunkJobs(jobs, SCORE_JOBS_PER_MODEL);
+  const chunkList = chunkJobs(jobs, SCORE_JOBS_PER_MODEL);
   log.info(
     "score",
-    `Work pool: ${chunks.length} chunk(s) × ≤${SCORE_JOBS_PER_MODEL} jobs across ${models.length} model(s)`
+    `Work pool: ${chunkList.length} chunk(s) × ≤${SCORE_JOBS_PER_MODEL} jobs across ${models.length} model(s)`,
+    "failed chunks retry on another free model"
   );
 
-  // Classic shared work queue: one counter, every worker pulls the next
-  // chunk the moment it's free. `nextChunk++` is atomic in JS (no await
-  // between read/write), so no chunk is ever handed to two workers.
-  let nextChunk = 0;
+  // Shared work queue. Each entry tracks which models already failed on it,
+  // so a failed chunk is requeued for a DIFFERENT model instead of being
+  // dropped. A worker only grabs an entry its model hasn't tried yet, and a
+  // failed chunk goes back to the tail for another worker to retry.
+  const queue: { chunk: ScoreJobInput[]; tried: Set<string> }[] = chunkList.map(
+    (chunk) => ({ chunk, tried: new Set<string>() })
+  );
 
   let scored = 0;
+  const totalJobs = chunkList.reduce((n, c) => n + c.length, 0);
 
   async function persist(results: ScoreResult[], model: string): Promise<void> {
     if (persistMode === "all") {
@@ -268,11 +273,14 @@ export async function scoreJobsParallel(
 
   async function worker(model: string): Promise<void> {
     while (true) {
-      const idx = nextChunk++;
-      if (idx >= chunks.length) break;
-      const chunk = chunks[idx];
+      // Grab the first chunk this model hasn't already failed on. findIndex +
+      // splice are synchronous, so no two workers ever claim the same entry.
+      const idx = queue.findIndex((e) => !e.tried.has(model));
+      if (idx === -1) break; // nothing left for this model
+      const [entry] = queue.splice(idx, 1);
+      entry.tried.add(model);
       try {
-        const results = await scoreChunkWithModel(resumeText, chunk, apiKey, model);
+        const results = await scoreChunkWithModel(resumeText, entry.chunk, apiKey, model);
         used.add(model);
         await persist(results, model);
         scored += results.length;
@@ -289,11 +297,23 @@ export async function scoreJobsParallel(
       } catch (e) {
         failedModels.add(model);
         const msg = e instanceof Error ? e.message : String(e);
-        log.warn(
-          "score",
-          `Chunk failed via ${model.replace(":free", "")} — dropping, ${chunk.length} job(s) left for next run`,
-          msg.slice(0, 160)
-        );
+        // Cross-model retry: if another free model hasn't tried this chunk
+        // yet, requeue it so that model picks it up.
+        const untried = models.find((m) => !entry.tried.has(m));
+        if (untried) {
+          queue.push(entry);
+          log.warn(
+            "score",
+            `Chunk failed via ${model.replace(":free", "")} — requeued for ${untried.replace(":free", "")}`,
+            msg.slice(0, 160)
+          );
+        } else {
+          log.warn(
+            "score",
+            `Chunk failed via ${model.replace(":free", "")} — no untried models left, ${entry.chunk.length} job(s) left for next run`,
+            msg.slice(0, 160)
+          );
+        }
       }
     }
   }
@@ -302,7 +322,7 @@ export async function scoreJobsParallel(
 
   return {
     scored,
-    attempted: chunks.reduce((n, c) => n + c.length, 0),
+    attempted: totalJobs,
     modelsUsed: [...used],
     failedModels: [...failedModels],
     modelCount: models.length,
