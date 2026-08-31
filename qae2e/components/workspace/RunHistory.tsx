@@ -13,7 +13,7 @@ const MAX_PREVIEW = 3;
 interface RunListItem {
   id: string;
   title: string;
-  status: "success" | "partial" | "failed" | "stopped";
+  status: "success" | "partial" | "failed" | "stopped" | "stuck";
   startedAt: string;
   counts: { testCases: number; scripts: number; defects: number };
   agents: Array<{ code: string; status: string }>;

@@ -19,7 +19,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-type RunStatus = "success" | "partial" | "failed" | "stopped";
+type RunStatus = "success" | "partial" | "failed" | "stopped" | "stuck";
 
 interface RunListItem {
   id: string;
@@ -40,6 +40,7 @@ const STATUS_FILTERS: Array<{ key: RunStatus | "all"; label: string }> = [
   { key: "partial", label: "Partial" },
   { key: "failed", label: "Failed" },
   { key: "stopped", label: "Stopped" },
+  { key: "stuck", label: "Stuck" },
 ];
 
 export default function HistoryPage() {
@@ -107,13 +108,13 @@ export default function HistoryPage() {
   }, [runs]);
 
   const statusTone = (s: RunStatus) =>
-    s === "success" ? "text-emerald-700" : s === "partial" ? "text-amber-600" : s === "failed" ? "text-red-600" : "text-text-muted";
+    s === "success" ? "text-emerald-700" : s === "partial" ? "text-amber-600" : s === "failed" ? "text-red-600" : s === "stuck" ? "text-text-muted" : "text-text-muted";
   const statusIcon = (s: RunStatus) =>
-    s === "success" ? <CheckCircle2 size={14} /> : s === "failed" ? <XCircle size={14} /> : s === "partial" ? <PauseCircle size={14} /> : <PauseCircle size={14} />;
+    s === "success" ? <CheckCircle2 size={14} /> : s === "failed" ? <XCircle size={14} /> : s === "partial" ? <PauseCircle size={14} /> : s === "stuck" ? <PauseCircle size={14} /> : <PauseCircle size={14} />;
   const statusPill = (s: RunStatus) =>
     cn(
       "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold",
-      s === "success" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700" : s === "failed" ? "border-red-500/40 bg-red-500/10 text-red-600" : s === "partial" ? "border-amber-500/40 bg-amber-500/10 text-amber-700" : "border-border bg-bg-surface text-text-muted"
+      s === "success" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700" : s === "failed" ? "border-red-500/40 bg-red-500/10 text-red-600" : s === "partial" ? "border-amber-500/40 bg-amber-500/10 text-amber-700" : s === "stuck" ? "border-border bg-bg-page text-text-muted uppercase" : "border-border bg-bg-surface text-text-muted"
     );
 
   return (

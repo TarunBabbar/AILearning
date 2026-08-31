@@ -14,7 +14,7 @@ export interface RunRecord {
   source: string;
   startedAt: string;
   finishedAt: string;
-  status: "success" | "partial" | "failed" | "stopped";
+  status: "success" | "partial" | "failed" | "stopped" | "stuck";
   // Owning workspace (personal workspaces → user-scoped history).
   workspaceId?: string;
   // Per-agent status for the summary.

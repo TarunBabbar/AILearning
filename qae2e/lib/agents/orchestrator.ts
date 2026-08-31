@@ -120,6 +120,7 @@ async function orchestrateInner(
   let createdCycleId: string | undefined;
   let testResults: string | undefined;
   let lastTestRun: RunRecord["testRun"];
+  let runStuck = false;
 
   try {
     for (let i = opts.startFrom ?? 0; i < chain.length; i++) {
@@ -368,9 +369,29 @@ Do NOT call script_save. Do not return prose only.`,
         }
 
         if (script && script.files.length) {
-          // Note: PR-diff risk-based selection was removed with the GitHub
-          // connector (now a placeholder) — the full suite always runs.
-          emit({ type: "status", agentId: "pipeline", message: "Running generated tests in Docker (auto-fix on failure)…" });
+          // Docker readiness gate: if no Docker (and no remote runner) is
+          // available, pause and ask the user to start Docker, auto-detecting
+          // it and continuing. Marks the run STUCK after 15 minutes.
+          const { waitForDockerExecutor } = await import("../exec/docker-gate");
+          const gate = await waitForDockerExecutor(
+            (l) => emit({ type: "status", agentId: "pipeline", message: l }),
+            () => Boolean(opts.signal?.aborted)
+          );
+          if (gate === "aborted") break;
+          if (gate === "stuck") {
+            runStuck = true;
+            emit({
+              type: "status",
+              agentId: "pipeline",
+              message:
+                "Pipeline is STUCK — the test run could not proceed because Docker was not started within 15 minutes. " +
+                "Start Docker and use 'Resume pipeline from a stage' to continue.",
+            });
+            emit({ type: "error", agentId: "pipeline", message: "Run stuck: Docker not started within 15 minutes." });
+            break;
+          }
+
+          emit({ type: "status", agentId: "pipeline", message: "Running generated tests (auto-fix on failure)…" });
           try {
             const { runTestsWithAutofix } = await import("../exec/autofix");
             const res = await runTestsWithAutofix(script, {
@@ -524,7 +545,7 @@ Do NOT call script_save. Do not return prose only.`,
   }
 
   // Persist the run (events, generated code, test results) for later reference.
-  await saveRunRecord(requirementId, allEvents, opts, createdCycleId, lastTestRun);
+  await saveRunRecord(requirementId, allEvents, opts, createdCycleId, lastTestRun, runStuck);
 
   return { requirementId, events: allEvents };
 }
@@ -631,7 +652,8 @@ async function saveRunRecord(
   events: AgentEvent[],
   opts: OrchestrationOptions,
   cycleId?: string,
-  testRun?: RunRecord["testRun"]
+  testRun?: RunRecord["testRun"],
+  stuck = false
 ): Promise<void> {
   try {
     const runs = await import("../runs/store");
@@ -686,7 +708,7 @@ async function saveRunRecord(
       source: req?.source || "manual",
       startedAt: new Date().toISOString(),
       finishedAt: new Date().toISOString(),
-      status: sawError ? "failed" : defects.length > 0 ? "partial" : "success",
+      status: stuck ? "stuck" : sawError ? "failed" : defects.length > 0 ? "partial" : "success",
       agents,
       counts: {
         analyses: analyses.filter((a) => a.requirementId === requirementId).length,
