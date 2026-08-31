@@ -74,18 +74,23 @@ function assertFreeModel(model: string): void {
   }
 }
 
-/** A request that failed for a model-availability reason (overloaded/rate limit). */
-function isRetryableModelError(err: LlmError): boolean {
+/**
+ * Errors that won't be fixed by trying another model — auth, bad request,
+ * model not found, invalid API key. Everything else (overload, rate limit,
+ * upstream/provider errors) is retryable by rotating to the next free model.
+ */
+function isNonRetryableError(err: LlmError): boolean {
   const m = err.message.toLowerCase();
   return (
-    /overload/i.test(m) ||
-    /rate\s*limit/i.test(m) ||
-    /429/i.test(m) ||
-    /503/i.test(m) ||
-    /upstream error/i.test(m) ||
-    /no completion/i.test(m) ||
-    /out of capacity/i.test(m) ||
-    /temporarily/i.test(m)
+    /401/i.test(m) ||
+    /403/i.test(m) ||
+    /400/i.test(m) ||
+    /invalid api key/i.test(m) ||
+    /authentication/i.test(m) ||
+    /unauthorized/i.test(m) ||
+    /not found/i.test(m) ||
+    /unknown model/i.test(m) ||
+    /invalid request/i.test(m)
   );
 }
 
@@ -190,8 +195,8 @@ export async function chatCompletion(
       return await requestModel(model, messages, opts, cfg);
     } catch (err) {
       lastErr = err instanceof LlmError ? err : new LlmError(String(err));
-      // Non-retryable (auth, bad request, model not found) — no point cycling.
-      if (!isRetryableModelError(lastErr)) throw lastErr;
+      // Auth / bad-request errors won't be fixed by another model — fail fast.
+      if (isNonRetryableError(lastErr)) throw lastErr;
       const next = pool[pool.indexOf(model) + 1];
       if (next) {
         opts.onModelSwitch?.(model, next, lastErr.message);

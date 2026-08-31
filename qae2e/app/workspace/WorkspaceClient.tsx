@@ -353,9 +353,12 @@ export function WorkspacePageInner() {
    * continue the remaining agents (the orchestrator's `startFrom` skips the
    * earlier agents). Uses the same requirement as the last run.
    */
-  const resumePipeline = async () => {
-    if (!failedAgent || !reqRef.current) return;
-    const startFrom = Math.max(0, failedAgent.index);
+  const resumePipeline = async (fromIndex?: number) => {
+    if (!reqRef.current) return;
+    // Default: resume from the failed agent, else the first incomplete stage.
+    const startFrom =
+      fromIndex ??
+      (failedAgent ? Math.max(0, failedAgent.index) : firstIncompleteStage());
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
@@ -392,6 +395,22 @@ export function WorkspacePageInner() {
       await refreshArtifactsWith(req.id);
     }
   };
+
+  // Index of the first pipeline stage (0-5) whose agent has NOT completed,
+  // derived from the event stream. Returns 0 when nothing has run yet.
+  const firstIncompleteStage = () => {
+    const doneAgentIds = new Set<string>();
+    for (const e of events) {
+      if (e.type === "agent_done") doneAgentIds.add(e.agentId);
+    }
+    const order = ["requirement-intelligence", "manual-test-case", "automation-script", "execution-defect", "devops-execution", "quality-intelligence"];
+    const idx = order.findIndex((id) => !doneAgentIds.has(id));
+    return idx === -1 ? 0 : idx;
+  };
+
+  // "Resume from stage" control state.
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [resumeFrom, setResumeFrom] = useState<number>(0);
 
   const refreshArtifactsWith = useCallback(
     async (rid: string) => {
@@ -669,12 +688,45 @@ export function WorkspacePageInner() {
                   failed — {failedAgent.message}
                 </p>
                 <button
-                  onClick={resumePipeline}
+                  onClick={() => resumePipeline()}
                   className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600"
                 >
                   <RotateCcw size={13} /> Retry from {failedAgent.code || "this agent"}
                 </button>
               </div>
+            )}
+
+            {/* Resume pipeline from stage — available after any run stops/ends */}
+            {!running && reqRef.current && events.length > 0 && (
+              <Card className="p-4">
+                <button
+                  onClick={() => setResumeOpen((o) => !o)}
+                  className="w-full flex items-center gap-2"
+                  type="button"
+                >
+                  <Play size={15} className="text-amber-600" />
+                  <span className="text-sm font-semibold text-text-primary">Resume pipeline from a stage</span>
+                  <ChevronDown size={14} className={`ml-auto text-text-muted transition-transform ${resumeOpen ? "rotate-180" : ""}`} />
+                </button>
+                {resumeOpen && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <select
+                      value={resumeFrom}
+                      onChange={(e) => setResumeFrom(Number(e.target.value))}
+                      className="rounded-lg border border-border-input bg-bg-input px-3 py-2 text-sm focus:outline-none focus:border-amber-500"
+                    >
+                      {["Requirement Intelligence (RI)", "Manual Test Cases (MT)", "Automation Scripts (AS)", "Execution & Defects (EX)", "DevOps Execution (DO)", "Release Report (IQ)"].map((label, i) => (
+                        <option key={i} value={i}>
+                          {i + 1}. {label}
+                        </option>
+                      ))}
+                    </select>
+                    <Button onClick={() => resumePipeline(resumeFrom)}>
+                      <RotateCcw size={14} /> Resume from stage {resumeFrom + 1}
+                    </Button>
+                  </div>
+                )}
+              </Card>
             )}
 
             {/* Live pipeline trace — every stage, tool, artifact, and DeepEval score */}
