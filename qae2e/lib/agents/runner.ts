@@ -98,6 +98,14 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
         })),
         toolChoice,
         signal: opts.signal,
+        // Surface model rotation in the live logs (e.g. overloaded → next free model).
+        onModelSwitch: (from, to, reason) => {
+          push({
+            type: "status",
+            agentId: agent.id,
+            message: `LLM fallback: ${from} unavailable (${reason}) — switching to ${to}`,
+          });
+        },
       });
 
       const message = res.choices[0]?.message;

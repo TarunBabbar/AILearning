@@ -43,12 +43,23 @@ function env(key: string, fallback = ""): string {
 
 export function getConfig() {
   return {
-    // ---- LLM (OpenRouter, free models only) ----
+    // ---- LLM (free models, with automatic fallback rotation) ----
     openrouterApiKey: env("OPENROUTER_API_KEY"),
     openrouterBaseUrl: env("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
     llmModel: env("LLM_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
-    // Judge model for AI stage evaluation (free only).
+    // Fallback pool for agent calls: when one model is overloaded / errors,
+    // the next model in this list is tried automatically. Comma-separated.
+    llmModels: env("LLM_MODELS", "nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,z-ai/glm-5.2:free,cohere/north-mini-code:free,openai/gpt-oss-20b:free")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    // Judge model for AI stage evaluation.
     evalModel: env("EVAL_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
+    // Fallback pool for the AI-evaluation judge.
+    evalModels: env("EVAL_MODELS", "nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
     visionModel: env("VISION_MODEL", "google/gemma-4-26b-a4b-it:free"),
 
     // ---- App ----

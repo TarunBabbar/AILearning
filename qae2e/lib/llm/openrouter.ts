@@ -37,6 +37,12 @@ export interface ChatCompletionOptions {
   tools?: ChatTool[];
   toolChoice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
   signal?: AbortSignal;
+  /**
+   * Called whenever the request falls back to another model in the pool
+   * (overloaded / rate-limited / upstream error). Lets the UI log
+   * "Switching LLM → ..." lines.
+   */
+  onModelSwitch?: (from: string, to: string, reason: string) => void;
 }
 
 interface ChatCompletionResponse {
@@ -68,13 +74,28 @@ function assertFreeModel(model: string): void {
   }
 }
 
-export async function chatCompletion(
+/** A request that failed for a model-availability reason (overloaded/rate limit). */
+function isRetryableModelError(err: LlmError): boolean {
+  const m = err.message.toLowerCase();
+  return (
+    /overload/i.test(m) ||
+    /rate\s*limit/i.test(m) ||
+    /429/i.test(m) ||
+    /503/i.test(m) ||
+    /upstream error/i.test(m) ||
+    /no completion/i.test(m) ||
+    /out of capacity/i.test(m) ||
+    /temporarily/i.test(m)
+  );
+}
+
+/** Single attempt against one model. Returns the response or throws LlmError. */
+async function requestModel(
+  model: string,
   messages: ChatMessage[],
-  opts: ChatCompletionOptions = {}
+  opts: ChatCompletionOptions,
+  cfg: ReturnType<typeof getConfig>
 ): Promise<ChatCompletionResponse> {
-  const cfg = getConfig();
-  const model = opts.model || cfg.llmModel;
-  assertFreeModel(model);
   const body: Record<string, unknown> = {
     model,
     messages,
@@ -91,7 +112,6 @@ export async function chatCompletion(
     headers: {
       Authorization: `Bearer ${getApiKey()}`,
       "Content-Type": "application/json",
-      // HTTP-Referer is optional; only sent when the app URL is configured.
       ...(cfg.appUrl ? { "HTTP-Referer": cfg.appUrl } : {}),
       "X-Title": cfg.appName.replace(/[^\x20-\x7E]/g, ""),
     },
@@ -101,16 +121,13 @@ export async function chatCompletion(
 
   if (!res.ok) {
     const err = await res.text().catch(() => "unknown error");
-    throw new LlmError(`OpenRouter error ${res.status}: ${err.slice(0, 500)}`);
+    throw new LlmError(`OpenRouter error ${res.status} (${model}): ${err.slice(0, 500)}`);
   }
 
   const parsed = (await res.json()) as ChatCompletionResponse & { error?: { message?: string } };
 
-  // OpenRouter can 200 with { error: {...} } (provider down / model out of
-  // capacity) or with an empty choices array — surface it instead of blowing
-  // up with "Cannot read properties of undefined (reading '0')".
   if (parsed.error?.message) {
-    throw new LlmError(`OpenRouter: ${parsed.error.message}`);
+    throw new LlmError(`OpenRouter (${model}): ${parsed.error.message}`);
   }
   if (!Array.isArray(parsed.choices) || parsed.choices.length === 0) {
     throw new LlmError(
@@ -119,6 +136,69 @@ export async function chatCompletion(
   }
 
   return parsed;
+}
+
+/**
+ * Fetch the current list of free (:free) OpenRouter models. Best-effort —
+ * returns [] on any failure (network/unauth).
+ */
+async function fetchFreeModels(cfg: ReturnType<typeof getConfig>): Promise<string[]> {
+  try {
+    const res = await fetch(`${cfg.openrouterBaseUrl}/models`, {
+      headers: {
+        Authorization: `Bearer ${getApiKey()}`,
+        ...(cfg.appUrl ? { "HTTP-Referer": cfg.appUrl } : {}),
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { data?: Array<{ id: string }> };
+    const ids = (data.data || []).map((m) => m.id).filter((id) => id.endsWith(":free"));
+    // Prefer larger-context models for the agent pipeline, but keep the whole
+    // free set as a last-resort pool. We just need ids here.
+    return [...new Set(ids)];
+  } catch {
+    return [];
+  }
+}
+
+export async function chatCompletion(
+  messages: ChatMessage[],
+  opts: ChatCompletionOptions = {}
+): Promise<ChatCompletionResponse> {
+  const cfg = getConfig();
+  const requested = opts.model || cfg.llmModel;
+  assertFreeModel(requested);
+
+  // Rotation pool: requested model first, then the configured LLM_MODELS pool,
+  // then (as a last resort) the live free list from OpenRouter.
+  let pool: string[] = [];
+  const push = (m: string) => {
+    if (m && !pool.includes(m)) pool.push(m);
+  };
+  push(requested);
+  for (const m of cfg.llmModels) push(m);
+  if (!pool.includes(requested) || cfg.llmModels.length <= 1) {
+    const live = await fetchFreeModels(cfg);
+    for (const m of live) push(m);
+  }
+
+  let lastErr: LlmError | null = null;
+  for (const model of pool) {
+    if (opts.signal?.aborted) throw new LlmError("Request aborted");
+    try {
+      return await requestModel(model, messages, opts, cfg);
+    } catch (err) {
+      lastErr = err instanceof LlmError ? err : new LlmError(String(err));
+      // Non-retryable (auth, bad request, model not found) — no point cycling.
+      if (!isRetryableModelError(lastErr)) throw lastErr;
+      const next = pool[pool.indexOf(model) + 1];
+      if (next) {
+        opts.onModelSwitch?.(model, next, lastErr.message);
+      }
+    }
+  }
+  throw lastErr ?? new LlmError("All models in the fallback pool failed.");
 }
 
 export function extractToolCalls(message: ToolCallMessage | undefined): NonNullable<ToolCallMessage["tool_calls"]> {
