@@ -378,7 +378,29 @@ Do NOT call script_save. Do not return prose only.`,
             () => Boolean(opts.signal?.aborted)
           );
           if (gate === "aborted") break;
-          if (gate === "stuck") {
+          if (gate === "skipped") {
+            // No Docker and no remote runner in this environment (e.g. Vercel):
+            // report that tests were not run and continue the chain so EX/DO/IQ
+            // still produce their (no-evidence) outputs.
+            emit({
+              type: "status",
+              agentId: "pipeline",
+              message: "No test executor available (Docker not installed / no remote runner) — tests were not run.",
+            });
+            testResults = "No real test execution was available — tests were not run.";
+            emit({
+              type: "test_run",
+              agentId: "pipeline",
+              ok: false,
+              passed: 0,
+              failed: 0,
+              skipped: 0,
+              total: 0,
+              attempts: 0,
+              message: "No test executor available (Docker not installed / no remote runner) — tests were not run.",
+            });
+            // Skip straight to the next agent.
+          } else if (gate === "stuck") {
             runStuck = true;
             emit({
               type: "status",

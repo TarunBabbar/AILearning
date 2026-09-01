@@ -62,6 +62,14 @@ function hasDocker(): Promise<boolean> {
   });
 }
 
+/** True when the `docker` binary exists (even if the daemon is stopped).
+ *  False on machines with no Docker installed (e.g. serverless/Vercel). */
+export function dockerInstalled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile("docker", ["--version"], { timeout: 5000 }, (err) => resolve(!err));
+  });
+}
+
 function runProcess(
   cmd: string,
   args: string[],

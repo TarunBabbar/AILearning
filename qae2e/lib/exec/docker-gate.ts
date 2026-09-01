@@ -1,26 +1,30 @@
 // Docker readiness gate.
 //
 // Before the pipeline runs the generated tests it needs a test executor:
-// either a local Docker engine or a configured remote runner. If neither is
-// available, the pipeline pauses and asks the user to start Docker, polls until
-// it detects it, and only then continues. If Docker never comes up within
-// WAIT_MS (15 minutes), the run is marked "stuck" instead of silently failing.
+// either a local Docker engine or a configured remote runner.
+//
+// - Docker installed + daemon running  → ready, run tests.
+// - Remote runner configured           → ready, run tests.
+// - Docker installed but daemon OFF    → wait up to DOCKER_WAIT_MS for the user
+//                                        to start it, then mark the run STUCK.
+// - Docker NOT installed (serverless,  → skip immediately with a clear message
+//   Vercel, no docker binary)            so the pipeline doesn't hang waiting
+//                                        for something that can never appear.
 
-import { hasDocker } from "./index";
+import { hasDocker, dockerInstalled } from "./index";
 import { remoteRunnerConfigured } from "./remote";
 
 export const DOCKER_WAIT_MS = 15 * 60 * 1000; // 15 minutes
 export const DOCKER_POLL_MS = 10 * 1000; // check every 10s
 
-export type DockerGateResult = "ready" | "stuck" | "aborted";
+export type DockerGateResult = "ready" | "stuck" | "skipped" | "aborted";
 
 /**
- * Wait for a test executor (local Docker or a remote runner) to become
- * available. `emitLog` is called with human-readable status lines so the UI
- * live log shows what's happening.
- *
+ * Determine whether the test run can proceed.
  * - "ready"   → Docker (or a remote runner) is available; continue.
- * - "stuck"   → nothing became available within the timeout; mark run stuck.
+ * - "skipped" → Docker is not installed here (serverless) and no remote runner
+ *               is configured — tests cannot run; skip gracefully.
+ * - "stuck"   → Docker is installed but was never started within the timeout.
  * - "aborted" → the pipeline was stopped by the user.
  */
 export async function waitForDockerExecutor(
@@ -37,6 +41,18 @@ export async function waitForDockerExecutor(
   if (await hasDocker()) {
     emitLog("Docker engine detected — proceeding to run tests.");
     return "ready";
+  }
+
+  // Docker isn't installed at all (e.g. Vercel serverless): never wait — the
+  // tests cannot run here, so report it and skip gracefully.
+  const installed = await dockerInstalled();
+  if (!installed) {
+    emitLog(
+      "Docker is not available in this environment and no remote runner is configured (TEST_RUNNER_URL). " +
+        "The tests cannot run here — skipping the test run and continuing with what was generated. " +
+        "To run the tests, deploy with a remote runner or run the pipeline on a machine with Docker."
+    );
+    return "skipped";
   }
 
   emitLog(
