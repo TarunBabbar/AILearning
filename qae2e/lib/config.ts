@@ -46,6 +46,18 @@ export function getConfig() {
     // ---- LLM (free models, with automatic fallback rotation) ----
     openrouterApiKey: env("OPENROUTER_API_KEY"),
     openrouterBaseUrl: env("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+    // Which LLM source to use: "openrouter" (default) | "commandcode" | "auto".
+    // "auto" tries the OpenRouter free pool first, then falls back to Command
+    // Code when every free model is unavailable.
+    llmSource: env("LLM_SOURCE", "auto"),
+    // Command Code Provider API — used as the fallback LLM source. Works on
+    // Vercel (plain HTTP), unlike the cmdc CLI which needs a local install.
+    commandCodeApiKey: env("COMMAND_CODE_API_KEY"),
+    commandCodeApiUrl: env("COMMAND_CODE_API_URL", "https://api.commandcode.ai/provider/v1"),
+    commandCodeModel: env("COMMAND_CODE_MODEL", "deepseek/deepseek-v4-flash"),
+    // Legacy: local cmdc CLI path (kept for on-machine usage; the API is the
+    // preferred path now).
+    commandCodePath: env("COMMAND_CODE_PATH", "cmdc"),
     llmModel: env("LLM_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
     // Fallback pool for agent calls: when one model is overloaded / errors,
     // the next model in this list is tried automatically. Comma-separated.

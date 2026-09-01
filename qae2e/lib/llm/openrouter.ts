@@ -167,11 +167,36 @@ async function fetchFreeModels(cfg: ReturnType<typeof getConfig>): Promise<strin
   }
 }
 
+/** Convert a plain text completion (e.g. from the Command Code fallback) into
+ *  the ChatCompletionResponse shape used by the runner. */
+function textResponse(text: string): ChatCompletionResponse {
+  return {
+    choices: [
+      {
+        message: { role: "assistant", content: text },
+        finish_reason: "stop",
+      },
+    ],
+  };
+}
+
 export async function chatCompletion(
   messages: ChatMessage[],
   opts: ChatCompletionOptions = {}
 ): Promise<ChatCompletionResponse> {
   const cfg = getConfig();
+
+  // Command Code as the primary source (LLM_SOURCE=commandcode): run the
+  // completion through the CLI. Note: tool-calling is not supported here, so
+  // this path is best for plain completions / fallback only.
+  if (cfg.llmSource === "commandcode") {
+    opts.onModelSwitch?.("openrouter", cfg.commandCodeModel, "LLM_SOURCE=commandcode");
+    const prompt = messages.map((m) => (m.role === "user" || m.role === "system" ? m.content : typeof m.content === "string" ? m.content : JSON.stringify(m))).join("\n");
+    const { commandCodeCompletion } = await import("./commandcode");
+    const r = await commandCodeCompletion(prompt, { model: cfg.commandCodeModel });
+    return textResponse(r.text);
+  }
+
   const requested = opts.model || cfg.llmModel;
   assertFreeModel(requested);
 
@@ -203,6 +228,25 @@ export async function chatCompletion(
       }
     }
   }
+
+  // LLM_SOURCE=auto: the whole free pool failed — fall back to Command Code
+  // so the pipeline keeps going instead of breaking on exhausted free models.
+  if (cfg.llmSource === "auto") {
+    try {
+      opts.onModelSwitch?.(pool[pool.length - 1] || requested, cfg.commandCodeModel, lastErr?.message || "free pool exhausted");
+      const prompt = messages
+        .map((m) => (m.role === "user" || m.role === "system" ? m.content : typeof m.content === "string" ? m.content : JSON.stringify(m)))
+        .join("\n");
+      const { commandCodeCompletion } = await import("./commandcode");
+      const r = await commandCodeCompletion(prompt, { model: cfg.commandCodeModel });
+      return textResponse(r.text);
+    } catch (ccErr) {
+      throw new LlmError(
+        `All OpenRouter free models failed, and the Command Code fallback also failed: ${ccErr instanceof Error ? ccErr.message : String(ccErr)}`
+      );
+    }
+  }
+
   throw lastErr ?? new LlmError("All models in the fallback pool failed.");
 }
 
