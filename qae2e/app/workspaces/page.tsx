@@ -72,15 +72,18 @@ export default function WorkspacesPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me");
-      const d = await res.json();
+      // Fetch auth + workspaces in parallel (was sequential → slower load).
+      const [meRes, wsRes] = await Promise.all([
+        fetch("/api/auth/me"),
+        fetch("/api/workspaces"),
+      ]);
+      const d = await meRes.json();
       if (!d.user) {
         router.replace("/login");
         return;
       }
       setMe(d.user);
-      const ws = await fetch("/api/workspaces");
-      const wd = await ws.json();
+      const wd = await wsRes.json();
       setWorkspaces(wd.workspaces || []);
     } catch {
       setMe(null);

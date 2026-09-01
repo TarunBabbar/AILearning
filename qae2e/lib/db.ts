@@ -17,8 +17,13 @@ function pgConfigured(): boolean {
   return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_HOST || process.env.POSTGRES_DATABASE || process.env.DATABASE_URL);
 }
 
-/** Best-effort table bootstrap. Returns true when Postgres is usable. */
+let tablesReady: boolean | null = null;
+
+/** Best-effort table bootstrap. Returns true when Postgres is usable.
+ *  CREATE TABLE IF NOT EXISTS runs once per process — cached to avoid a round
+ *  trip on every DB read (a major slowdown for list-heavy pages). */
 async function ensureTables(): Promise<boolean> {
+  if (tablesReady !== null) return tablesReady;
   try {
     const { sql } = await import("@vercel/postgres");
     await sql`CREATE TABLE IF NOT EXISTS users (
@@ -74,8 +79,10 @@ async function ensureTables(): Promise<boolean> {
       data JSONB NOT NULL
     )`;
     await sql`CREATE INDEX IF NOT EXISTS idx_runs_ws ON qae2e_runs (workspace_id)`;
+    tablesReady = true;
     return true;
   } catch {
+    tablesReady = false;
     return false;
   }
 }

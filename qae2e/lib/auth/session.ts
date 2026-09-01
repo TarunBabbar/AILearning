@@ -3,6 +3,7 @@
 
 import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { createSession, deleteSession, getSession, getUserById } from "../db";
 
 const COOKIE = "qae2e_session";
@@ -29,7 +30,12 @@ export async function createSessionCookie(userId: string): Promise<void> {
   });
 }
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+/**
+ * Current session user, memoized per render via React.cache — so multiple
+ * server components on one page (Header, Hero, CtaPanel) share a single DB
+ * read instead of each calling getSession + getUserById.
+ */
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
@@ -43,7 +49,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     email: String(user.email),
     name: user.name ? String(user.name) : undefined,
   };
-}
+});
 
 export async function destroySessionCookie(): Promise<void> {
   const store = await cookies();

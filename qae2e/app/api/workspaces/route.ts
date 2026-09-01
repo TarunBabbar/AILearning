@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/guard";
-import { createWorkspace, deleteWorkspace, getWorkspace, listWorkspaces, listRuns } from "@/lib/db";
+import { createWorkspace, deleteWorkspace, getWorkspace, listWorkspaces } from "@/lib/db";
+import { runStatsForWorkspaces } from "@/lib/runs/store";
 
 export const runtime = "nodejs";
 
@@ -10,21 +11,22 @@ export async function GET() {
   if (!auth.user) return auth.response;
   const workspaces = await listWorkspaces(auth.user.id);
 
-  const withStats = await Promise.all(
-    workspaces.map(async (w) => {
-      const runs = await listRuns(w.id, 1);
-      const run = (runs[0] as { startedAt?: string; status?: string } | undefined) || undefined;
-      return {
-        id: w.id,
-        name: w.name,
-        description: w.description,
-        createdAt: w.createdAt,
-        runCount: (await listRuns(w.id, 200)).length,
-        lastRunAt: run?.startedAt,
-        lastRunStatus: run?.status,
-      };
-    })
-  );
+  // Single query for run counts + latest run across all workspaces (no N+1).
+  const stats = await runStatsForWorkspaces(workspaces.map((w) => w.id));
+
+  const withStats = workspaces.map((w) => {
+    const s = stats.get(w.id);
+    const run = s?.lastRun as { startedAt?: string; status?: string } | undefined;
+    return {
+      id: w.id,
+      name: w.name,
+      description: w.description,
+      createdAt: w.createdAt,
+      runCount: s?.count || 0,
+      lastRunAt: run?.startedAt,
+      lastRunStatus: run?.status,
+    };
+  });
 
   return NextResponse.json({ workspaces: withStats });
 }

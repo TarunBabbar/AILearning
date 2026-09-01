@@ -59,7 +59,12 @@ function pgConfigured(): boolean {
   return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_HOST || process.env.POSTGRES_DATABASE || process.env.DATABASE_URL);
 }
 
+let pgRunTableReady: boolean | null = null;
+
 async function pgRunTable(): Promise<boolean> {
+  // CREATE TABLE IF NOT EXISTS once per process — avoids a round trip on
+  // every read (this was a major slowdown for list-heavy pages).
+  if (pgRunTableReady !== null) return pgRunTableReady;
   try {
     const { sql } = await import("@vercel/postgres");
     await sql`CREATE TABLE IF NOT EXISTS qae2e_runs (
@@ -73,8 +78,10 @@ async function pgRunTable(): Promise<boolean> {
       status TEXT,
       data JSONB NOT NULL
     )`;
+    pgRunTableReady = true;
     return true;
   } catch {
+    pgRunTableReady = false;
     return false;
   }
 }
@@ -147,6 +154,58 @@ export async function listRuns(limit = 50, workspaceIds?: string[] | string): Pr
   } catch {
     return [];
   }
+}
+
+/**
+ * Run stats for a set of workspaces in ONE query (count + latest run each).
+ * Replaces the per-workspace listRuns N+1 that slowed the workspaces page.
+ * Returns a Map<workspaceId, { count, lastRun }>.
+ */
+export async function runStatsForWorkspaces(
+  workspaceIds: string[]
+): Promise<Map<string, { count: number; lastRun: RunRecord | null }>> {
+  const out = new Map<string, { count: number; lastRun: RunRecord | null }>();
+  const ids = workspaceIds.filter(Boolean);
+  if (!ids.length) return out;
+  for (const id of ids) out.set(id, { count: 0, lastRun: null });
+
+  if (pgConfigured()) {
+    try {
+      await pgRunTable();
+      const { sql } = await import("@vercel/postgres");
+      const idsLit = `{${ids.map((i) => `"${i.replace(/"/g, '\\"')}"`).join(",")}}`;
+      const rows = await sql`SELECT workspace_id, data FROM qae2e_runs WHERE workspace_id = ANY(${idsLit}::text[]) ORDER BY started_at DESC`;
+      for (const r of rows.rows || []) {
+        const ws = String((r as { workspace_id: string }).workspace_id);
+        const rec = (r as { data: RunRecord }).data;
+        const cur = out.get(ws);
+        if (cur) {
+          cur.count++;
+          if (!cur.lastRun) cur.lastRun = rec;
+        }
+      }
+      return out;
+    } catch {
+      // fall through to file fallback
+    }
+  }
+  try {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const runs = JSON.parse(readFileSync(join(process.cwd(), runsFile()), "utf-8"));
+    const arr: RunRecord[] = Array.isArray(runs) ? runs : [];
+    for (const r of arr) {
+      const ws = String((r as unknown as { workspaceId?: string }).workspaceId || "default");
+      const cur = out.get(ws);
+      if (cur) {
+        cur.count++;
+        if (!cur.lastRun) cur.lastRun = r;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return out;
 }
 
 export async function getRun(id: string, workspaceId?: string): Promise<RunRecord | null> {
