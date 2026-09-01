@@ -55,9 +55,9 @@ export function getConfig() {
     commandCodeApiKey: env("COMMAND_CODE_API_KEY"),
     commandCodeApiUrl: env("COMMAND_CODE_API_URL", "https://api.commandcode.ai/provider/v1"),
     commandCodeModel: env("COMMAND_CODE_MODEL", "deepseek/deepseek-v4-flash"),
-    // Legacy: local cmdc CLI path (kept for on-machine usage; the API is the
-    // preferred path now).
-    commandCodePath: env("COMMAND_CODE_PATH", "cmdc"),
+    // Legacy: local cmdc CLI path. Empty by default — the CLI is only used
+    // when explicitly configured (the Provider API is the preferred path).
+    commandCodePath: env("COMMAND_CODE_PATH"),
     llmModel: env("LLM_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
     // Fallback pool for agent calls: when one model is overloaded / errors,
     // the next model in this list is tried automatically. Comma-separated.

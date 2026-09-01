@@ -126,5 +126,14 @@ export async function commandCodeCompletion(
   if (cfg.commandCodeApiKey) {
     return apiCompletion(prompt, model);
   }
-  return cliCompletion(prompt, model);
+
+  // No API key: only attempt the local CLI if the user explicitly configured
+  // COMMAND_CODE_PATH. Otherwise fail with a clear, actionable error.
+  if (cfg.commandCodePath) {
+    return cliCompletion(prompt, model);
+  }
+  throw new Error(
+    "Command Code fallback requires COMMAND_CODE_API_KEY (recommended, works anywhere) " +
+      "or COMMAND_CODE_PATH pointing to the cmdc CLI. Set one of them to enable the fallback."
+  );
 }
