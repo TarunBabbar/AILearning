@@ -55,14 +55,18 @@
 - Per-file progress: `Queued → Extracting → Parsing → Done (+N new)`.
 - Files over 50MB are flagged and skipped.
 
-### 🧠 LLM extraction (OpenRouter free models)
-- The Upload page loads the **live list of free OpenRouter models** on page load (`GET /api/models`, cached 6h) and lets you pick any of them — no hardcoded model ids.
-- **`OPENROUTER_MODEL` is the default extraction model** — every chunk tries it first; if it fails, extraction falls back through the curated free list (Nvidia + OpenAI — Google gemma models removed due to chronic upstream 429s).
-- Each model chip shows its **context window** (larger = handles bigger files in one pass).
-- A **Custom** option accepts any model id you type (e.g. `openrouter/free`).
-- Large documents are split into overlapping chunks so output never exceeds the model's token limit.
+### 🧠 LLM extraction (Command Code provider — DeepSeek V4 Flash)
+- **Primary LLM path**: when `CMD_API_KEY` is set, all LLM calls (extraction, scoring, chat, enrichment) route through the **Command Code provider API** (`https://api.commandcode.ai/provider/v1`) with `CMD_MODEL` (default `deepseek/deepseek-v4-flash`). OpenRouter free models are **not** used — they're flaky and 429-prone.
+- Extraction runs chunks in parallel across the model; large documents are split into overlapping chunks so output never exceeds the model's token limit.
 - Results are deduplicated (by title + email + company) against existing rows.
 - Strict-JSON prompting with fallback-safe parsing (handles markdown fences / prose around JSON).
+
+### 🧠 LLM extraction (OpenRouter mode — fallback)
+- Only used when `CMD_API_KEY` is **not** set.
+- The Upload page loads the **live list of free OpenRouter models** on page load (`GET /api/models`, cached 6h) and lets you pick any of them — no hardcoded model ids.
+- **`OPENROUTER_MODEL` is the default extraction model** — every chunk tries it first; if it fails, extraction falls back through the whole live free list (Google gemma models removed due to chronic upstream 429s).
+- Each model chip shows its **context window** (larger = handles bigger files in one pass).
+- A **Custom** option accepts any model id you type (e.g. `openrouter/free`).
 
 ### 📊 QA Jobs (default page)
 - Compact job cards with search, company / location dropdown filters, and sort (newest / oldest / company).
@@ -83,14 +87,15 @@
 - The dashboard resolves companies on demand — jobs with personal-email domains simply show *"Company info not resolved"*.
 
 ### 🔐 Env-only API key
-- The OpenRouter key is read **only** from `OPENROUTER_API_KEY` (`.env` locally, Vercel env vars in production).
-- No settings page, no UI entry, no cookies — the key never reaches the browser.
+- **Command Code mode (primary)**: `CMD_API_KEY` (`user_...` from `~/.commandcode/auth.json`) + `CMD_MODEL` route all LLM calls through the Command Code provider — billed to your Command Code plan, no free-pool 429s.
+- **OpenRouter mode (fallback)**: `OPENROUTER_API_KEY` is read from `.env` locally / Vercel env vars in production.
+- No settings page, no UI entry, no cookies — keys never reach the browser.
 
-### ⚠️ Free-model rate limits (HTTP 429)
+### ⚠️ Free-model rate limits (HTTP 429) — OpenRouter mode only
 - OpenRouter's `:free` models share a single **anonymous pool** per provider — when it's saturated the API returns `429` with `"limit_source":"upstream_provider_shared_pool"`, regardless of the model picked. Google AI Studio's pool is especially busy, which is why gemma models were dropped from extraction.
-- Fix: add a key at https://openrouter.ai/settings/keys and set it as `OPENROUTER_API_KEY` in Vercel env vars. With `is_byok:true` the request uses **your** rate limit instead of the shared pool (free models still cost $0). Redeploy after changing env vars.
-- If 429s persist, pick a model from a different provider (e.g. Nvidia instead of Google) — free pools are per-provider.
-- Client-side resilience: retries honor OpenRouter's `Retry-After` header (max 60s backoff); extraction chunks rotate starting models so parallel calls don't all hammer one pool; a rate-limited model fails fast (2 tries) and the chunk switches provider.
+- **Fix: switch to Command Code mode** (set `CMD_API_KEY` + `CMD_MODEL`) — requests route through your Command Code plan instead of the shared free pool.
+- If you must stay on OpenRouter: add a key at https://openrouter.ai/settings/keys and set it as `OPENROUTER_API_KEY` (with `is_byok:true` the request uses **your** rate limit). Redeploy after changing env vars.
+- Client-side resilience: retries honor the provider's `Retry-After` header (max 60s backoff); extraction chunks rotate starting models so parallel calls don't all hammer one pool; a rate-limited model fails fast (2 tries) and the chunk switches provider.
 
 ### ⚡ Client + edge caching (Jobs / Contacts)
 - List pages use **[SWR](https://swr.vercel.app)** so switching tabs reuses in-memory data instead of hitting Neon on every navigation.
@@ -163,7 +168,7 @@
 | PDF text   | pdfjs-dist 6 — extracted **in the browser**                       |
 | DOCX text  | mammoth — extracted **in the browser**                            |
 | Styling    | Tailwind CSS 4, Claude-style beige palette                        |
-| LLM        | OpenRouter chat completions (free models)                         |
+| LLM        | Command Code provider (DeepSeek V4 Flash) · OpenRouter fallback   |
 | Deploy     | Vercel-ready (stateless API routes, env-var config)               |
 
 ---
@@ -254,7 +259,9 @@ docker run -d --name jobdetails-postgres \
 # 2. Create .env from the template and fill in your values
 cp .env.example .env
 #    DATABASE_URL        — postgresql://postgres:postgres@localhost:5432/jobdetails?schema=public
-#    OPENROUTER_API_KEY  — your OpenRouter key (https://openrouter.ai/keys)
+#    CMD_API_KEY         — Command Code key (user_... from ~/.commandcode/auth.json) — primary path
+#    CMD_MODEL           — deepseek/deepseek-v4-flash (default)
+#    OPENROUTER_API_KEY  — OpenRouter key, only if NOT using CMD mode (https://openrouter.ai/keys)
 #    ADMIN_USERNAME      — admin login for the Upload page
 #    ADMIN_PASSWORD      — admin password for the Upload page
 
@@ -284,8 +291,11 @@ npm run dev
 | Variable             | Required | Description                                                                  | Example                                                       |
 | -------------------- | -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `DATABASE_URL`       | ✅       | PostgreSQL connection string (used by Prisma CLI **and** runtime)            | `postgresql://user:pass@host:5432/jobdetails?schema=public`  |
-| `OPENROUTER_API_KEY` | ✅       | OpenRouter API key — server-side only, never exposed to the client           | `sk-or-v1-…`                                                  |
-| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload (verified)                     | `nvidia/nemotron-3-ultra-550b-a55b:free`                  |
+| `CMD_API_KEY`        | ❌       | Command Code provider key (`user_...` from `~/.commandcode/auth.json`). When set, **all** LLM calls route via Command Code (primary path) | `user_…`                                    |
+| `CMD_MODEL`          | ❌       | Command Code model for all LLM calls (default `deepseek/deepseek-v4-flash`) | `deepseek/deepseek-v4-flash`                                  |
+| `CMD_BASE_URL`       | ❌       | Command Code provider base URL                                             | `https://api.commandcode.ai/provider/v1`                      |
+| `OPENROUTER_API_KEY` | ❌       | OpenRouter API key — used only when `CMD_API_KEY` is not set               | `sk-or-v1-…`                                                  |
+| `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload (OpenRouter mode only)        | `nvidia/nemotron-nano-9b-v2:free`                             |
 | `GENERIC_EMAIL_DOMAINS` | ❌     | Comma-separated personal-email domains hidden from the dashboard             | `gmail.com,yahoo.com,live.com,…`                              |
 | `ADMIN_USERNAME`     | ❌       | Username that unlocks the Upload page (defaults to `admin`)                  | `admin`                                                       |
 | `ADMIN_PASSWORD`     | ❌       | Password that unlocks the Upload page — without it, uploads stay locked      | `admin123`                                                    |
@@ -295,7 +305,7 @@ npm run dev
 | `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | ❌ | Max upload size per file shown on the Upload page                          | `50`                                                          |
 | `TELEGRAM_BOT_TOKEN` | ❌       | Telegram bot token for chat-widget forwarding to the owner                   | `8887227521:AA…`                                              |
 | `TELEGRAM_CHAT_ID`   | ❌       | Owner's Telegram chat id for forwarded messages                              | `1622727099`                                                  |
-| `CHATBOT_MODEL`      | ❌       | Optional OpenRouter model for chat auto-answers (falls back to `OPENROUTER_MODEL`) | `nvidia/nemotron-3-ultra-550b-a55b:free`             |
+| `CHATBOT_MODEL`      | ❌       | Optional model for chat auto-answers (falls back to `OPENROUTER_MODEL` / `CMD_MODEL`) | `deepseek/deepseek-v4-flash`                    |
 | `SMTP_HOST`          | ❌       | SMTP server for welcome/reset emails (default `smtp.gmail.com`)              | `smtp.gmail.com`                                              |
 | `SMTP_PORT`          | ❌       | SMTP port (default `587`)                                                   | `587`                                                         |
 | `SMTP_USER`          | ❌       | SMTP account (e.g. Gmail address)                                           | `qajobs.portal@gmail.com`                                     |
@@ -350,8 +360,10 @@ npx prisma db push
 - Framework: **Next.js** (auto-detected)
 - Add **Environment Variables** (Project → Settings → Environment Variables):
   - `DATABASE_URL` — the Neon connection string
-  - `OPENROUTER_API_KEY` — your OpenRouter key
-  - `OPENROUTER_MODEL` — default `nvidia/nemotron-3-ultra-550b-a55b:free`
+  - `CMD_API_KEY` — Command Code provider key (`user_...` from `~/.commandcode/auth.json`) — **primary LLM path**
+  - `CMD_MODEL` — `deepseek/deepseek-v4-flash`
+  - `OPENROUTER_API_KEY` — your OpenRouter key (only if not using CMD mode)
+  - `OPENROUTER_MODEL` — default `nvidia/nemotron-nano-9b-v2:free` (OpenRouter mode)
   - `GENERIC_EMAIL_DOMAINS` — the comma-separated personal-domain list
   - `ADMIN_USERNAME` / `ADMIN_PASSWORD` — upload page credentials
   - `NEXT_PUBLIC_APP_URL` — `https://<your-project>.vercel.app`
@@ -495,8 +507,10 @@ a pause takes a few seconds to wake the DB. That's normal.
 
 | Problem | Fix |
 | ------- | --- |
-| `No OpenRouter API key configured` | Set `OPENROUTER_API_KEY` in `.env` (local) or Vercel env vars. |
-| `OpenRouter returned 402` | The model needs credits or has no free variant — pick a free model id on the Upload page. |
+| `CMD_API_KEY is missing` | Set `CMD_API_KEY` (and `CMD_MODEL`) in `.env` / Vercel env vars — the primary LLM path. |
+| `No OpenRouter API key configured` | Only relevant in OpenRouter mode — set `OPENROUTER_API_KEY` in `.env` (local) or Vercel env vars. |
+| `Command Code rejected the API key (401)` | The `CMD_API_KEY` must be the `user_...` key from `~/.commandcode/auth.json`. |
+| `OpenRouter returned 402` | The model needs credits or has no free variant — pick a free model id on the Upload page (OpenRouter mode). |
 | `OpenRouter rejected the API key (401)` | Double-check the key at [openrouter.ai/keys](https://openrouter.ai/keys); it must be `sk-or-v1-…`. |
 | `DATABASE_URL is not set` | Add `DATABASE_URL` to `.env` / Vercel env vars. |
 | `P1010: User was denied access` / SSL errors | The app uses `rejectUnauthorized: false` in production; verify the direct connection string and DB credentials. |
