@@ -191,10 +191,12 @@ export async function extractJobsFromText(
             prompt,
             EXTRACTION_SYSTEM_PROMPT,
             apiKey,
-            // Short retry budget: a rate-limited (429) free model should fail
-            // fast so the chunk can switch to a different provider instead of
-            // burning the Vercel function budget on backoff sleeps.
-            { model, maxTokens: 8192, maxRetries: 2, maxRetryDelayMs: 20_000 },
+            // 24k output budget: DeepSeek Flash writes verbose JSON (full job
+            // descriptions) and 8192 tokens gets exhausted under parallel
+            // chunks → finish_reason "length" with EMPTY content. Also keep a
+            // short retry budget so a flaky model fails fast and the chunk
+            // switches provider instead of burning the function budget.
+            { model, maxTokens: 24000, maxRetries: 2, maxRetryDelayMs: 20_000 },
             log
           );
         } catch (e) {
