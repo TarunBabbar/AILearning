@@ -496,11 +496,11 @@ export default function UploadPage() {
       <div className="mb-5 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-claude-text">
-            Upload Job Files
+            AI Job Extraction
           </h1>
           <p className="mt-1 text-sm text-claude-muted">
             {admin
-              ? "Drop job listing PDFs, DOCX, or text files. Text is extracted in your browser and parsed with an OpenRouter free model."
+              ? "Drop job listing PDFs, DOCX, or text files. Text is extracted in your browser and parsed by AI to find every job."
               : "Sign in with admin credentials to upload job PDFs."}
           </p>
         </div>
@@ -571,7 +571,7 @@ export default function UploadPage() {
             >
               <UploadCloud size={32} className="mb-2 text-claude-accent" />
               <p className="text-sm font-medium text-claude-text">
-                Drag & drop job files here
+                Drag & drop job files here — AI extracts every job
               </p>
               <p className="mt-1 text-xs text-claude-muted">
                 or click to browse — PDF, DOCX, TXT, MD (up to{" "}

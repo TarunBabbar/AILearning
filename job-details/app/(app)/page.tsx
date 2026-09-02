@@ -129,7 +129,7 @@ export default function Dashboard() {
         <div className="flex flex-col gap-2.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
             <h1 className="text-lg font-semibold tracking-tight text-claude-text">
-              QA Jobs
+              AI Job Finder
             </h1>
             <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
               <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">

@@ -176,7 +176,7 @@ export default function JobCard({
 
         <div className="mt-auto flex items-center justify-between pt-2.5 text-[11px] text-claude-muted">
           <span className="truncate pr-2">
-            {score != null ? "Scored job" : job.email ?? ""}
+            {score != null ? "AI scored" : job.email ?? ""}
           </span>
           <span className="flex shrink-0 items-center gap-0.5">
             {job.jobDate ? formatShortDate(job.jobDate) : ""}

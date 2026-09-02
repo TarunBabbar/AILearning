@@ -103,7 +103,7 @@ export default function ResumePage() {
   if (!loggedIn) {
     return (
       <PageChrome
-        header={<h1 className="text-lg font-semibold tracking-tight text-claude-text">Upload Resume</h1>}
+        header={<h1 className="text-lg font-semibold tracking-tight text-claude-text">AI Resume</h1>}
       >
         <div className="mx-auto flex max-w-md flex-col items-center rounded-xl border border-claude-border bg-white px-6 py-10 text-center shadow-sm">
           <FileText size={22} className="mb-3 text-claude-accent" />
@@ -123,9 +123,9 @@ export default function ResumePage() {
     <PageChrome
       header={
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-lg font-semibold tracking-tight text-claude-text">Upload Resume</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-claude-text">AI Resume</h1>
           <p className="text-[11px] leading-snug text-claude-muted">
-            Upload your resume once, then head to <b>Match by Resume</b> to score jobs against it.
+            Upload your resume once, then head to <b>Match Jobs by AI</b> to score jobs against it.
           </p>
         </div>
       }
@@ -220,7 +220,7 @@ export default function ResumePage() {
             <span className="font-semibold uppercase tracking-wide text-[#7a6120]">Tip</span>
             <p className="mt-1">
               No resume uploaded yet. Upload one to enable AI scoring — then open{" "}
-              <b>Match by Resume</b> and hit the <b>Score</b> button to see fit % for every job.
+              <b>Match Jobs by AI</b> and hit the <b>Score</b> button to see fit % for every job.
             </p>
           </div>
         )}

@@ -558,10 +558,10 @@ export default function ScoreJobsPage() {
       <div className="mx-auto max-w-md">
         <div className="mb-6">
           <h1 className="text-xl font-semibold tracking-tight text-claude-text">
-            Match Jobs by Resume
+            Match Jobs by AI
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-claude-muted">
-            Sign in, upload your resume, and score board openings against it.
+            Sign in, upload your resume, and let AI score board openings against it.
             Each job gets a fit % plus short strengths and gaps for your profile.
           </p>
         </div>
@@ -673,7 +673,7 @@ export default function ScoreJobsPage() {
           <div className="flex min-w-0 items-center justify-between gap-2">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               <h1 className="shrink-0 text-sm font-semibold tracking-tight text-claude-text">
-                Match Jobs by Resume
+                Match Jobs by AI
               </h1>
 
               <div className="inline-flex h-7 rounded-md border border-claude-border bg-claude-bg p-0.5">

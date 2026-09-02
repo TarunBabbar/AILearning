@@ -10,14 +10,14 @@ import { SESSION_KEY, swrFetcher } from "@/lib/swr-fetcher";
 import FeedbackModal from "@/components/FeedbackModal";
 
 const PUBLIC_NAV_ITEMS = [
-  { href: "/", label: "QA Jobs", icon: LayoutDashboard },
-  { href: "/score", label: "Match by Resume", icon: Target },
+  { href: "/", label: "AI Job Finder", icon: LayoutDashboard },
+  { href: "/score", label: "Match Jobs by AI", icon: Target },
 ];
 
 // Only shown to logged-in users — recruiter contact details are gated.
 const AUTH_NAV_ITEMS = [
   { href: "/contacts", label: "Recruiter Contacts", icon: Contact },
-  { href: "/resume", label: "Upload Resume", icon: FileUp },
+  { href: "/resume", label: "AI Resume", icon: FileUp },
 ];
 
 // Shown last, always — opens the feedback modal AND the reviews page.
@@ -84,7 +84,7 @@ export default function Sidebar() {
             <div className="text-sm font-semibold tracking-tight text-claude-text">
               QA Tracker
             </div>
-            <div className="text-[11px] text-claude-muted">Job Opportunities</div>
+            <div className="text-[11px] text-claude-muted">AI-Powered Job Opportunities</div>
           </div>
         </div>
         <button
