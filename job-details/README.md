@@ -110,6 +110,8 @@
 - Results render as the same job cards as QA Jobs with a **fit % badge** and strengths snippet on each card; 40 cards per page.
 - Click a card for a centered detail popup with strengths, gaps, and full description (header hidden while open).
 - Score shared board jobs via OpenRouter. Each wave lists free `:free` models, then fires **one parallel request per model** with **10 jobs** each. Results upsert to `JobScore` as each chunk returns.
+- **CMD mode**: scoring runs **8 parallel DeepSeek workers** (`CMD_SCORE_CONCURRENCY`) instead of 1 sequential call — ~8× faster.
+- **Recent-first scoring**: a **"Last 7 days / All time"** toggle scores only recent jobs (`jobDate`- or `createdAt`-based) so you get fresh matches fast, and can run the full backlog later.
 - Per-model: up to **2 tries**, then blacklist that model for the run and reassign the chunk.
 - Scores keyed by `(userId, jobId)` so users never see each other’s results.
 - **Single status line**: while scoring, live `processed / remaining` progress; when idle, `X scored · Y left`.
@@ -293,6 +295,7 @@ npm run dev
 | `DATABASE_URL`       | ✅       | PostgreSQL connection string (used by Prisma CLI **and** runtime)            | `postgresql://user:pass@host:5432/jobdetails?schema=public`  |
 | `CMD_API_KEY`        | ❌       | Command Code provider key (`user_...` from `~/.commandcode/auth.json`). When set, **all** LLM calls route via Command Code (primary path) | `user_…`                                    |
 | `CMD_MODEL`          | ❌       | Command Code model for all LLM calls (default `deepseek/deepseek-v4-flash`) | `deepseek/deepseek-v4-flash`                                  |
+| `CMD_SCORE_CONCURRENCY` | ❌    | Parallel DeepSeek workers for Match-by-Resume scoring (default `8`)         | `8`                                                           |
 | `CMD_BASE_URL`       | ❌       | Command Code provider base URL                                             | `https://api.commandcode.ai/provider/v1`                      |
 | `OPENROUTER_API_KEY` | ❌       | OpenRouter API key — used only when `CMD_API_KEY` is not set               | `sk-or-v1-…`                                                  |
 | `OPENROUTER_MODEL`   | ❌       | Default model when none is selected on Upload (OpenRouter mode only)        | `nvidia/nemotron-nano-9b-v2:free`                             |

@@ -209,14 +209,19 @@ export async function scoreJobsParallel(
   // CMD mode: score with the Command Code model (CMD_MODEL) only — OpenRouter
   // free models are never used. OpenRouter mode: all free models as a pool.
   let models: string[];
+  let workerCount: number;
   if (cfg.cmdApiKey) {
     models = [cfg.cmdModel || "deepseek/deepseek-v4-flash"];
+    // Parallelize CMD mode: N workers hit DeepSeek Flash concurrently (like
+    // extraction's parallel chunks) instead of one sequential call at a time.
+    workerCount = Number(process.env.CMD_SCORE_CONCURRENCY) || 8;
   } else {
     models = await listFreeOpenRouterModelIds().catch(() => [] as string[]);
     if (!models.length) {
       const fallback = cfg.llmModel;
       models = fallback ? [fallback] : [];
     }
+    workerCount = models.length;
   }
   if (!models.length) {
     throw new Error("No LLM models available.");
@@ -228,17 +233,16 @@ export async function scoreJobsParallel(
   const chunkList = chunkJobs(jobs, SCORE_JOBS_PER_MODEL);
   log.info(
     "score",
-    `Work pool: ${chunkList.length} chunk(s) × ≤${SCORE_JOBS_PER_MODEL} jobs across ${models.length} model(s)`,
+    `Work pool: ${chunkList.length} chunk(s) × ≤${SCORE_JOBS_PER_MODEL} jobs across ${models.length} model(s) × ${workerCount} worker(s)`,
     "failed chunks retry on another free model"
   );
 
-  // Shared work queue. Each entry tracks which models already failed on it,
-  // so a failed chunk is requeued for a DIFFERENT model instead of being
-  // dropped. A worker only grabs an entry its model hasn't tried yet, and a
-  // failed chunk goes back to the tail for another worker to retry.
-  const queue: { chunk: ScoreJobInput[]; tried: Set<string> }[] = chunkList.map(
-    (chunk) => ({ chunk, tried: new Set<string>() })
-  );
+  // Shared work queue. Each entry tracks which models already failed on it
+  // (cross-model retry in OpenRouter mode) and a global attempt count (used
+  // for same-model retries in CMD mode where there's only one model).
+  // findIndex + splice are synchronous, so no two workers claim the same entry.
+  const queue: { chunk: ScoreJobInput[]; tried: Set<string>; attempts: number }[] =
+    chunkList.map((chunk) => ({ chunk, tried: new Set<string>(), attempts: 0 }));
 
   let scored = 0;
   const totalJobs = chunkList.reduce((n, c) => n + c.length, 0);
@@ -281,12 +285,17 @@ export async function scoreJobsParallel(
 
   async function worker(model: string): Promise<void> {
     while (true) {
-      // Grab the first chunk this model hasn't already failed on. findIndex +
-      // splice are synchronous, so no two workers ever claim the same entry.
-      const idx = queue.findIndex((e) => !e.tried.has(model));
+      // Grab the first chunk this worker's model can still try:
+      //  - CMD mode (single model): any entry not yet exhausted its retries.
+      //  - OpenRouter mode: any entry this model hasn't already failed on.
+      const idx = queue.findIndex((e) => {
+        if (models.length === 1) return e.attempts < workerCount;
+        return !e.tried.has(model);
+      });
       if (idx === -1) break; // nothing left for this model
       const [entry] = queue.splice(idx, 1);
       entry.tried.add(model);
+      entry.attempts += 1;
       try {
         const results = await scoreChunkWithModel(resumeText, entry.chunk, apiKey, model);
         used.add(model);
@@ -305,20 +314,22 @@ export async function scoreJobsParallel(
       } catch (e) {
         failedModels.add(model);
         const msg = e instanceof Error ? e.message : String(e);
-        // Cross-model retry: if another free model hasn't tried this chunk
-        // yet, requeue it so that model picks it up.
-        const untried = models.find((m) => !entry.tried.has(m));
-        if (untried) {
+        // Cross-model retry (OpenRouter): requeue for another free model.
+        // CMD mode: requeue up to `workerCount` attempts on the same model.
+        const canRetry = models.length === 1
+          ? entry.attempts < workerCount
+          : models.some((m) => !entry.tried.has(m));
+        if (canRetry) {
           queue.push(entry);
           log.warn(
             "score",
-            `Chunk failed via ${model.replace(":free", "")} — requeued for ${untried.replace(":free", "")}`,
+            `Chunk failed via ${model.replace(":free", "")} — retry ${entry.attempts}/${models.length === 1 ? workerCount : models.length}`,
             msg.slice(0, 160)
           );
         } else {
           log.warn(
             "score",
-            `Chunk failed via ${model.replace(":free", "")} — no untried models left, ${entry.chunk.length} job(s) left for next run`,
+            `Chunk failed via ${model.replace(":free", "")} — out of retries, ${entry.chunk.length} job(s) left for next run`,
             msg.slice(0, 160)
           );
         }
@@ -326,7 +337,12 @@ export async function scoreJobsParallel(
     }
   }
 
-  await Promise.all(models.map((m) => worker(m)));
+  // CMD mode: `workerCount` workers all use the single CMD model.
+  // OpenRouter mode: one worker per free model.
+  const workers = Array.from({ length: workerCount }, (_, i) =>
+    worker(models[i % models.length])
+  );
+  await Promise.all(workers);
 
   return {
     scored,
@@ -341,7 +357,11 @@ export async function scoreJobsParallel(
 export async function parallelWaveCapacity(): Promise<number> {
   try {
     const cfg = getConfig();
-    if (cfg.cmdApiKey) return SCORE_JOBS_PER_MODEL; // single CMD model
+    if (cfg.cmdApiKey) {
+      // CMD mode: (concurrency × jobs-per-model) jobs per wave.
+      const concurrency = Number(process.env.CMD_SCORE_CONCURRENCY) || 8;
+      return concurrency * SCORE_JOBS_PER_MODEL;
+    }
     const models = await listFreeOpenRouterModelIds();
     const n = models.length || 1;
     return n * SCORE_JOBS_PER_MODEL;

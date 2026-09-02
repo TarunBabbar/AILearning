@@ -21,11 +21,13 @@ const MIN_FIRST_WAVE = 20;
 type ScoreBody = {
   scope?: string;
   search?: string;
+  /** Only score jobs from the last N days (jobDate-based). Omit/0 = all. */
+  days?: number;
 };
 
 /**
  * POST /api/user/score
- * Body: { scope?: "unscored" | "all", search?: string }
+ * Body: { scope?: "unscored" | "all", search?: string, days?: number }
  *
  * Streams NDJSON progress as each model chunk is saved:
  *   {"type":"start",...}
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as ScoreBody;
   const scope = body.scope === "all" ? "all" : "unscored";
   const search = (body.search || "").trim();
+  const days = Number.isFinite(body.days) && body.days! > 0 ? Math.floor(body.days!) : 0;
 
   const resume = await prisma.resume.findUnique({ where: { userId } });
   if (!resume?.content) {
@@ -61,6 +64,14 @@ export async function POST(req: Request) {
   }
 
   const where = jobsSearchWhere(search);
+  if (days > 0) {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const andList = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+    where.AND = [
+      ...andList,
+      { OR: [{ jobDate: { gte: cutoff } }, { createdAt: { gte: cutoff } }] },
+    ];
+  }
   const allMatching = await prisma.job.findMany({
     where,
     select: {
@@ -223,8 +234,8 @@ export async function POST(req: Request) {
 }
 
 /**
- * GET /api/user/score?search=
- * Preview counts + ETA using parallel free-model waves.
+ * GET /api/user/score?search=&days=
+ * Preview counts + ETA using parallel waves. `days` scopes to recent jobs.
  */
 export async function GET(req: Request) {
   try {
@@ -235,7 +246,17 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const search = url.searchParams.get("search")?.trim() || "";
+    const daysParam = Number(url.searchParams.get("days")) || 0;
+    const days = daysParam > 0 ? Math.floor(daysParam) : 0;
     const where = jobsSearchWhere(search);
+    if (days > 0) {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const andList = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+      where.AND = [
+        ...andList,
+        { OR: [{ jobDate: { gte: cutoff } }, { createdAt: { gte: cutoff } }] },
+      ];
+    }
 
     const [totalMatching, scoredRows, capacity] = await Promise.all([
       prisma.job.count({ where }),

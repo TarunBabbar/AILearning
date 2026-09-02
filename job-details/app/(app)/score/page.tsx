@@ -82,6 +82,8 @@ export default function ScoreJobsPage() {
   const [authBusy, setAuthBusy] = useState(false);
 
   const [scope, setScope] = useState<"unscored" | "all">("unscored");
+  // Score recent jobs first: 7 = last 7 days, 0 = everything.
+  const [days, setDays] = useState(7);
   const [stats, setStats] = useState<ScoreStats | null>(null);
   const [confirmLarge, setConfirmLarge] = useState(false);
   const [scoring, setScoring] = useState(false);
@@ -211,13 +213,15 @@ export default function ScoreJobsPage() {
     ]
   );
 
-  const loadStats = useCallback(async (search: string) => {
+  const loadStats = useCallback(async (search: string, daysValue?: number) => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
+    const d = daysValue ?? days;
+    if (d > 0) params.set("days", String(d));
     const res = await fetch(`/api/user/score?${params}`, { cache: "no-store" });
     if (!res.ok) return;
     setStats((await res.json()) as ScoreStats);
-  }, []);
+  }, [days]);
 
   useEffect(() => {
     (async () => {
@@ -407,7 +411,7 @@ export default function ScoreJobsPage() {
         const res = await fetch("/api/user/score", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scope }),
+          body: JSON.stringify({ scope, days }),
         });
 
         const ctype = res.headers.get("content-type") || "";
@@ -696,6 +700,40 @@ export default function ScoreJobsPage() {
                   )}
                 >
                   Rescore
+                </button>
+              </div>
+
+              {/* Recent window toggle: score last N days first, or everything */}
+              <div className="inline-flex h-7 rounded-md border border-claude-border bg-claude-bg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDays(7);
+                    loadStats("", 7);
+                  }}
+                  className={cn(
+                    "rounded px-1.5 text-[11px] font-medium",
+                    days === 7
+                      ? "bg-white text-claude-text shadow-sm"
+                      : "text-claude-muted"
+                  )}
+                >
+                  Last 7 days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDays(0);
+                    loadStats("", 0);
+                  }}
+                  className={cn(
+                    "rounded px-1.5 text-[11px] font-medium",
+                    days === 0
+                      ? "bg-white text-claude-text shadow-sm"
+                      : "text-claude-muted"
+                  )}
+                >
+                  All time
                 </button>
               </div>
 
