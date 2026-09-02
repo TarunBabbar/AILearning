@@ -144,6 +144,11 @@ export async function callOpenRouter(
           max_tokens: maxTokens,
           temperature,
           stream: false,
+          // DeepSeek V4 Flash (reasoning model) thinks for minutes on
+          // structured tasks and can return empty content when reasoning
+          // eats the token budget. Disable reasoning for deterministic
+          // JSON work so responses come back fast and complete.
+          ...(usingCmd ? { reasoning: { enabled: false } } : {}),
         }),
       });
 
