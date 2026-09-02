@@ -74,18 +74,23 @@ export async function callOpenRouter(
   history: ChatMessage[] = []
 ): Promise<string> {
   const cfg = getConfig();
-  const key = apiKey || cfg.openrouterApiKey;
+  const usingCmd = Boolean(cfg.cmdApiKey);
+  // Command Code provider mode: use CMD_API_KEY + CMD_MODEL and the CMD
+  // endpoint. OpenRouter free models are NOT used in this mode.
+  const key = usingCmd ? cfg.cmdApiKey : apiKey || cfg.openrouterApiKey;
   if (!key) {
     throw new OpenRouterError(
-      "OpenRouter API key is missing. Set OPENROUTER_API_KEY in the environment.",
+      usingCmd
+        ? "CMD_API_KEY is missing. Set it in the environment."
+        : "OpenRouter API key is missing. Set OPENROUTER_API_KEY in the environment.",
       400
     );
   }
 
-  const model = opts.model || cfg.llmModel;
+  const model = opts.model || (usingCmd ? cfg.cmdModel : cfg.llmModel);
   if (!model) {
     throw new OpenRouterError(
-      "No OpenRouter model configured. Set OPENROUTER_MODEL in the environment.",
+      "No LLM model configured. Set OPENROUTER_MODEL in the environment.",
       400
     );
   }
@@ -95,11 +100,16 @@ export async function callOpenRouter(
   const timeoutMs = opts.timeoutMs ?? ABORT_TIMEOUT_MS;
   const maxRetries = opts.maxRetries ?? MAX_RETRIES;
   const maxRetryDelayMs = opts.maxRetryDelayMs ?? 60_000;
-  const url = `${cfg.openrouterBaseUrl}/chat/completions`;
+  const baseUrl = usingCmd ? cfg.cmdBaseUrl : cfg.openrouterBaseUrl;
+  const url = `${baseUrl}/chat/completions`;
   const keyPreview = key.length > 14 ? `${key.slice(0, 11)}…${key.slice(-3)}` : "***";
   const referer = cfg.appUrl || "https://openrouter.ai";
 
-  log.info("llm", `Calling OpenRouter · model=${model}`, `key=${keyPreview} maxTokens=${maxTokens}`);
+  log.info(
+    "llm",
+    `Calling ${usingCmd ? "Command Code" : "OpenRouter"} · model=${model}`,
+    `key=${keyPreview} maxTokens=${maxTokens}`
+  );
 
   let lastError: Error | null = null;
   const startedAt = Date.now();
@@ -113,12 +123,17 @@ export async function callOpenRouter(
       const response = await fetch(url, {
         signal: controller.signal,
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${key}`,
-          "HTTP-Referer": referer,
-          "X-Title": "QA Tracker",
-        },
+        headers: usingCmd
+          ? {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${key}`,
+            }
+          : {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${key}`,
+              "HTTP-Referer": referer,
+              "X-Title": "QA Tracker",
+            },
         body: JSON.stringify({
           model,
           messages: [
@@ -137,15 +152,16 @@ export async function callOpenRouter(
       if (!response.ok) {
         const body = await response.text().catch(() => "");
         const detail = body.slice(0, 400);
+        const providerName = usingCmd ? "Command Code" : "OpenRouter";
         if (response.status === 401) {
           throw new OpenRouterError(
-            "OpenRouter rejected the API key (401). Check OPENROUTER_API_KEY.",
+            `${providerName} rejected the API key (401). Check ${usingCmd ? "CMD_API_KEY" : "OPENROUTER_API_KEY"}.`,
             401
           );
         }
         if (response.status === 402) {
           throw new OpenRouterError(
-            "OpenRouter returned 402 — the model may require credits/top-up, or no free variant exists for it.",
+            `${providerName} returned 402 — the model may require credits/top-up, or no free variant exists for it.`,
             402
           );
         }
@@ -155,7 +171,7 @@ export async function callOpenRouter(
           ? Number(retryAfterSec) * 1000
           : undefined;
         throw new OpenRouterError(
-          `OpenRouter API ${response.status}: ${detail}`,
+          `${providerName} API ${response.status}: ${detail}`,
           response.status,
           Number.isFinite(retryAfterMs) ? retryAfterMs : undefined
         );
@@ -170,7 +186,7 @@ export async function callOpenRouter(
 
       log.info(
         "llm",
-        `OpenRouter responded OK in ${ms(Date.now() - startedAt)} (attempt ${attempt})`,
+        `${usingCmd ? "Command Code" : "OpenRouter"} responded OK in ${ms(Date.now() - startedAt)} (attempt ${attempt})`,
         `${content.length} chars · ${usage}`
       );
       return content;

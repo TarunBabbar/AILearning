@@ -10,9 +10,12 @@ import { getConfig } from "@/lib/config";
 export async function GET() {
   const { apiKey } = resolveApiKey();
   const cfg = getConfig();
+  // Effective default model: CMD_MODEL in CMD mode, else OPENROUTER_MODEL.
+  const llmModel = cfg.cmdApiKey ? cfg.cmdModel : cfg.llmModel;
   return NextResponse.json({
     apiKeyConfigured: apiKey.length > 0,
-    llmModel: cfg.llmModel,
+    llmModel,
+    provider: cfg.cmdApiKey ? "cmd" : "openrouter",
     appName: cfg.appName,
   });
 }

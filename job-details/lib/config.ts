@@ -24,9 +24,21 @@ export function getConfig() {
     openrouterApiKey: process.env.OPENROUTER_API_KEY || "",
     openrouterBaseUrl:
       process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+    // Command Code provider (billed to the Command Code plan). When
+    // CMD_API_KEY is set, ALL LLM calls route here — OpenRouter free
+    // models are NOT used (they're flaky/429-prone).
+    cmdApiKey: process.env.CMD_API_KEY || "",
+    cmdBaseUrl:
+      process.env.CMD_BASE_URL || "https://api.commandcode.ai/provider/v1",
+    // Explicit Command Code model; defaults to DeepSeek V4 Flash.
+    cmdModel: process.env.CMD_MODEL || "deepseek/deepseek-v4-flash",
+    // Default model for OpenRouter mode only (upload page default, etc.).
     llmModel: process.env.OPENROUTER_MODEL || "",
     llmModels: parseModels(process.env.LLM_MODELS_JSON),
-    chatbotModel: process.env.CHATBOT_MODEL || process.env.OPENROUTER_MODEL || "",
+    chatbotModel:
+      process.env.CHATBOT_MODEL ||
+      process.env.OPENROUTER_MODEL ||
+      (process.env.CMD_API_KEY ? process.env.CMD_MODEL || "deepseek/deepseek-v4-flash" : ""),
     maxPdfPages: Number.isFinite(maxPdfPages) && maxPdfPages > 0 ? maxPdfPages : 50,
     maxJobs: Number.isFinite(maxJobs) && maxJobs > 0 ? maxJobs : 200,
     maxFileSizeMb:

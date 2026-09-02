@@ -3,6 +3,7 @@ import { chunkText, parseJobDate } from "./extract";
 import { stripSpamText } from "./sanitize";
 import { createLogger, type Logger } from "./logger";
 import { listFreeOpenRouterModelIds } from "./free-models";
+import { getConfig } from "./config";
 
 export type ExtractedJob = {
   title: string;
@@ -72,12 +73,21 @@ ${text}`;
 
 /**
  * Build the extraction model pool:
- *  - preferred model first (from OPENROUTER_MODEL / upload selection)
- *  - then ALL currently-free OpenRouter models (fastest first), so chunks
- *    genuinely spread across the whole free pool instead of a hardcoded list.
- * Falls back to just the preferred model if the live list can't be fetched.
+ *  - CMD mode (CMD_API_KEY set): the CMD_MODEL only (DeepSeek V4 Flash by
+ *    default) — OpenRouter free models are never used.
+ *  - OpenRouter mode: preferred model first, then ALL currently-free
+ *    OpenRouter models (fastest first), so chunks spread across the free pool.
  */
 async function buildModelPool(preferredModel: string, log: Logger): Promise<string[]> {
+  // CMD mode: just the CMD model. Ignore the preferred model entirely —
+  // OpenRouter free LLMs are not used anymore.
+  const cfg = getConfig();
+  if (cfg.cmdApiKey) {
+    const model = cfg.cmdModel || "deepseek/deepseek-v4-flash";
+    log.info("extract", "CMD mode — using Command Code model", model);
+    return [model];
+  }
+
   let freeModels: string[] = [];
   try {
     freeModels = await listFreeOpenRouterModelIds();

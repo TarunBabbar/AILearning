@@ -125,7 +125,7 @@ export async function POST(req: Request) {
 
         log.info("upload", "Upload received", `file=${fileName ?? "unknown"} source=${source}`);
         progress(
-          `Connected — OpenRouter key OK (${source === "env" ? "server env" : "configured"}).`
+          `Connected — ${source === "cmd" ? "Command Code key OK" : "OpenRouter key OK"} (${source === "env" ? "server env" : source === "cmd" ? "cmd env" : "configured"}).`
         );
 
         // Dedupe on the strongest signal for "same job posting":

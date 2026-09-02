@@ -205,13 +205,21 @@ export async function scoreJobsParallel(
     };
   }
 
-  let models = await listFreeOpenRouterModelIds().catch(() => [] as string[]);
-  if (!models.length) {
-    const fallback = getConfig().llmModel;
-    models = fallback ? [fallback] : [];
+  const cfg = getConfig();
+  // CMD mode: score with the Command Code model (CMD_MODEL) only — OpenRouter
+  // free models are never used. OpenRouter mode: all free models as a pool.
+  let models: string[];
+  if (cfg.cmdApiKey) {
+    models = [cfg.cmdModel || "deepseek/deepseek-v4-flash"];
+  } else {
+    models = await listFreeOpenRouterModelIds().catch(() => [] as string[]);
+    if (!models.length) {
+      const fallback = cfg.llmModel;
+      models = fallback ? [fallback] : [];
+    }
   }
   if (!models.length) {
-    throw new Error("No free OpenRouter models available.");
+    throw new Error("No LLM models available.");
   }
 
   const used = new Set<string>();
@@ -332,6 +340,8 @@ export async function scoreJobsParallel(
 /** How many jobs one parallel wave can cover. */
 export async function parallelWaveCapacity(): Promise<number> {
   try {
+    const cfg = getConfig();
+    if (cfg.cmdApiKey) return SCORE_JOBS_PER_MODEL; // single CMD model
     const models = await listFreeOpenRouterModelIds();
     const n = models.length || 1;
     return n * SCORE_JOBS_PER_MODEL;
