@@ -55,8 +55,8 @@
 - Per-file progress: `Queued → Extracting → Parsing → Done (+N new)`.
 - Files over 50MB are flagged and skipped.
 
-### 🧠 LLM extraction (Command Code provider — DeepSeek V4 Flash)
-- **Primary LLM path**: when `CMD_API_KEY` is set, all LLM calls (extraction, scoring, chat, enrichment) route through the **Command Code provider API** (`https://api.commandcode.ai/provider/v1`) with `CMD_MODEL` (default `deepseek/deepseek-v4-flash`). OpenRouter free models are **not** used — they're flaky and 429-prone.
+### 🧠 LLM extraction (Command Code provider — DeepSeek V4 Flash Fast)
+- **Primary LLM path**: when `CMD_API_KEY` is set, all LLM calls (extraction, scoring, chat, enrichment) route through the **Command Code provider API** (`https://api.commandcode.ai/provider/v1`) with `CMD_MODEL` (default `deepseek/deepseek-v4-flash-fast` — the low-latency variant, ~4× faster extraction than standard flash). OpenRouter free models are **not** used — they're flaky and 429-prone.
 - Extraction runs chunks in parallel across the model; large documents are split into overlapping chunks so output never exceeds the model's token limit.
 - Results are deduplicated (by title + email + company) against existing rows.
 - Strict-JSON prompting with fallback-safe parsing (handles markdown fences / prose around JSON).
@@ -262,7 +262,7 @@ docker run -d --name jobdetails-postgres \
 cp .env.example .env
 #    DATABASE_URL        — postgresql://postgres:postgres@localhost:5432/jobdetails?schema=public
 #    CMD_API_KEY         — Command Code key (user_... from ~/.commandcode/auth.json) — primary path
-#    CMD_MODEL           — deepseek/deepseek-v4-flash (default)
+#    CMD_MODEL           — deepseek/deepseek-v4-flash-fast (default)
 #    OPENROUTER_API_KEY  — OpenRouter key, only if NOT using CMD mode (https://openrouter.ai/keys)
 #    ADMIN_USERNAME      — admin login for the Upload page
 #    ADMIN_PASSWORD      — admin password for the Upload page
@@ -294,7 +294,7 @@ npm run dev
 | -------------------- | -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `DATABASE_URL`       | ✅       | PostgreSQL connection string (used by Prisma CLI **and** runtime)            | `postgresql://user:pass@host:5432/jobdetails?schema=public`  |
 | `CMD_API_KEY`        | ❌       | Command Code provider key (`user_...` from `~/.commandcode/auth.json`). When set, **all** LLM calls route via Command Code (primary path) | `user_…`                                    |
-| `CMD_MODEL`          | ❌       | Command Code model for all LLM calls (default `deepseek/deepseek-v4-flash`) | `deepseek/deepseek-v4-flash`                                  |
+| `CMD_MODEL`          | ❌       | Command Code model for all LLM calls (default `deepseek/deepseek-v4-flash-fast`, low-latency variant) | `deepseek/deepseek-v4-flash-fast`                  |
 | `CMD_SCORE_CONCURRENCY` | ❌    | Parallel DeepSeek workers for Match-by-Resume scoring (default `8`)         | `8`                                                           |
 | `CMD_BASE_URL`       | ❌       | Command Code provider base URL                                             | `https://api.commandcode.ai/provider/v1`                      |
 | `OPENROUTER_API_KEY` | ❌       | OpenRouter API key — used only when `CMD_API_KEY` is not set               | `sk-or-v1-…`                                                  |
@@ -308,7 +308,7 @@ npm run dev
 | `NEXT_PUBLIC_MAX_FILE_SIZE_MB` | ❌ | Max upload size per file shown on the Upload page                          | `50`                                                          |
 | `TELEGRAM_BOT_TOKEN` | ❌       | Telegram bot token for chat-widget forwarding to the owner                   | `8887227521:AA…`                                              |
 | `TELEGRAM_CHAT_ID`   | ❌       | Owner's Telegram chat id for forwarded messages                              | `1622727099`                                                  |
-| `CHATBOT_MODEL`      | ❌       | Optional model for chat auto-answers (falls back to `OPENROUTER_MODEL` / `CMD_MODEL`) | `deepseek/deepseek-v4-flash`                    |
+| `CHATBOT_MODEL`      | ❌       | Optional model for chat auto-answers (falls back to `OPENROUTER_MODEL` / `CMD_MODEL`) | `deepseek/deepseek-v4-flash-fast`                |
 | `SMTP_HOST`          | ❌       | SMTP server for welcome/reset emails (default `smtp.gmail.com`)              | `smtp.gmail.com`                                              |
 | `SMTP_PORT`          | ❌       | SMTP port (default `587`)                                                   | `587`                                                         |
 | `SMTP_USER`          | ❌       | SMTP account (e.g. Gmail address)                                           | `qajobs.portal@gmail.com`                                     |
@@ -364,7 +364,7 @@ npx prisma db push
 - Add **Environment Variables** (Project → Settings → Environment Variables):
   - `DATABASE_URL` — the Neon connection string
   - `CMD_API_KEY` — Command Code provider key (`user_...` from `~/.commandcode/auth.json`) — **primary LLM path**
-  - `CMD_MODEL` — `deepseek/deepseek-v4-flash`
+  - `CMD_MODEL` — `deepseek/deepseek-v4-flash-fast`
   - `OPENROUTER_API_KEY` — your OpenRouter key (only if not using CMD mode)
   - `OPENROUTER_MODEL` — default `nvidia/nemotron-nano-9b-v2:free` (OpenRouter mode)
   - `GENERIC_EMAIL_DOMAINS` — the comma-separated personal-domain list

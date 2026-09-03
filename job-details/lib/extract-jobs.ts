@@ -83,7 +83,11 @@ async function buildModelPool(preferredModel: string, log: Logger): Promise<stri
   // OpenRouter free LLMs are not used anymore.
   const cfg = getConfig();
   if (cfg.cmdApiKey) {
-    const model = cfg.cmdModel || "deepseek/deepseek-v4-flash";
+    const model = cfg.cmdModel; // from CMD_MODEL env
+    if (!model) {
+      log.error("extract", "CMD mode — CMD_MODEL not set in environment", "aborting");
+      return [];
+    }
     log.info("extract", "CMD mode — using Command Code model", model);
     return [model];
   }

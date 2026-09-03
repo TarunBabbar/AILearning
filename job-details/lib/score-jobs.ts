@@ -211,7 +211,10 @@ export async function scoreJobsParallel(
   let models: string[];
   let workerCount: number;
   if (cfg.cmdApiKey) {
-    models = [cfg.cmdModel || "deepseek/deepseek-v4-flash"];
+    models = cfg.cmdModel ? [cfg.cmdModel] : []; // from CMD_MODEL env
+    if (!models.length) {
+      throw new Error("CMD mode — CMD_MODEL not set in environment.");
+    }
     // Parallelize CMD mode: N workers hit DeepSeek Flash concurrently (like
     // extraction's parallel chunks) instead of one sequential call at a time.
     workerCount = Number(process.env.CMD_SCORE_CONCURRENCY) || 8;
