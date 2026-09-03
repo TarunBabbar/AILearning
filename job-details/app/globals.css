@@ -89,3 +89,73 @@ body {
   position: absolute;
   animation: loadingbar 1.1s ease-in-out infinite;
 }
+
+/* Skeleton shimmer sweep — subtle moving highlight instead of flat pulse */
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #ece9e0 25%,
+    #f7f5ef 37%,
+    #ece9e0 63%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Animated ellipsis dots for loading titles */
+@keyframes dotPulse {
+  0%,
+  20% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  60%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+}
+.animate-dot {
+  display: inline-block;
+  animation: dotPulse 1.4s ease-in-out infinite;
+}
+.animate-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.animate-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Pulsing halo ring behind the loading icon */
+@keyframes haloPulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.animate-halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: haloPulse 1.8s ease-out infinite;
+}

@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Mail, Search, Copy, Check, X, Building2, LogIn } from "lucide-react";
+import { Mail, Search, Copy, Check, X, Building2, LogIn, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TableSkeleton } from "@/components/Skeleton";
+import LoadingState from "@/components/LoadingState";
 import { avatarColor, initials } from "@/components/JobCard";
 import ListPagination from "@/components/ListPagination";
 import ShowingRange from "@/components/ShowingRange";
@@ -66,8 +67,9 @@ export default function ContactsPage() {
     return `/api/contacts?${params.toString()}`;
   }, [debounced, page, loggedIn]);
 
-  const { data, error: swrError, isLoading } = useListSWR<Response>(contactsKey);
+  const { data, error: swrError, isLoading, isValidating } = useListSWR<Response>(contactsKey);
   const loading = isLoading && !data;
+  const refreshing = isValidating && !!data && !loading;
   const error = swrError
     ? swrError instanceof Error
       ? swrError.message
@@ -152,6 +154,12 @@ export default function ContactsPage() {
                 <Mail size={11} />
                 {(data?.totalEmails ?? 0).toLocaleString()} emails
               </span>
+              {refreshing && (
+                <span className="fade-up inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-1 font-medium text-claude-muted shadow-sm">
+                  <Loader2 size={11} className="animate-spin text-claude-accent" />
+                  Updating…
+                </span>
+              )}
             </div>
           </div>
 
@@ -180,7 +188,9 @@ export default function ContactsPage() {
       }
     >
       {loading ? (
-        <TableSkeleton />
+        <LoadingState title="AI is loading recruiter contacts" hint="Fetching companies and emails">
+          <TableSkeleton />
+        </LoadingState>
       ) : error ? (
         <p className="py-6 text-center text-sm text-claude-muted">{error}</p>
       ) : !data || data.contacts.length === 0 ? (

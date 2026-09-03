@@ -29,7 +29,7 @@ function isFresh(key: string): boolean {
 export function useListSWR<T>(key: string | null) {
   const fresh = key ? isFresh(key) : false;
 
-  return useSWR<T>(key, swrFetcher, {
+  const swr = useSWR<T>(key, swrFetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
     revalidateIfStale: !fresh,
@@ -40,6 +40,8 @@ export function useListSWR<T>(key: string | null) {
       if (key) markFetched(key);
     },
   });
+
+  return swr; // exposes data / error / isLoading / isValidating
 }
 
 /** Clear list caches after upload / delete so next visit refetches. */

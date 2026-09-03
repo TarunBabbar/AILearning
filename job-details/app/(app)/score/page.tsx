@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton, JobGridSkeleton } from "@/components/Skeleton";
+import LoadingState from "@/components/LoadingState";
 import JobCard from "@/components/JobCard";
 import JobFilters, { type JobFilterValue } from "@/components/JobFilters";
 import JobDetailModal from "@/components/JobDetailModal";
@@ -966,7 +967,9 @@ export default function ScoreJobsPage() {
 
       {/* Results — shared card grid with score badges */}
       {matchesLoading ? (
-        <JobGridSkeleton />
+        <LoadingState title="AI is loading your matches" hint="Fetching your latest scored jobs">
+          <JobGridSkeleton />
+        </LoadingState>
       ) : matches.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-claude-border bg-white px-4 py-12 text-center shadow-sm">
           <Briefcase size={18} className="mb-2 text-claude-accent" />

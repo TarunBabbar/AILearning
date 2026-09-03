@@ -2,14 +2,7 @@ import { cn } from "@/lib/utils";
 
 /** Base shimmering placeholder block. */
 export function Skeleton({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "animate-pulse rounded-md bg-claude-bg",
-        className
-      )}
-    />
-  );
+  return <div className={cn("skeleton-shimmer rounded-md", className)} />;
 }
 
 /** Skeleton grid of job cards (QA Jobs page). */

@@ -8,8 +8,10 @@ import {
   Sparkles,
   Inbox,
   Database,
+  Loader2,
 } from "lucide-react";
 import { JobGridSkeleton } from "@/components/Skeleton";
+import LoadingState from "@/components/LoadingState";
 import JobCard from "@/components/JobCard";
 import JobFilters, { type JobFilterValue } from "@/components/JobFilters";
 import JobDetailModal from "@/components/JobDetailModal";
@@ -61,8 +63,11 @@ export default function Dashboard() {
     return `/api/jobs?${params.toString()}`;
   }, [search, company, location, sort, today, page]);
 
-  const { data, error: swrError, isLoading } = useListSWR<JobsResponse>(jobsKey);
+  const { data, error: swrError, isLoading, isValidating } = useListSWR<JobsResponse>(jobsKey);
   const loading = isLoading && !data;
+  // Data already on screen but a background refresh is running — show a
+  // subtle "updating" note so slow revalidations don't look frozen.
+  const refreshing = isValidating && !!data && !loading;
   const error = swrError
     ? swrError instanceof Error
       ? swrError.message
@@ -150,6 +155,12 @@ export default function Dashboard() {
                   {data.todayCount.toLocaleString()} new jobs today
                 </span>
               )}
+              {refreshing && (
+                <span className="fade-up inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-1 font-medium text-claude-muted shadow-sm">
+                  <Loader2 size={11} className="animate-spin text-claude-accent" />
+                  Updating…
+                </span>
+              )}
             </div>
           </div>
 
@@ -174,7 +185,9 @@ export default function Dashboard() {
 
       {/* Jobs grid */}
       {loading ? (
-        <JobGridSkeleton />
+        <LoadingState title="AI is finding your jobs" hint="Scanning the latest openings">
+          <JobGridSkeleton />
+        </LoadingState>
       ) : error ? (
         <div className="rounded-xl border border-claude-border bg-white p-8 text-center text-sm text-claude-muted shadow-sm">
           {error}
