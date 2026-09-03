@@ -75,3 +75,17 @@ body {
 .fade-up {
   animation: fadeUp 0.25s ease-out both;
 }
+
+/* Global top loading bar — indeterminate sliding segment */
+@keyframes loadingbar {
+  0% {
+    left: -35%;
+  }
+  100% {
+    left: 110%;
+  }
+}
+.animate-loadingbar {
+  position: absolute;
+  animation: loadingbar 1.1s ease-in-out infinite;
+}

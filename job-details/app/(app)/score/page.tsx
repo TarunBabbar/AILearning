@@ -133,6 +133,7 @@ export default function ScoreJobsPage() {
       company?: string;
       location?: string;
       today?: boolean;
+      days?: number;
       sort?: "newest" | "score" | "company" | "location";
       order?: "asc" | "desc";
       page?: number;
@@ -147,6 +148,7 @@ export default function ScoreJobsPage() {
         const company = overrides?.company ?? companyFilter;
         const location = overrides?.location ?? locationFilter;
         const today = overrides?.today ?? todayOnly;
+        const windowDays = overrides?.days ?? days;
         const sort = overrides?.sort ?? sortBy;
         const order = overrides?.order ?? sortOrder;
         const pageNo = overrides?.page ?? page;
@@ -156,6 +158,7 @@ export default function ScoreJobsPage() {
         if (company.trim()) params.set("company", company.trim());
         if (location.trim()) params.set("location", location.trim());
         if (today) params.set("today", "1");
+        if (windowDays > 0) params.set("days", String(windowDays));
         params.set("sort", sort);
         params.set("order", order);
         params.set("page", String(pageNo));
@@ -207,6 +210,7 @@ export default function ScoreJobsPage() {
       companyFilter,
       locationFilter,
       todayOnly,
+      days,
       sortBy,
       sortOrder,
       page,
@@ -709,7 +713,9 @@ export default function ScoreJobsPage() {
                   type="button"
                   onClick={() => {
                     setDays(7);
+                    setPage(1);
                     loadStats("", 7);
+                    loadMatches({ days: 7, page: 1 });
                   }}
                   className={cn(
                     "rounded px-1.5 text-[11px] font-medium",
@@ -724,7 +730,9 @@ export default function ScoreJobsPage() {
                   type="button"
                   onClick={() => {
                     setDays(0);
+                    setPage(1);
                     loadStats("", 0);
+                    loadMatches({ days: 0, page: 1 });
                   }}
                   className={cn(
                     "rounded px-1.5 text-[11px] font-medium",

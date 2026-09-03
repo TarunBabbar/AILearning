@@ -260,8 +260,14 @@ export async function GET(req: Request) {
 
     const [totalMatching, scoredRows, capacity] = await Promise.all([
       prisma.job.count({ where }),
+      // Scope scored rows to the same job set as `totalMatching` — otherwise
+      // old scores (outside the days window) inflate the scored count and
+      // `unscored` undercounts recent jobs (Score button wrongly disabled).
       prisma.jobScore.findMany({
-        where: { userId, job: nonGenericEmailWhere() },
+        where: {
+          userId,
+          job: { AND: [nonGenericEmailWhere(), where] },
+        },
         select: { jobId: true },
       }),
       parallelWaveCapacity(),
