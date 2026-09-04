@@ -167,9 +167,16 @@ export async function extractJobsFromText(
   if (!firstModel) return [];
   const startOffset = Math.floor(Math.random() * modelPool.length);
 
-  // ── Parallel extraction: one LLM call per chunk, all fired at once ──
-  const results = await Promise.all(
-    chunks.map(async (chunkText, i) => {
+  // ── Parallel extraction, bounded concurrency ──
+  // Firing every chunk at once against a rate-limited provider slams it with
+  // a burst of requests → aggregate 429s. Cap how many chunks hit the model
+  // simultaneously (3 is fast but gentle); the retry/jitter layer then
+  // handles any residual rate limits. Tune via env if needed.
+  const MAX_PARALLEL = Number(process.env.EXTRACT_CONCURRENCY) || 3;
+  const results = await mapWithConcurrency(
+    chunks,
+    MAX_PARALLEL,
+    async (chunkText, i) => {
       const chunkNum = i + 1;
       const prompt = buildExtractionPrompt(chunkText);
       const tried = new Set<string>();
@@ -197,10 +204,11 @@ export async function extractJobsFromText(
             apiKey,
             // 24k output budget: DeepSeek Flash writes verbose JSON (full job
             // descriptions) and 8192 tokens gets exhausted under parallel
-            // chunks → finish_reason "length" with EMPTY content. Also keep a
-            // short retry budget so a flaky model fails fast and the chunk
-            // switches provider instead of burning the function budget.
-            { model, maxTokens: 24000, maxRetries: 2, maxRetryDelayMs: 20_000 },
+            // chunks → finish_reason "length" with EMPTY content.
+            // Longer retry budget for 429s: provider rate-limits are transient
+            // and jittered backoff (added in callOpenRouter) desyncs the
+            // parallel chunks so they don't re-hammer upstream in lockstep.
+            { model, maxTokens: 24000, maxRetries: 5, maxRetryDelayMs: 60_000 },
             log
           );
         } catch (e) {
@@ -285,7 +293,7 @@ export async function extractJobsFromText(
         }
       }
       return [] as ExtractedJob[];
-    })
+    }
   );
 
   const allJobs = results.flat();
@@ -319,6 +327,31 @@ export async function extractJobsFromText(
   });
 
   return unique;
+}
+
+/**
+ * Run an async map over `items` with at most `limit` promises in flight at
+ * once. Preserves input order (result[i] corresponds to items[i]).
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) break;
+      results[i] = await fn(items[i], i);
+    }
+  }
+
+  const n = Math.min(limit, items.length);
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return results;
 }
 
 // Small local helper to keep this file free of extra imports

@@ -144,12 +144,11 @@ async function scoreChunkWithModel(
       model,
       maxTokens: 4096,
       temperature: 0.2,
-      // Short retry budget: one retry rides out a transient 429/5xx, then
-      // fails fast so a flaky free model can't pin a worker for minutes
-      // (maxRetries: 2 = attempt 1 + one retry).
-      timeoutMs: 60_000,
-      maxRetries: 2,
-      maxRetryDelayMs: 15_000,
+      // Retry budget sized for 429s: provider rate-limits are transient.
+      // Jittered backoff in callOpenRouter desyncs parallel chunk workers.
+      timeoutMs: 90_000,
+      maxRetries: 5,
+      maxRetryDelayMs: 60_000,
     }
   );
   const results = parseScores(content, batch);

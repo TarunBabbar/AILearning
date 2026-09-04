@@ -44,16 +44,21 @@ function retryDelayMs(
 ): number {
   // Respect the provider's Retry-After header when present (OpenRouter
   // returns it for 429s so clients don't hammer the shared free pool).
+  let base: number;
   if (retryAfterMs != null) {
-    return Math.min(maxDelayMs, Math.max(0, retryAfterMs));
+    base = Math.min(maxDelayMs, Math.max(0, retryAfterMs));
+  } else if (status === 429) {
+    // Rate limits need much longer waits. 10s, 20s, 40s…
+    base = Math.min(maxDelayMs, 10_000 * Math.pow(2, attempt - 1));
+  } else {
+    // 1.5s, 3s, 6s, 12s — exponential backoff, capped at maxDelayMs
+    base = Math.min(maxDelayMs, BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1));
   }
-  // Rate limits need much longer waits (free shared pools).
-  if (status === 429) {
-    // 10s, 20s, 40s, 60s… capped at maxDelayMs
-    return Math.min(maxDelayMs, 10_000 * Math.pow(2, attempt - 1));
-  }
-  // 1.5s, 3s, 6s, 12s — exponential backoff, capped at maxDelayMs
-  return Math.min(maxDelayMs, BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1));
+
+  // Add up to ±25% jitter so N parallel chunks don't all retry at the same
+  // instant and re-hammer the provider in lockstep after a 429.
+  const jitter = 0.75 + Math.random() * 0.5; // 0.75 → 1.25
+  return Math.round(base * jitter);
 }
 
 function isRetryableStatus(status: number): boolean {
