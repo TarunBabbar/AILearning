@@ -54,7 +54,7 @@ export function getConfig() {
     // Vercel (plain HTTP), unlike the cmdc CLI which needs a local install.
     commandCodeApiKey: env("COMMAND_CODE_API_KEY"),
     commandCodeApiUrl: env("COMMAND_CODE_API_URL", "https://api.commandcode.ai/provider/v1"),
-    commandCodeModel: env("COMMAND_CODE_MODEL", "deepseek/deepseek-v4-flash"),
+    commandCodeModel: env("COMMAND_CODE_MODEL", "deepseek/deepseek-v4-flash-fast"),
     // Legacy: local cmdc CLI path. Empty by default — the CLI is only used
     // when explicitly configured (the Provider API is the preferred path).
     commandCodePath: env("COMMAND_CODE_PATH"),

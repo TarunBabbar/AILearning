@@ -20,16 +20,21 @@ export type TestRunSnapshot = {
 
 export function TestRunReport({ run, evaluation }: { run: TestRunSnapshot | null; evaluation?: Evaluation | null }) {
   if (!run) return null;
-  const notRun = run.attempts === 0;
+  const disabled = /disabled/i.test(run.message || "");
+  const notRun = run.attempts === 0 && !disabled;
 
   return (
     <Card className="p-6">
       <div className="flex items-center gap-2 mb-3">
-        <Container size={16} className={notRun ? "text-text-muted" : "text-amber-600"} />
+        <Container size={16} className={notRun || disabled ? "text-text-muted" : "text-amber-600"} />
         <h3 className="font-semibold text-text-primary">Test execution</h3>
         {run.ok ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 ml-auto">
             <CheckCircle2 size={13} /> Passed
+          </span>
+        ) : disabled ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-text-muted ml-auto uppercase">
+            <XCircle size={13} /> Disabled
           </span>
         ) : notRun ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 ml-auto">
@@ -41,6 +46,22 @@ export function TestRunReport({ run, evaluation }: { run: TestRunSnapshot | null
           </span>
         )}
       </div>
+
+      {disabled && (
+        <div className="mb-4 rounded-lg border border-border bg-bg-page px-4 py-3">
+          <p className="text-sm text-text-primary">
+            <span className="font-bold text-text-primary">Automatic test execution is disabled.</span>
+          </p>
+          <p className="mt-1 text-xs text-text-secondary leading-relaxed">
+            The pipeline generates the Playwright + TypeScript automation suite only. To run the tests, download or
+            copy the generated code and execute it on a machine with Docker (or Node + Playwright installed):
+          </p>
+          <pre className="mt-2 rounded-md bg-bg-code px-3 py-2 text-[11px] text-[#e8e0d1] font-mono overflow-x-auto">
+            npx playwright test --project=chromium
+          </pre>
+          <p className="mt-2 text-xs text-text-muted">{run.message}</p>
+        </div>
+      )}
 
       {notRun && (
         <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
@@ -73,7 +94,7 @@ export function TestRunReport({ run, evaluation }: { run: TestRunSnapshot | null
         </div>
       )}
 
-      {run.message && !notRun && <p className="text-sm text-text-secondary mb-4">{run.message}</p>}
+      {run.message && !notRun && !disabled && <p className="text-sm text-text-secondary mb-4">{run.message}</p>}
 
       <div className="grid grid-cols-4 gap-2 text-center">
         <Metric label="Passed" value={run.passed} tone="text-emerald-700" />

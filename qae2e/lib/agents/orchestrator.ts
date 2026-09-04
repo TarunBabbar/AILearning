@@ -4,7 +4,7 @@
 import { runAgent } from "./runner";
 import { insertOne, listAll, withWorkspace, currentWorkspace } from "../store";
 import { isRunnableAutomation } from "../exec/script-quality";
-import type { AgentEvent, Analysis, Coverage, Cycle, Defect, Evaluation, ExecutionStatus, ReleaseReport, Requirement, Script } from "../types";
+import type { AgentEvent, Analysis, Coverage, Cycle, Defect, Evaluation, ReleaseReport, Requirement, Script } from "../types";
 import type { RunRecord } from "../runs/store";
 
 export interface OrchestrationResult {
@@ -120,7 +120,6 @@ async function orchestrateInner(
   let createdCycleId: string | undefined;
   let testResults: string | undefined;
   let lastTestRun: RunRecord["testRun"];
-  let runStuck = false;
 
   try {
     for (let i = opts.startFrom ?? 0; i < chain.length; i++) {
@@ -369,184 +368,43 @@ Do NOT call script_save. Do not return prose only.`,
         }
 
         if (script && script.files.length) {
-          // Docker readiness gate: if no Docker (and no remote runner) is
-          // available, pause and ask the user to start Docker, auto-detecting
-          // it and continuing. Marks the run STUCK after 15 minutes.
-          const { waitForDockerExecutor } = await import("../exec/docker-gate");
-          const gate = await waitForDockerExecutor(
-            (l) => emit({ type: "status", agentId: "pipeline", message: l }),
-            () => Boolean(opts.signal?.aborted)
-          );
-          if (gate === "aborted") break;
-          if (gate === "skipped") {
-            // No Docker and no remote runner in this environment (e.g. Vercel):
-            // report that tests were not run and continue the chain so EX/DO/IQ
-            // still produce their (no-evidence) outputs.
-            emit({
-              type: "status",
-              agentId: "pipeline",
-              message: "No test executor available (Docker not installed / no remote runner) — tests were not run.",
-            });
-            testResults = "No real test execution was available — tests were not run.";
-            emit({
-              type: "test_run",
-              agentId: "pipeline",
-              ok: false,
-              passed: 0,
-              failed: 0,
-              skipped: 0,
-              total: 0,
-              attempts: 0,
-              message: "No test executor available (Docker not installed / no remote runner) — tests were not run.",
-            });
-            // Skip straight to the next agent.
-          } else if (gate === "stuck") {
-            runStuck = true;
-            emit({
-              type: "status",
-              agentId: "pipeline",
-              message:
-                "Pipeline is STUCK — the test run could not proceed because Docker was not started within 15 minutes. " +
-                "Start Docker and use 'Resume pipeline from a stage' to continue.",
-            });
-            emit({ type: "error", agentId: "pipeline", message: "Run stuck: Docker not started within 15 minutes." });
-            break;
-          }
-
-          emit({ type: "status", agentId: "pipeline", message: "Running generated tests (auto-fix on failure)…" });
-          try {
-            const { runTestsWithAutofix } = await import("../exec/autofix");
-            const res = await runTestsWithAutofix(script, {
-              emitLog: (l) => emit({ type: "status", agentId: "pipeline", message: l }),
-            });
-            lastTestRun = {
-              ok: res.ok,
-              passed: res.summary.passed,
-              failed: res.summary.failed,
-              skipped: res.summary.skipped,
-              total: res.summary.total,
-              attempts: res.attempts,
-              failures: res.failures,
-              logs: res.logs,
-              results: res.results?.map((r) => ({ test: r.test, status: r.status, durationMs: r.durationMs })) || undefined,
-            };
-            const s = res.summary;
-            testResults = `Passed: ${s.passed}, Failed: ${s.failed}, Skipped: ${s.skipped}, Total: ${s.total} (after ${res.attempts} run attempt(s))`;
-            emit({
-              type: "test_run",
-              agentId: "pipeline",
-              ok: res.ok,
-              passed: s.passed,
-              failed: s.failed,
-              skipped: s.skipped,
-              total: s.total,
-              attempts: res.attempts,
-              failures: res.failures.slice(0, 10),
-              logs: res.logs.slice(-40),
-              results: res.results?.slice(0, 200).map((r) => ({ test: r.test, status: r.status, durationMs: r.durationMs })),
-              message: res.ok
-                ? `Tests passed (${s.passed}/${s.total}) after ${res.attempts} attempt(s).`
-                : res.attempts === 0
-                  ? res.logs[0] || "Docker run did not start."
-                  : `Tests still failing (${s.failed} failed) after ${res.attempts} attempts.`,
-            });
-            emit({
-              type: "status",
-              agentId: "pipeline",
-              message: res.ok
-                ? `Tests passed (${s.passed}/${s.total}) after ${res.attempts} attempt(s).`
-                : res.attempts === 0
-                  ? res.logs[0] || "Docker run did not start — skipping result recording."
-                  : `Tests still failing (${s.failed} failed) after ${res.attempts} attempts.`,
-            });
-
-            // Persist a cycle whenever Docker actually attempted a run (pass or fail).
-            if (res.attempts > 0) {
-              const executions: Cycle["executions"] = [];
-              // Prefer per-test detail from the Playwright JSON results so the
-              // cycle (and the AI Evaluation of the execute stage) reflects
-              // every real test instead of one aggregate "Passed (15)" row.
-              if (res.results?.length) {
-                for (const r of res.results) {
-                  const norm = (r.status === "timedOut" || r.status === "interrupted" ? "failed" : r.status) as ExecutionStatus;
-                  executions.push({
-                    id: crypto.randomUUID(),
-                    caseId: crypto.randomUUID(),
-                    caseTitle: r.test,
-                    status: norm,
-                    evidence: `Playwright JSON reporter — ${r.status}${r.durationMs ? ` (${r.durationMs}ms)` : ""}`,
-                    executedBy: "autofix-runner",
-                    executedAt: new Date().toISOString(),
-                  });
-                }
-              }
-              if (!executions.length) {
-                if (s.passed > 0) {
-                  executions.push({
-                    id: crypto.randomUUID(),
-                    caseId: "suite-passed",
-                    caseTitle: `Passed (${s.passed})`,
-                    status: "passed",
-                    evidence: "Docker autofix run",
-                    executedBy: "autofix-runner",
-                    executedAt: new Date().toISOString(),
-                  });
-                }
-                if (s.failed > 0) {
-                  executions.push({
-                    id: crypto.randomUUID(),
-                    caseId: "suite-failed",
-                    caseTitle: `Failed (${s.failed})`,
-                    status: "failed",
-                    evidence: res.failures.map((f) => f.test + ": " + f.message.slice(0, 80)).join("\n"),
-                    executedBy: "autofix-runner",
-                    executedAt: new Date().toISOString(),
-                  });
-                }
-                if (s.skipped > 0) {
-                  executions.push({
-                    id: crypto.randomUUID(),
-                    caseId: "suite-skipped",
-                    caseTitle: `Skipped (${s.skipped})`,
-                    status: "skipped",
-                    evidence: "",
-                    executedBy: "autofix-runner",
-                    executedAt: new Date().toISOString(),
-                  });
-                }
-                if (executions.length === 0) {
-                  executions.push({
-                    id: crypto.randomUUID(),
-                    caseId: "suite-empty",
-                    caseTitle: "Suite completed with no parsed Playwright results",
-                    status: res.ok ? "passed" : "failed",
-                    evidence: res.logs.slice(-5).join("\n"),
-                    executedBy: "autofix-runner",
-                    executedAt: new Date().toISOString(),
-                  });
-                }
-              }
-              const cycle: Cycle = {
-                id: crypto.randomUUID(),
-                requirementId,
-                name: "Automated Docker run (autofix)",
-                status: "completed",
-                executions,
-                createdAt: new Date().toISOString(),
-              };
-              await insertOne("cycles", cycle);
-              createdCycleId = cycle.id;
-              emit({ type: "artifact", agentId: "pipeline", artifact: "cycle", id: cycle.id });
-            }
-          } catch (err) {
-            emit({ type: "error", agentId: "pipeline", message: `Autofix run failed: ${err instanceof Error ? err.message : String(err)}` });
-          }
+          // Automatic Docker test execution is DISABLED.
+          //
+          // The pipeline generates the automation code (Playwright + TypeScript
+          // POM) and hands it to the user to run on their own machine. We do not
+          // run tests inside the pipeline anymore — the Docker runner code
+          // (lib/exec/*, autofix, docker-gate) is kept intact but is not invoked
+          // here. This keeps the pipeline fast, avoids the serverless no-Docker
+          // timeout problem, and gives the user the generated suite to execute.
+          emit({
+            type: "status",
+            agentId: "pipeline",
+            message:
+              "Test run is disabled — the pipeline generates the automation code only. " +
+              "Download / copy the generated Playwright suite and run it on a machine with Docker (npx playwright test --project=chromium).",
+          });
+          testResults = "No automatic test run — test execution is disabled. Run the generated suite on your own machine.";
+          emit({
+            type: "test_run",
+            agentId: "pipeline",
+            ok: false,
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+            total: 0,
+            attempts: 0,
+            message:
+              "Test run disabled — automation generated. Run the Playwright suite locally: npx playwright test --project=chromium.",
+          });
+          // NOTE: EX/DO receive testResults = "No automatic test run..." so they
+          // report honestly that no real execution happened, and the execute-stage
+          // AI evaluation scores against that. The chain continues normally.
         } else {
           emit({
             type: "error",
             agentId: "pipeline",
             message:
-              "No generated scripts found after AS (+ retry) — skipping Docker. Check that coverage_get + automation_framework_generate succeeded.",
+              "No generated scripts found after AS (+ retry). Check that coverage_get + automation_framework_generate succeeded.",
           });
           break;
         }
@@ -567,7 +425,7 @@ Do NOT call script_save. Do not return prose only.`,
   }
 
   // Persist the run (events, generated code, test results) for later reference.
-  await saveRunRecord(requirementId, allEvents, opts, createdCycleId, lastTestRun, runStuck);
+  await saveRunRecord(requirementId, allEvents, opts, createdCycleId, lastTestRun);
 
   return { requirementId, events: allEvents };
 }
@@ -674,8 +532,7 @@ async function saveRunRecord(
   events: AgentEvent[],
   opts: OrchestrationOptions,
   cycleId?: string,
-  testRun?: RunRecord["testRun"],
-  stuck = false
+  testRun?: RunRecord["testRun"]
 ): Promise<void> {
   try {
     const runs = await import("../runs/store");
@@ -730,7 +587,7 @@ async function saveRunRecord(
       source: req?.source || "manual",
       startedAt: new Date().toISOString(),
       finishedAt: new Date().toISOString(),
-      status: stuck ? "stuck" : sawError ? "failed" : defects.length > 0 ? "partial" : "success",
+      status: sawError ? "failed" : defects.length > 0 ? "partial" : "success",
       agents,
       counts: {
         analyses: analyses.filter((a) => a.requirementId === requirementId).length,

@@ -13,7 +13,7 @@ import { TestRunReport, type TestRunSnapshot } from "@/components/workspace/Test
 import { ReleaseGauge } from "@/components/workspace/ReleaseGauge";
 import { TraceabilityRail } from "@/components/workspace/TraceabilityRail";
 import { McpConnectionsCard } from "@/components/workspace/McpConnectionsCard";
-import { PipelineTrace } from "@/components/workspace/PipelineTrace";
+import { TrainPipeline } from "@/components/workspace/TrainPipeline";
 import { PipelineSummary } from "@/components/workspace/PipelineSummary";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -729,8 +729,8 @@ export function WorkspacePageInner() {
               </Card>
             )}
 
-            {/* Live pipeline trace — every stage, tool, artifact, and DeepEval score */}
-            <PipelineTrace events={events} evaluations={evaluations} running={running} evaluating={evaluating} />
+            {/* Agent pipeline train — stations + click-to-expand agent outputs */}
+            <TrainPipeline events={events} evaluations={evaluations} running={running} evaluating={evaluating} />
 
             {/* Run summary — shown after a run completes */}
             {!running && events.length > 0 && <PipelineSummary events={events} />}
