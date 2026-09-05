@@ -10,6 +10,9 @@ import type { RunRecord } from "../runs/store";
 export interface OrchestrationResult {
   requirementId: string;
   events: AgentEvent[];
+  /** Stable id for this orchestration — checkpoints + final save share it so a
+   *  mid-run "partial" record is overwritten by the final one on completion. */
+  runId: string;
 }
 
 export interface OrchestrationOptions {
@@ -19,6 +22,12 @@ export interface OrchestrationOptions {
   content?: string; // requirement text (persisted before the chain starts)
   // Start the chain from this agent index (for step-by-step / resume).
   startFrom?: number;
+  // When resuming a paused run, the SAME runId keeps checkpoints + the final
+  // record under one history entry (the resume merges the prior half's events).
+  runId?: string;
+  // Real Docker test results injected on resume so EX/DO record actual
+  // executions instead of honestly reporting "not executed".
+  testResults?: string;
   // Workspace the run belongs to. When set, the whole chain runs inside
   // withWorkspace() so every tool/store call is scoped to it.
   workspaceId?: string;
@@ -87,6 +96,20 @@ async function orchestrateInner(
   };
 
   const allEvents: AgentEvent[] = [];
+  // Reuse the runId passed on resume so checkpoints + the final save land on
+  // the SAME history entry as the pre-pause half. Fresh run otherwise.
+  const runId = opts.runId || crypto.randomUUID();
+  // On resume, seed the event log with the paused run's prior events so the
+  // final record shows one continuous timeline (not just the EX→IQ half).
+  if (opts.runId && opts.startFrom) {
+    try {
+      const runs = await import("../runs/store");
+      const prior = await runs.getRun(opts.runId, currentWorkspace()).catch(() => null);
+      if (prior?.events?.length) allEvents.push(...(prior.events as AgentEvent[]));
+    } catch {
+      // best effort — a fresh event log is acceptable
+    }
+  }
   const chain: Array<{ id: Parameters<typeof runAgent>[0]["agentId"]; prompt: string }> = [
     {
       id: "requirement-intelligence",
@@ -118,7 +141,11 @@ async function orchestrateInner(
   ];
 
   let createdCycleId: string | undefined;
-  let testResults: string | undefined;
+  // True when the chain paused at the AS→EX boundary awaiting a Docker run
+  // decision. The paused half is saved as "partial" (resumable), not failed.
+  let pausedForTestRun = false;
+  // Real Docker results injected on resume (from the interactive run step).
+  let testResults = opts.testResults;
   let lastTestRun: RunRecord["testRun"];
 
   try {
@@ -166,70 +193,17 @@ async function orchestrateInner(
         break;
       }
 
-      // DeepEval-style stage evaluation + EVAL-DRIVEN RETRY:
-      // The judge scores this agent's output against what was asked. If the
-      // output doesn't match (precision/accuracy below the threshold), the
-      // agent is re-run with the judge's feedback (rationale + improvements)
-      // so the next attempt is aligned with the requirement. This is the core
-      // "understand → verify → redo until correct" loop.
-      const evalPassThreshold = 60; // precision OR accuracy must be >= this to proceed
-      const maxEvalRetries = 2;
-      let attempts = 0;
-      let ev = await runStageEval(step.id, requirementId, emit, createdCycleId, testResults, lastTestRun);
-      // Retry when the output scored below threshold OR no artifact was
-      // produced at all (agent replied with prose instead of its deliverable).
-      while (attempts < maxEvalRetries && !opts.signal?.aborted && (ev === null || ev.precision < evalPassThreshold || ev.accuracy < evalPassThreshold)) {
-        attempts++;
-        const retryNote = ev
-          ? `AI Evaluation: ${step.id} output scored ${ev.precision}% precision / ${ev.accuracy}% accuracy — re-running with feedback (attempt ${attempts}/${maxEvalRetries}).`
-          : `AI Evaluation: ${step.id} produced no deliverable — re-running (attempt ${attempts}/${maxEvalRetries}).`;
-        emit({ type: "status", agentId: "pipeline", message: retryNote });
-        emit({
-          type: "eval_retry",
-          agentId: step.id,
-          stage: ev?.stage ?? "analyze",
-          attempt: attempts,
-          maxAttempts: maxEvalRetries,
-          precision: ev?.precision ?? 0,
-          accuracy: ev?.accuracy ?? 0,
-          feedback: retryNote,
-        });
-        allEvents.push({
-          type: "eval_retry",
-          agentId: step.id,
-          stage: ev?.stage ?? "analyze",
-          attempt: attempts,
-          maxAttempts: maxEvalRetries,
-          precision: ev?.precision ?? 0,
-          accuracy: ev?.accuracy ?? 0,
-          feedback: retryNote,
-        });
-        const feedback = ev
-          ? [
-              `The AI judge scored your previous output as precision ${ev.precision}% and accuracy ${ev.accuracy}%.`,
-              ev.rationale ? `Judge feedback: ${ev.rationale}` : "",
-              ev.improvements?.length ? `Required fixes:\n${ev.improvements.map((i) => `- ${i}`).join("\n")}` : "",
-              "Re-run your tools and produce a corrected, complete output that fully matches the requirement. Do not repeat the same mistakes.",
-            ]
-              .filter(Boolean)
-              .join("\n\n")
-          : "You did not produce your deliverable. Use your tools and return the required output (analysis / coverage / script / cycle+defects / release report) as instructed. Do not reply with prose alone.";
-        const retryEvents = await runAgent(
-          {
-            agentId: step.id,
-            userPrompt: `${prompt}\n\n${feedback}`,
-            requirementId,
-            lifecycle: { index: i, total },
-            signal: opts.signal,
-          },
-          emit
-        );
-        allEvents.push(...retryEvents);
-        if (opts.signal?.aborted) break;
-        if (retryEvents.some((e) => e.type === "error")) {
-          emit({ type: "status", agentId: "pipeline", message: `Agent ${step.id} retry errored — moving on.` });
-          break;
-        }
+      // AI stage evaluation — ADVISORY ONLY (no eval-driven re-runs).
+      // The judge scores this agent's output once against what was asked and
+      // the chain always continues. Low scores are flagged in the log + run
+      // record instead of re-running the agent — re-runs multiplied wall-clock
+      // time by up to 3x per stage and pushed runs past Vercel's 5-min cap.
+      const evalPassThreshold = 60;
+      // EX is the only execute-stage agent that gets scored — DO operates on
+      // the same cycle/executions, so judging it again is redundant and slow.
+      const skipEval = step.id === "devops-execution";
+      let ev: Evaluation | null = null;
+      if (!skipEval) {
         ev = await runStageEval(step.id, requirementId, emit, createdCycleId, testResults, lastTestRun);
       }
       if (ev) {
@@ -247,14 +221,26 @@ async function orchestrateInner(
         allEvents.push(evalEvent);
         // Emit so the client clears the "scoring…" state and shows the score.
         emit(evalEvent);
+        if (ev.precision < evalPassThreshold || ev.accuracy < evalPassThreshold) {
+          emit({
+            type: "status",
+            agentId: "pipeline",
+            message: `AI Evaluation: ${step.id} scored ${ev.precision}% precision / ${ev.accuracy}% accuracy — below the ${evalPassThreshold}% bar, flagged in the run report.`,
+          });
+        }
       }
-      if (attempts > 0) {
-        emit({
-          type: "status",
-          agentId: "pipeline",
-          message: `AI Evaluation: ${step.id} finalized at ${ev?.precision ?? 0}% precision / ${ev?.accuracy ?? 0}% accuracy after ${attempts} retr${attempts === 1 ? "y" : "ies"}.`,
-        });
-      }
+
+      // Durability checkpoint: persist everything completed so far (events +
+      // next agent index). If the serverless function is killed at the 5-min
+      // cap, the run survives as "partial" and the user can resume from here
+      // instead of losing the whole run. Fire-and-forget — never block the chain.
+      void saveRunCheckpoint(
+        runId,
+        requirementId,
+        allEvents,
+        opts,
+        { cycleId: createdCycleId, testRun: lastTestRun, nextIndex: i + 1 }
+      ).catch(() => {});
 
       // After AS generates scripts → run them in Docker with LLM auto-fix,
       // then record the REAL results on a cycle for EX/DO to reference.
@@ -368,37 +354,28 @@ Do NOT call script_save. Do not return prose only.`,
         }
 
         if (script && script.files.length) {
-          // Automatic Docker test execution is DISABLED.
-          //
-          // The pipeline generates the automation code (Playwright + TypeScript
-          // POM) and hands it to the user to run on their own machine. We do not
-          // run tests inside the pipeline anymore — the Docker runner code
-          // (lib/exec/*, autofix, docker-gate) is kept intact but is not invoked
-          // here. This keeps the pipeline fast, avoids the serverless no-Docker
-          // timeout problem, and gives the user the generated suite to execute.
+          // Test execution now PAUSES for a user decision. The automation is
+          // generated; the UI asks "Run on Docker?" and then RESUMES the chain
+          // at the EX index (startFrom=3), optionally injecting real test
+          // results so EX/DO record actual executions. Without a Docker host
+          // (e.g. Vercel), the resume carries no results and EX/DO honestly
+          // report "not executed". This keeps each request short and avoids
+          // hard-wiring a Docker dependency into a serverless pipeline.
           emit({
             type: "status",
             agentId: "pipeline",
             message:
-              "Test run is disabled — the pipeline generates the automation code only. " +
-              "Download / copy the generated Playwright suite and run it on a machine with Docker (npx playwright test --project=chromium).",
+              "Automation suite ready. Test execution is paused — run the generated suite on Docker to get real pass/fail results for EX/DO.",
           });
-          testResults = "No automatic test run — test execution is disabled. Run the generated suite on your own machine.";
           emit({
-            type: "test_run",
+            type: "awaiting_test_run",
             agentId: "pipeline",
-            ok: false,
-            passed: 0,
-            failed: 0,
-            skipped: 0,
-            total: 0,
-            attempts: 0,
-            message:
-              "Test run disabled — automation generated. Run the Playwright suite locally: npx playwright test --project=chromium.",
+            requirementId,
+            runId,
           });
-          // NOTE: EX/DO receive testResults = "No automatic test run..." so they
-          // report honestly that no real execution happened, and the execute-stage
-          // AI evaluation scores against that. The chain continues normally.
+          // Stop the chain here; the client resumes from the EX stage.
+          pausedForTestRun = true;
+          break;
         } else {
           emit({
             type: "error",
@@ -425,9 +402,12 @@ Do NOT call script_save. Do not return prose only.`,
   }
 
   // Persist the run (events, generated code, test results) for later reference.
-  await saveRunRecord(requirementId, allEvents, opts, createdCycleId, lastTestRun);
+  // Same runId as the checkpoints → the final record overwrites the last
+  // "partial" checkpoint instead of leaving duplicate history rows. A run that
+  // paused at the AS→EX boundary is saved as "partial" (resumable), not failed.
+  await saveRunRecord(runId, requirementId, allEvents, opts, createdCycleId, lastTestRun, pausedForTestRun);
 
-  return { requirementId, events: allEvents };
+  return { requirementId, events: allEvents, runId };
 }
 
 /**
@@ -528,88 +508,139 @@ async function runStageEval(
 
 /** Build + persist a RunRecord from this orchestration. */
 async function saveRunRecord(
+  runId: string,
   requirementId: string,
   events: AgentEvent[],
   opts: OrchestrationOptions,
   cycleId?: string,
-  testRun?: RunRecord["testRun"]
+  testRun?: RunRecord["testRun"],
+  paused = false
 ): Promise<void> {
   try {
     const runs = await import("../runs/store");
-
-    const req = (await listAll<Requirement>("requirements")).find((r) => r.id === requirementId);
-    const coverage = (await listAll<Coverage>("coverages")).filter((c) => c.requirementId === requirementId).pop();
-    const script = (await listAll<Script>("scripts")).filter((s) => s.requirementId === requirementId).pop();
-    const defects = (await listAll<Defect>("defects")).filter((d) => d.requirementId === requirementId);
-    const releases = (await listAll<ReleaseReport>("releases")).filter((r) => r.requirementId === requirementId);
-    const analyses = await listAll<Analysis>("analyses");
-
-    const agentMap = new Map<string, { code: string; name: string; status: "done" | "error" | "skipped" | "running"; index: number; total: number }>();
-    for (const e of events as Array<Record<string, unknown>>) {
-      if (e.type === "agent_start") {
-        agentMap.set(String(e.agentId), { code: String(e.code), name: String(e.name), index: Number(e.index), total: Number(e.total), status: "running" });
-      } else if (e.type === "agent_done" && agentMap.has(String(e.agentId))) {
-        const a = agentMap.get(String(e.agentId))!;
-        if (a.status !== "error") a.status = "done";
-      } else if (e.type === "error" && agentMap.has(String(e.agentId))) {
-        agentMap.get(String(e.agentId))!.status = "error";
-      }
-    }
-    let sawError = false;
-    const agents = [...agentMap.values()].sort((a, b) => a.index - b.index);
-    for (const a of agents) {
-      if (a.status === "error") sawError = true;
-      else if (sawError) a.status = "skipped";
-    }
-
-    const issues = (events as Array<Record<string, unknown>>)
-      .filter((e) => e.type === "error")
-      .map((e) => `Agent ${e.agentId}: ${e.message}`);
-
-    // DeepEval-style stage evaluations from this run (agent code → scores).
-    const evaluations = (events as Array<Record<string, unknown>>)
-      .filter((e) => e.type === "evaluation")
-      .map((e) => {
-        const id = String(e.agentId);
-        const code = id === "pipeline" ? "PIPE" : id.split("-").map((p) => p[0]?.toUpperCase() || "").join("");
-        return {
-          agentCode: code,
-          stage: String(e.stage),
-          precision: Number(e.precision),
-          accuracy: Number(e.accuracy),
-        };
-      });
-
-    const record: RunRecord = {
-      id: crypto.randomUUID(),
-      requirementId,
-      title: req?.title || opts.title || "Untitled requirement",
-      source: req?.source || "manual",
-      startedAt: new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      status: sawError ? "failed" : defects.length > 0 ? "partial" : "success",
-      agents,
-      counts: {
-        analyses: analyses.filter((a) => a.requirementId === requirementId).length,
-        coverages: coverage ? 1 : 0,
-        testCases: coverage?.testCases.length || 0,
-        scripts: script?.files.length || 0,
-        cycles: cycleId ? 1 : 0,
-        defects: defects.length,
-        releases: releases.length,
-        evaluations: evaluations.length,
-      },
-      evaluations,
-      files: script?.files || [],
-      events,
-      issues,
-      testRun,
-      // Carry the owning workspace on the record so the JSON-fallback filter
-      // (which reads record.workspaceId) is user-scoped too.
-      workspaceId: currentWorkspace(),
-    } as RunRecord;
+    const record = await buildRunRecord(runId, requirementId, events, opts, { cycleId, testRun, paused });
+    // If a mid-run checkpoint already exists for this runId, keep its startedAt
+    // so a resumed/timed-out run reads as one continuous timeline.
+    const prior = await runs.getRun(runId, currentWorkspace()).catch(() => null);
+    if (prior?.startedAt) record.startedAt = prior.startedAt;
     await runs.saveRun(record, currentWorkspace());
   } catch (err) {
     console.error("Failed to save run record:", err);
   }
+}
+
+interface CheckpointArgs {
+  cycleId?: string;
+  testRun?: RunRecord["testRun"];
+  /** Index of the NEXT agent to run — the resume cursor after a timeout. */
+  nextIndex: number;
+}
+
+/** Persist a durable mid-run checkpoint (status "partial") so a serverless
+ *  timeout doesn't lose the whole run. Fire-and-forget from the chain loop. */
+async function saveRunCheckpoint(
+  runId: string,
+  requirementId: string,
+  events: AgentEvent[],
+  opts: OrchestrationOptions,
+  checkpoint: CheckpointArgs
+): Promise<void> {
+  try {
+    const runs = await import("../runs/store");
+    const record = await buildRunRecord(runId, requirementId, events, opts, checkpoint);
+    record.status = "partial";
+    // Tag the checkpoint with the resume cursor so the UI can offer
+    // "Resume from stage N". Runs table has no such column, so it lives on
+    // the JSONB record alongside the events.
+    (record as unknown as { resumeFrom?: number }).resumeFrom = checkpoint.nextIndex;
+    await runs.saveRun(record, currentWorkspace());
+  } catch (err) {
+    console.error("Failed to save run checkpoint:", err);
+  }
+}
+
+/** Build a full RunRecord from the requirement + events so far. Used by both
+ *  the final save and the mid-run checkpoint. */
+async function buildRunRecord(
+  runId: string,
+  requirementId: string,
+  events: AgentEvent[],
+  opts: OrchestrationOptions,
+  extra: { cycleId?: string; testRun?: RunRecord["testRun"]; paused?: boolean }
+): Promise<RunRecord> {
+  const req = (await listAll<Requirement>("requirements")).find((r) => r.id === requirementId);
+  const coverage = (await listAll<Coverage>("coverages")).filter((c) => c.requirementId === requirementId).pop();
+  const script = (await listAll<Script>("scripts")).filter((s) => s.requirementId === requirementId).pop();
+  const defects = (await listAll<Defect>("defects")).filter((d) => d.requirementId === requirementId);
+  const releases = (await listAll<ReleaseReport>("releases")).filter((r) => r.requirementId === requirementId);
+  const analyses = await listAll<Analysis>("analyses");
+
+  const agentMap = new Map<string, { code: string; name: string; status: "done" | "error" | "skipped" | "running"; index: number; total: number }>();
+  for (const e of events as Array<Record<string, unknown>>) {
+    if (e.type === "agent_start") {
+      agentMap.set(String(e.agentId), { code: String(e.code), name: String(e.name), index: Number(e.index), total: Number(e.total), status: "running" });
+    } else if (e.type === "agent_done" && agentMap.has(String(e.agentId))) {
+      const a = agentMap.get(String(e.agentId))!;
+      if (a.status !== "error") a.status = "done";
+    } else if (e.type === "error" && agentMap.has(String(e.agentId))) {
+      agentMap.get(String(e.agentId))!.status = "error";
+    }
+  }
+  let sawError = false;
+  const agents = [...agentMap.values()].sort((a, b) => a.index - b.index);
+  for (const a of agents) {
+    if (a.status === "error") sawError = true;
+    else if (sawError) a.status = "skipped";
+  }
+
+  const issues = (events as Array<Record<string, unknown>>)
+    .filter((e) => e.type === "error")
+    .map((e) => `Agent ${e.agentId}: ${e.message}`);
+
+  // DeepEval-style stage evaluations from this run (agent code → scores).
+  const evaluations = (events as Array<Record<string, unknown>>)
+    .filter((e) => e.type === "evaluation")
+    .map((e) => {
+      const id = String(e.agentId);
+      const code = id === "pipeline" ? "PIPE" : id.split("-").map((p) => p[0]?.toUpperCase() || "").join("");
+      return {
+        agentCode: code,
+        stage: String(e.stage),
+        precision: Number(e.precision),
+        accuracy: Number(e.accuracy),
+      };
+    });
+
+  const startedAt = new Date().toISOString();
+  return {
+    id: runId,
+    requirementId,
+    title: req?.title || opts.title || "Untitled requirement",
+    source: req?.source || "manual",
+    startedAt,
+    finishedAt: startedAt,
+    // A run that paused at the AS→EX boundary is "partial" (resumable). An
+    // agent error is "failed". Otherwise all agents finished = "success" —
+    // zero defects is a legitimate "nothing failed" outcome, not a partial run.
+    status: extra.paused ? "partial" : sawError ? "failed" : "success",
+    agents,
+    counts: {
+      analyses: analyses.filter((a) => a.requirementId === requirementId).length,
+      coverages: coverage ? 1 : 0,
+      testCases: coverage?.testCases.length || 0,
+      scripts: script?.files.length || 0,
+      cycles: extra.cycleId ? 1 : 0,
+      defects: defects.length,
+      releases: releases.length,
+      evaluations: evaluations.length,
+    },
+    evaluations,
+    files: script?.files || [],
+    events,
+    issues,
+    testRun: extra.testRun,
+    // Carry the owning workspace on the record so the JSON-fallback filter
+    // (which reads record.workspaceId) is user-scoped too.
+    workspaceId: currentWorkspace(),
+  } as RunRecord;
 }

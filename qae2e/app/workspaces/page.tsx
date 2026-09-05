@@ -13,7 +13,6 @@ import {
   Loader2,
   Plus,
   Sparkles,
-  ArrowRight,
   LayoutGrid,
   History,
   Settings2,
@@ -57,6 +56,18 @@ const TEMPLATES: Template[] = [
   { label: "Database testing", name: "Database Testing", icon: Server, supported: false, hint: "Coming soon" },
   { label: "Mobile app QA", name: "Mobile App QA", icon: Smartphone, supported: false, hint: "Coming soon" },
 ];
+
+// A lightweight, deterministic "domain" icon per workspace so the grid stops
+// repeating one generic glyph. Derived from the name: web/api/shop/mobile/qa.
+function workspaceGlyph(name: string): { icon: typeof Globe; label: string } {
+  const n = name.toLowerCase();
+  if (/\bapi\b|rest|graphql|backend/.test(n)) return { icon: Server, label: "API" };
+  if (/mobile|ios|android|app\b/.test(n)) return { icon: Smartphone, label: "Mobile" };
+  if (/db|database|sql|warehouse|data/.test(n)) return { icon: Server, label: "Data" };
+  if (/qa|test|e2e|automation/.test(n)) return { icon: LayoutGrid, label: "QA" };
+  // shop / cart / e-com / web default to the globe glyph
+  return { icon: Globe, label: "Web" };
+}
 
 export default function WorkspacesPage() {
   const router = useRouter();
@@ -211,69 +222,111 @@ export default function WorkspacesPage() {
 
         {/* Stats */}
         {workspaces.length > 0 && (
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-lg">
-            <div className="rounded-lg border border-border bg-bg-surface p-4 text-center">
-              <p className="text-2xl font-bold text-text-primary">{workspaces.length}</p>
-              <p className="text-[11px] text-text-muted">Workspaces</p>
-            </div>
-            <div className="rounded-lg border border-border bg-bg-surface p-4 text-center">
-              <p className="text-2xl font-bold text-text-primary">{workspaces.reduce((n, w) => n + (w.runCount || 0), 0)}</p>
-              <p className="text-[11px] text-text-muted">Total runs</p>
-            </div>
-            <div className="rounded-lg border border-border bg-bg-surface p-4 text-center">
-              <p className="text-2xl font-bold text-text-primary">{workspaces.filter((w) => w.lastRunAt).length}</p>
-              <p className="text-[11px] text-text-muted">Active</p>
-            </div>
+          <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-text-muted">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-surface px-3 py-1.5">
+              <LayoutGrid size={12} className="text-amber-600" />
+              <span className="font-semibold text-text-primary">{workspaces.length}</span> workspaces
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-surface px-3 py-1.5">
+              <History size={12} className="text-amber-600" />
+              <span className="font-semibold text-text-primary">{workspaces.reduce((n, w) => n + (w.runCount || 0), 0)}</span> total runs
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-surface px-3 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="font-semibold text-text-primary">{workspaces.filter((w) => w.lastRunAt).length}</span> active
+            </span>
           </div>
         )}
 
         {/* Workspace grid */}
-        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {workspaces.map((w) => (
-            <Link
-              key={w.id}
-              href={`/workspace?workspaceId=${w.id}`}
-              className="group rounded-xl border border-border bg-bg-surface card-shadow p-5 flex flex-col transition-all hover:-translate-y-1 hover:border-amber-500/40 hover:card-shadow-lg"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/15 to-amber-500/5 text-amber-700 ring-1 ring-amber-500/20">
-                  <LayoutGrid size={17} />
-                </span>
-                {w.lastRunStatus && (
+        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {workspaces.map((w, i) => {
+            const healthy = w.lastRunStatus === "success";
+            const ran = Boolean(w.lastRunStatus);
+            const idle = !ran;
+            const Glyph = workspaceGlyph(w.name).icon;
+            // Rail + chip tint by real health so the eye scans "which needs me".
+            const rail = idle
+              ? "bg-border"
+              : healthy
+                ? "bg-emerald-500"
+                : w.lastRunStatus === "failed"
+                  ? "bg-red-500"
+                  : "bg-amber-500";
+            return (
+              <Link
+                key={w.id}
+                href={`/workspace?workspaceId=${w.id}`}
+                className="group relative overflow-hidden rounded-xl border border-border bg-bg-surface card-shadow p-4 pl-5 flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/40 hover:card-shadow-lg"
+                style={{ animation: `riseIn 420ms ease both`, animationDelay: `${Math.min(i, 8) * 45}ms` }}
+              >
+                {/* Left status rail */}
+                <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-[3px] ${rail} transition-colors`} />
+
+                <div className="flex items-center gap-3">
                   <span
+                    title={workspaceGlyph(w.name).label}
                     className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold border",
-                      w.lastRunStatus === "success"
-                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
-                        : w.lastRunStatus === "failed"
-                          ? "border-red-500/40 bg-red-500/10 text-red-600"
-                          : "border-amber-500/40 bg-amber-500/10 text-amber-700"
+                      "flex items-center justify-center w-9 h-9 rounded-lg transition-colors",
+                      idle
+                        ? "bg-bg-page text-text-muted ring-1 ring-border"
+                        : "bg-amber-500/10 text-amber-700 ring-1 ring-amber-500/20"
                     )}
                   >
-                    {w.lastRunStatus}
+                    <Glyph size={15} />
                   </span>
-                )}
-              </div>
+                  <div className="min-w-0 flex-1 pr-6">
+                    <h3 className="truncate text-[15px] font-semibold text-text-primary group-hover:text-amber-700 transition-colors">
+                      {w.name}
+                    </h3>
+                    {w.description && (
+                      <p className="mt-0.5 truncate text-[11px] text-text-secondary">{w.description}</p>
+                    )}
+                    {!w.description && ran && (
+                      <p className="mt-0.5 text-[11px] text-text-muted">
+                        {healthy ? "Last run passed" : "Needs attention"}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
-              <h3 className="mt-3 font-semibold text-text-primary group-hover:text-amber-700 transition-colors">{w.name}</h3>
-              {w.description && <p className="mt-1 text-xs text-text-secondary line-clamp-2 flex-1">{w.description}</p>}
-              {!w.description && <div className="flex-1" />}
-
-              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-text-muted">
-                <span className="inline-flex items-center gap-1.5">
-                  <History size={12} /> {w.runCount} run{w.runCount !== 1 ? "s" : ""}
-                </span>
-                {w.lastRunAt && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70" />
-                    {new Date(w.lastRunAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                <div className="mt-4 flex items-center justify-between text-[11px] text-text-muted">
+                  <span className="inline-flex items-center gap-1.5 tabular-nums">
+                    <History size={12} /> {w.runCount} run{w.runCount !== 1 ? "s" : ""}
                   </span>
-                )}
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Open workspace <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
-                </span>
+                  <div className="flex items-center gap-2">
+                    {idle ? (
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border border-border bg-bg-page text-text-muted">
+                        Not run yet
+                      </span>
+                    ) : (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border",
+                          healthy
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                            : w.lastRunStatus === "failed"
+                              ? "border-red-500/40 bg-red-500/10 text-red-600"
+                              : "border-amber-500/40 bg-amber-500/10 text-amber-700"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "w-1 h-1 rounded-full",
+                            healthy ? "bg-emerald-500" : w.lastRunStatus === "failed" ? "bg-red-500" : "bg-amber-500"
+                          )}
+                        />
+                        {w.lastRunStatus}
+                      </span>
+                    )}
+                    {w.lastRunAt && (
+                      <span className="tabular-nums">
+                        {new Date(w.lastRunAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -282,19 +335,18 @@ export default function WorkspacesPage() {
                   }}
                   disabled={deletingId === w.id}
                   className={cn(
-                    "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors",
-                    "text-text-muted hover:text-red-600 hover:bg-red-500/10",
-                    "opacity-0 group-hover:opacity-100",
+                    "absolute top-2 right-2 inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted transition-colors",
+                    "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 hover:bg-red-500/10",
                     deletingId === w.id && "opacity-100 text-red-600"
                   )}
                   title="Delete workspace and all its data"
+                  aria-label={`Delete ${w.name}`}
                 >
-                  {deletingId === w.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                  {deletingId === w.id ? "Deleting…" : "Delete"}
+                  {deletingId === w.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                 </button>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
 
           {workspaces.length === 0 && !loading && (
             <div className="sm:col-span-2 lg:col-span-3 rounded-xl border border-dashed border-border p-12 text-center">

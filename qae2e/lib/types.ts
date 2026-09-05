@@ -328,4 +328,8 @@ export type AgentEvent =
       accuracy: number;
       feedback: string;
       ts?: number;
-    };
+    }
+  // Automation scripts are ready — the pipeline is pausing before the EX/DO
+  // execution agents so the UI can ask the user whether to run the suite on
+  // Docker. The client resumes with startFrom=EX and optional testResults.
+  | { type: "awaiting_test_run"; agentId: string; requirementId: string; runId?: string; ts?: number };

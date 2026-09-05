@@ -46,7 +46,9 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
   const isAS = agent.id === "automation-script";
   const isRI = agent.id === "requirement-intelligence";
   const isMT = agent.id === "manual-test-case";
-  const maxSteps = opts.maxSteps ?? (isAS ? 12 : 10);
+  // Lower caps keep the run inside Vercel's serverless window — most agents
+  // finish in 1-3 tool turns; 6 is a generous safety ceiling.
+  const maxSteps = opts.maxSteps ?? (isAS ? 8 : 6);
   let steps = 0;
   let scriptSaved = false;
   let coverageFetched = false;
@@ -84,6 +86,12 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
         toolChoice = { type: "function", function: { name: "requirement_analyze" } };
       }
 
+      // Trim the retained history to keep each request small: the tools do the
+      // heavy lifting server-side, so the model only needs the system prompt,
+      // the original ask, and the most recent tool trajectory. Keeping the full
+      // growing transcript made every step slower (more prompt tokens to read).
+      trimMessages(messages);
+
       const res = await chatCompletion(messages, {
         model: agent.model,
         temperature: 0.2,
@@ -119,12 +127,12 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
         const content = extractContent(message);
         if (content) push({ type: "chunk", agentId: agent.id, text: content });
 
-        if (isAS && !scriptSaved && asNudges < 2 && steps < maxSteps) {
+        if (isAS && !scriptSaved && asNudges < 1 && steps < maxSteps) {
           asNudges++;
           push({
             type: "status",
             agentId: agent.id,
-            message: `AS returned prose without automation_framework_generate — nudge ${asNudges}/2`,
+            message: `AS returned prose without automation_framework_generate — nudge ${asNudges}/1`,
           });
           messages.push({
             role: "user",
@@ -133,12 +141,12 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
           });
           continue;
         }
-        if (isRI && !analysisSaved && riNudges < 2 && steps < maxSteps) {
+        if (isRI && !analysisSaved && riNudges < 1 && steps < maxSteps) {
           riNudges++;
           push({
             type: "status",
             agentId: agent.id,
-            message: `RI returned prose without saving an analysis — nudge ${riNudges}/2`,
+            message: `RI returned prose without saving an analysis — nudge ${riNudges}/1`,
           });
           messages.push({
             role: "user",
@@ -147,12 +155,12 @@ export async function runAgent(opts: RunOptions, emit: (e: AgentEvent) => void):
           });
           continue;
         }
-        if (isMT && !coverageSaved && mtNudges < 2 && steps < maxSteps) {
+        if (isMT && !coverageSaved && mtNudges < 1 && steps < maxSteps) {
           mtNudges++;
           push({
             type: "status",
             agentId: agent.id,
-            message: `MT returned prose without saving coverage — nudge ${mtNudges}/2`,
+            message: `MT returned prose without saving coverage — nudge ${mtNudges}/1`,
           });
           messages.push({
             role: "user",
@@ -255,6 +263,18 @@ function safeParse(raw: string): ToolInput {
   } catch {
     return {};
   }
+}
+
+/** Keep the system prompt + original ask + last MAX_RETAINED messages. Tool
+ *  results are already persisted server-side; dropping the old transcript keeps
+ *  prompt size (and latency) bounded across the agent loop. */
+const MAX_RETAINED = 12;
+function trimMessages(messages: ChatMessage[]): void {
+  if (messages.length <= 2 + MAX_RETAINED) return;
+  const head = messages.slice(0, 2); // system + first user ask
+  const tail = messages.slice(-MAX_RETAINED);
+  messages.length = 0;
+  messages.push(...head, ...tail);
 }
 
 function summarize(text: string): string {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Play, Loader2, Sparkles, Wand2, Square, AlertTriangle, RotateCcw, ShieldCheck, Workflow, History, CircleDot, FileText, TestTube2, Settings2, Info, ChevronDown, CheckCircle2, Pencil } from "lucide-react";
+import { Play, Loader2, Sparkles, Wand2, Square, AlertTriangle, RotateCcw, ShieldCheck, Workflow, History, CircleDot, FileText, TestTube2, Settings2, Info, ChevronDown, CheckCircle2, Pencil, Container, LayoutGrid } from "lucide-react";
 import { Stepper, PIPELINE_STEPS } from "@/components/workspace/Stepper";
 import { LiveLogs } from "@/components/workspace/LiveLogs";
 import { AnalysisView } from "@/components/workspace/AnalysisView";
@@ -103,6 +103,32 @@ export function WorkspacePageInner() {
   // Last requirement metadata, so "Retry from failed agent" can resume with
   // the same requirement without re-collecting the form.
   const reqRef = useRef<{ id: string; title: string; source: string; sourceKey?: string; content: string } | null>(null);
+
+  // Paused at the AS→EX boundary: the suite is generated and we're waiting for
+  // the user to decide whether to run it on Docker before EX/DO execute.
+  const [awaitingTestRun, setAwaitingTestRun] = useState(false);
+  const [dockerAvailable, setDockerAvailable] = useState(false);
+  // runId of the paused run — the resume must reuse it so history stays one row.
+  const pausedRunIdRef = useRef<string | null>(null);
+  // True while the Docker run itself is executing (from the consent card).
+  const [runningTests, setRunningTests] = useState(false);
+
+  // Probe whether this server can run Docker (local dev only; false on Vercel).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/docker-status");
+        const d = await res.json();
+        if (!cancelled) setDockerAvailable(Boolean(d.available));
+      } catch {
+        // best effort — assume no Docker
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The workspace's latest (already-completed) requirement, if any. When it
   // exists the intake fields are shown greyed out with re-run / edit options.
@@ -281,6 +307,15 @@ export function WorkspacePageInner() {
       const code = e.agentId.split("-").map((p) => p[0]?.toUpperCase() || "").join("");
       setEvaluating({ stage: e.stage, agentCode: code });
     }
+    if (e.type === "awaiting_test_run") {
+      // AS finished and the suite is ready — pause so the user can choose to
+      // run it on Docker before EX/DO execute. Store the runId for the resume.
+      pausedRunIdRef.current = e.runId || null;
+      setAwaitingTestRun(true);
+      // Stop the running spinner; the pipeline request ended (we resume after).
+      setRunning(false);
+      setCurrentAgent(null);
+    }
   };
 
   // ONE-CLICK: run the full 6-agent chain.
@@ -294,6 +329,9 @@ export function WorkspacePageInner() {
     setCurrentStep(0);
     setCurrentAgent(null);
     setFailedAgent(null);
+    setAwaitingTestRun(false);
+    setRunningTests(false);
+    pausedRunIdRef.current = null;
     setAnalysis(null);
     setCoverage(null);
     setScript(null);
@@ -352,8 +390,11 @@ export function WorkspacePageInner() {
    * Resume from the agent that failed: re-run that agent, then automatically
    * continue the remaining agents (the orchestrator's `startFrom` skips the
    * earlier agents). Uses the same requirement as the last run.
+   *
+   * `resumeOpts.runId` keeps the same history row when continuing a paused
+   * run; `resumeOpts.testResults` injects real Docker results into EX/DO.
    */
-  const resumePipeline = async (fromIndex?: number) => {
+  const resumePipeline = async (fromIndex?: number, resumeOpts?: { runId?: string; testResults?: string }) => {
     if (!reqRef.current) return;
     // Default: resume from the failed agent, else the first incomplete stage.
     const startFrom =
@@ -362,6 +403,7 @@ export function WorkspacePageInner() {
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
+    setAwaitingTestRun(false);
     setCurrentAgent(null);
     setFailedAgent(null);
 
@@ -378,6 +420,8 @@ export function WorkspacePageInner() {
           content: req.content,
           startFrom,
           workspaceId,
+          runId: resumeOpts?.runId || pausedRunIdRef.current || undefined,
+          testResults: resumeOpts?.testResults,
         }),
         signal: controller.signal,
       });
@@ -393,6 +437,89 @@ export function WorkspacePageInner() {
     } finally {
       setRunning(false);
       await refreshArtifactsWith(req.id);
+    }
+  };
+
+  /**
+   * Consent-card actions: "Run on Docker" runs the generated suite via
+   * /api/run (streaming), then resumes the pipeline at EX with the real
+   * results so EX/DO record actual executions. "Skip" resumes at EX with no
+   * results → EX/DO honestly report "not executed".
+   */
+  const runTestsThenResume = async (skip: boolean) => {
+    const req = reqRef.current;
+    if (!req) return;
+    const EX_INDEX = 3; // execution-defect
+    if (skip) {
+      await resumePipeline(EX_INDEX, { runId: pausedRunIdRef.current || undefined });
+      return;
+    }
+    setRunningTests(true);
+    try {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requirementId: req.id, workspaceId }),
+        signal: controller.signal,
+      });
+      if (!res.ok || !res.body) throw new Error(`Test run failed: ${res.status}`);
+
+      // Consume the NDJSON stream; the "result" event carries the summary.
+      type RunOutcome = { passed: number; failed: number; skipped: number; total: number; exitCode: number | null; ok: boolean };
+      let outcome: RunOutcome | null = null;
+      await readNdjsonStream(res, (ev) => {
+        const e = ev as { type?: string; summary?: { passed: number; failed: number; skipped: number; total: number }; exitCode?: number | null; ok?: boolean; message?: string };
+        if (e.type === "result" && e.summary) {
+          outcome = {
+            passed: e.summary.passed,
+            failed: e.summary.failed,
+            skipped: e.summary.skipped,
+            total: e.summary.total,
+            exitCode: e.exitCode ?? null,
+            ok: Boolean(e.ok),
+          };
+        }
+        if (e.type === "status" || e.type === "log" || e.type === "error") {
+          // Surface the raw docker log lines into the event feed so the
+          // user sees the run happening (kept minimal — full logs in the
+          // test-run report).
+          setEvents((prev) => [
+            ...prev,
+            { type: "status", agentId: "pipeline", message: String(e.message || e.type).slice(0, 300) } as AgentEvent,
+          ]);
+        }
+      }, controller.signal).catch(() => {});
+
+      const summary = outcome as RunOutcome | null;
+
+      if (summary) {
+        const text = [
+          `Automated test run (local Docker): ${summary.passed} passed, ${summary.failed} failed, ${summary.skipped} skipped (${summary.total} total), exit code ${summary.exitCode ?? "n/a"}.`,
+          summary.failed > 0 ? "There were real failures — record them and raise defects for each failed case." : "All tests passed — record the executions on the cycle.",
+        ].join("\n");
+        setTestRun({
+          ok: summary.ok,
+          passed: summary.passed,
+          failed: summary.failed,
+          skipped: summary.skipped,
+          total: summary.total,
+          attempts: 1,
+          failures: [],
+          message: summary.ok ? "Tests passed on Docker." : "Tests failed on Docker — EX will record the failures.",
+        });
+        await resumePipeline(EX_INDEX, { runId: pausedRunIdRef.current || undefined, testResults: text });
+      } else {
+        await resumePipeline(EX_INDEX, { runId: pausedRunIdRef.current || undefined });
+      }
+    } catch (err) {
+      setEvents((prev) => [
+        ...prev,
+        { type: "error", agentId: "pipeline", message: `Docker run failed: ${err instanceof Error ? err.message : String(err)}` } as AgentEvent,
+      ]);
+    } finally {
+      setRunningTests(false);
     }
   };
 
@@ -479,36 +606,42 @@ export function WorkspacePageInner() {
             QAE2E
           </Link>
           <span className="text-sm text-text-muted hidden md:inline">Quality workspace</span>
-          <div className="ml-auto flex items-center gap-2.5">
+          <div className="ml-auto flex items-center gap-1.5">
+            <Link
+              href="/workspaces"
+              className="inline-flex items-center gap-1.5 min-h-8 px-3 rounded-lg bg-amber-500 text-white text-xs font-semibold shadow-sm hover:bg-amber-600 transition-colors"
+            >
+              <LayoutGrid size={13} /> Workspaces
+            </Link>
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
+              className="inline-flex items-center gap-1.5 min-h-8 px-3 rounded-lg bg-amber-500 text-white text-xs font-semibold shadow-sm hover:bg-amber-600 transition-colors"
             >
-              <Sparkles size={14} /> Home
+              <Sparkles size={13} /> Home
             </Link>
             <Link
               href={`/history?workspaceId=${encodeURIComponent(workspaceId)}`}
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
+              className="inline-flex items-center gap-1.5 min-h-8 px-3 rounded-lg bg-amber-500 text-white text-xs font-semibold shadow-sm hover:bg-amber-600 transition-colors"
             >
-              <History size={14} /> History
+              <History size={13} /> History
             </Link>
             <Link
               href={`/settings?workspaceId=${encodeURIComponent(workspaceId)}&tab=integrations`}
-              className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 transition-colors"
+              className="inline-flex items-center gap-1.5 min-h-8 px-3 rounded-lg bg-amber-500 text-white text-xs font-semibold shadow-sm hover:bg-amber-600 transition-colors"
             >
-              <Settings2 size={14} /> Settings
+              <Settings2 size={13} /> Settings
             </Link>
             {running ? (
               <Button
                 variant="secondary"
                 onClick={stopPipeline}
-                className="min-h-9 px-4 !border-red-500/50 !text-red-600 hover:!bg-red-500/10"
+                className="min-h-8 px-3 text-xs !border-red-500/50 !text-red-600 hover:!bg-red-500/10"
               >
-                <Square size={14} /> Stop pipeline
+                <Square size={13} /> Stop pipeline
               </Button>
             ) : (
-              <Button onClick={() => handleRunPipeline()} className="min-h-9 px-4">
-                <Play size={14} /> Run pipeline
+              <Button onClick={() => handleRunPipeline()} className="min-h-8 px-3 text-xs">
+                <Play size={13} /> Run pipeline
               </Button>
             )}
           </div>
@@ -677,6 +810,44 @@ export function WorkspacePageInner() {
             ) : null}
             </div>
 
+            {/* Docker consent card — pipeline paused after AS, before EX */}
+            {awaitingTestRun && !running && (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
+                <div className="flex items-center gap-2">
+                  <Container size={16} className="text-amber-600 shrink-0" />
+                  <h3 className="font-semibold text-text-primary">Run the generated Playwright suite?</h3>
+                </div>
+                <p className="mt-2 text-sm text-text-secondary leading-relaxed">
+                  The automation suite is ready. Running it on Docker gives the Execution &amp; DevOps agents real
+                  pass/fail results to record, so the AI judge can score actual test executions. Skipping makes them
+                  honestly report <span className="font-semibold text-text-primary">"not executed"</span>.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {dockerAvailable ? (
+                    <button
+                      onClick={() => void runTestsThenResume(false)}
+                      disabled={runningTests}
+                      className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg bg-amber-500 text-white text-sm font-semibold shadow-sm hover:bg-amber-600 disabled:opacity-60"
+                    >
+                      {runningTests ? <Loader2 size={14} className="animate-spin" /> : <Container size={14} />}
+                      {runningTests ? "Running tests on Docker…" : "Run on Docker"}
+                    </button>
+                  ) : (
+                    <p className="text-xs text-text-muted w-full">
+                      Docker isn't available on this server (Vercel has no Docker) — the suite can't be auto-run here.
+                    </p>
+                  )}
+                  <button
+                    onClick={() => void runTestsThenResume(true)}
+                    disabled={runningTests}
+                    className="inline-flex items-center gap-1.5 min-h-9 px-4 rounded-lg border border-border bg-bg-surface text-text-secondary text-sm font-semibold hover:bg-bg-hover disabled:opacity-60"
+                  >
+                    Skip — report as not executed
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Retry banner — shown after an agent failed */}
             {failedAgent && !running && (
               <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-red-500/40 bg-red-500/10">
@@ -696,8 +867,20 @@ export function WorkspacePageInner() {
               </div>
             )}
 
-            {/* Resume pipeline from stage — available after any run stops/ends */}
-            {!running && reqRef.current && events.length > 0 && (
+            {/* Resume pipeline from stage — only when the run is genuinely
+                incomplete (not all 6 agents reached). A fully completed run
+                doesn't need a resume control. */}
+            {!running &&
+              !awaitingTestRun &&
+              reqRef.current &&
+              events.length > 0 &&
+              (() => {
+                const done = new Set<string>();
+                for (const e of events) if (e.type === "agent_done") done.add(e.agentId);
+                const order = ["requirement-intelligence", "manual-test-case", "automation-script", "execution-defect", "devops-execution", "quality-intelligence"];
+                const allDone = order.every((id) => done.has(id));
+                return !allDone;
+              })() && (
               <Card className="p-4">
                 <button
                   onClick={() => setResumeOpen((o) => !o)}

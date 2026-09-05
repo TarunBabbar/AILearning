@@ -46,28 +46,33 @@ export function getConfig() {
     // ---- LLM (free models, with automatic fallback rotation) ----
     openrouterApiKey: env("OPENROUTER_API_KEY"),
     openrouterBaseUrl: env("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-    // Which LLM source to use: "openrouter" (default) | "commandcode" | "auto".
-    // "auto" tries the OpenRouter free pool first, then falls back to Command
-    // Code when every free model is unavailable.
+    // Which LLM source to use: "openrouter" | "commandcode" | "auto".
+    // "auto" prefers the fast Command Code provider model (LLM_MODEL /
+    // EVAL_MODEL when they are Command Code ids) and falls back to the
+    // OpenRouter free pool when Command Code is unavailable.
     llmSource: env("LLM_SOURCE", "auto"),
-    // Command Code Provider API — used as the fallback LLM source. Works on
-    // Vercel (plain HTTP), unlike the cmdc CLI which needs a local install.
+    // Command Code Provider API — the FAST path. Works on Vercel (plain HTTP),
+    // unlike the cmdc CLI which needs a local install. When LLM_MODEL / EVAL_MODEL
+    // are Command Code ids (e.g. deepseek/deepseek-v4-flash-fast) this key is
+    // required — without it the run falls back to the slow OpenRouter free pool.
     commandCodeApiKey: env("COMMAND_CODE_API_KEY"),
     commandCodeApiUrl: env("COMMAND_CODE_API_URL", "https://api.commandcode.ai/provider/v1"),
     commandCodeModel: env("COMMAND_CODE_MODEL", "deepseek/deepseek-v4-flash-fast"),
     // Legacy: local cmdc CLI path. Empty by default — the CLI is only used
     // when explicitly configured (the Provider API is the preferred path).
     commandCodePath: env("COMMAND_CODE_PATH"),
-    llmModel: env("LLM_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
-    // Fallback pool for agent calls: when one model is overloaded / errors,
-    // the next model in this list is tried automatically. Comma-separated.
+    // Default model for the agent pipeline. Command Code id = fast provider
+    // path (needs COMMAND_CODE_API_KEY). An OpenRouter ":free" id = free pool.
+    llmModel: env("LLM_MODEL", "deepseek/deepseek-v4-flash-fast"),
+    // Fallback pool used only when the primary model is unavailable. With the
+    // Command Code fast path this stays an OpenRouter free-model safety net.
     llmModels: env("LLM_MODELS", "nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,z-ai/glm-5.2:free,cohere/north-mini-code:free,openai/gpt-oss-20b:free")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    // Judge model for AI stage evaluation.
-    evalModel: env("EVAL_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
-    // Fallback pool for the AI-evaluation judge.
+    // Judge model for AI stage evaluation. Same fast-path semantics as LLM_MODEL.
+    evalModel: env("EVAL_MODEL", "deepseek/deepseek-v4-flash-fast"),
+    // Fallback pool for the AI-evaluation judge (OpenRouter free models).
     evalModels: env("EVAL_MODELS", "nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
       .split(",")
       .map((s) => s.trim())

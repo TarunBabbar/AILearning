@@ -145,30 +145,43 @@ async function requestModel(
 
 /**
  * Fetch the current list of free (:free) OpenRouter models. Best-effort —
- * returns [] on any failure (network/unauth).
+ * returns [] on any failure (network/unauth). Cached for FREE_MODELS_TTL_MS so
+ * the agent loop doesn't hit /models on every single completion.
  */
+const FREE_MODELS_TTL_MS = 60_000;
+let freeModelsCache: { at: number; ids: string[] } = { at: 0, ids: [] };
+
 async function fetchFreeModels(cfg: ReturnType<typeof getConfig>): Promise<string[]> {
+  const age = Date.now() - freeModelsCache.at;
+  if (age >= 0 && age < FREE_MODELS_TTL_MS) return freeModelsCache.ids;
   try {
     const res = await fetch(`${cfg.openrouterBaseUrl}/models`, {
       headers: {
         Authorization: `Bearer ${getApiKey()}`,
         ...(cfg.appUrl ? { "HTTP-Referer": cfg.appUrl } : {}),
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return freeModelsCache.ids;
     const data = (await res.json()) as { data?: Array<{ id: string }> };
     const ids = (data.data || []).map((m) => m.id).filter((id) => id.endsWith(":free"));
-    // Prefer larger-context models for the agent pipeline, but keep the whole
-    // free set as a last-resort pool. We just need ids here.
-    return [...new Set(ids)];
+    freeModelsCache = { at: Date.now(), ids: [...new Set(ids)] };
+    return freeModelsCache.ids;
   } catch {
-    return [];
+    // Network failure: reuse whatever we cached (possibly empty) rather than
+    // blocking the pipeline with another slow /models call.
+    return freeModelsCache.ids;
   }
 }
 
 function isCommandCodeModel(model: string): boolean {
   return !model.endsWith(":free");
+}
+
+/** Non-retryable Command Code errors — auth / bad request. */
+function isCcNonRetryable(err: Error): boolean {
+  const m = err.message.toLowerCase();
+  return /401|403|400|invalid api key|unauthorized|invalid request/i.test(m);
 }
 
 function commandCodeAvailable(cfg: ReturnType<typeof getConfig>): boolean {
@@ -187,12 +200,17 @@ function ccRequestOpts(opts: ChatCompletionOptions) {
 }
 
 /**
- * Route one completion. Decision tree:
+ * Route one completion. Decision tree (fast-path first):
  *
- *   LLM_SOURCE=commandcode           → Command Code provider, always
- *   requested model is not ":free"   → Command Code provider (paid model)
- *   requested model is ":free"       → OpenRouter free pool (with rotation),
- *                                      then Command Code fallback when auto
+ *   LLM_SOURCE=commandcode                        → Command Code always
+ *   requested model is a Command Code id (paid)   → Command Code first, then
+ *                                                     free pool fallback (auto)
+ *   requested model is ":free"                    → OpenRouter free pool only
+ *
+ * When LLM_SOURCE=auto and the requested model is a Command Code id (the new
+ * default), the fast paid model is attempted FIRST and the OpenRouter free
+ * pool is only a fallback if Command Code is down. An explicit ":free" model
+ * never touches Command Code (no accidental spend).
  */
 export async function chatCompletion(
   messages: ChatMessage[],
@@ -215,42 +233,56 @@ export async function chatCompletion(
     return commandCodeChat(messages, { model: cfg.commandCodeModel, ...ccOpts });
   }
 
-  // --- 2. Paid / Command Code model requested explicitly -------------------
-  let ccPaidError: Error | null = null;
+  // --- 2. Command Code (paid, fast) model requested -----------------------
+  let ccErr: Error | null = null;
   if (requested && isCommandCodeModel(requested)) {
-    if (!commandCodeAvailable(cfg)) {
+    if (cfg.llmSource === "openrouter") {
+      // Explicitly opted into OpenRouter-only → never route a paid model there.
       throw new LlmError(
         `"${requested}" is a Command Code model (not an OpenRouter :free model). ` +
-          `Set COMMAND_CODE_API_KEY in .env to use it via the Command Code provider API, ` +
-          `or use an OpenRouter :free model in LLM_MODEL.`
+          `Set LLM_SOURCE=auto and COMMAND_CODE_API_KEY in .env to use it, ` +
+          `or use an OpenRouter :free model.`
       );
     }
-    try {
-      opts.onModelSwitch?.(requested, requested, "Command Code provider model (paid)");
-      const { commandCodeChat } = await import("./commandcode");
-      return await commandCodeChat(messages, { model: requested, ...ccOpts });
-    } catch (err) {
-      ccPaidError = err instanceof Error ? err : new Error(String(err));
-      if (cfg.llmSource !== "auto") {
-        throw new LlmError(`Command Code (${requested}) failed: ${ccPaidError.message}`);
+    if (!commandCodeAvailable(cfg)) {
+      if (cfg.llmSource === "commandcode") {
+        throw new LlmError(
+          `"${requested}" needs the Command Code provider. Set COMMAND_CODE_API_KEY in .env.`
+        );
       }
-      // auto: fall through to the free pool as a last resort.
-      opts.onModelSwitch?.(
-        requested,
-        "OpenRouter free pool",
-        `Command Code (${requested}) failed — ${ccPaidError.message}`
-      );
+      // auto + no CC key → cannot use the paid model; drop to the free pool.
+      opts.onModelSwitch?.(requested, "OpenRouter free pool", "COMMAND_CODE_API_KEY not set");
+    } else {
+      try {
+        const { commandCodeChat } = await import("./commandcode");
+        return await commandCodeChat(messages, { model: requested, ...ccOpts });
+      } catch (err) {
+        ccErr = err instanceof Error ? err : new Error(String(err));
+        // Auth / bad-request won't be fixed by the free pool — fail fast.
+        if (isCcNonRetryable(ccErr)) throw new LlmError(`Command Code (${requested}) failed: ${ccErr.message}`);
+        if (cfg.llmSource === "commandcode") {
+          throw new LlmError(`Command Code (${requested}) failed: ${ccErr.message}`);
+        }
+        // auto: fall through to the OpenRouter free pool as a last resort.
+        opts.onModelSwitch?.(
+          requested,
+          "OpenRouter free pool",
+          `Command Code (${requested}) failed — ${ccErr.message}`
+        );
+      }
     }
   }
 
-  // --- 3. OpenRouter free pool with rotation -------------------------------
+  // --- 3. OpenRouter free pool with rotation (only :free models) ----------
   let pool: string[] = [];
   const push = (m: string) => {
-    if (m && !pool.includes(m)) pool.push(m);
+    if (m && m.endsWith(":free") && !pool.includes(m)) pool.push(m);
   };
   if (isFree) push(requested);
   for (const m of cfg.llmModels) push(m);
-  if (!pool.includes(requested) || cfg.llmModels.length <= 1) {
+  // Only fetch the live free list when we actually need more candidates AND we
+  // have no fresh cache (fetchFreeModels caches internally for 60s).
+  if (pool.length <= 1) {
     const live = await fetchFreeModels(cfg);
     for (const m of live) push(m);
   }
@@ -269,37 +301,13 @@ export async function chatCompletion(
     }
   }
 
-  // --- 4. LLM_SOURCE=auto → Command Code fallback --------------------------
-  if (cfg.llmSource === "auto") {
-    if (!commandCodeAvailable(cfg)) {
-      throw (
-        lastErr ??
-        new LlmError(
-          "All OpenRouter free models failed and Command Code fallback is not configured. Add COMMAND_CODE_API_KEY to .env."
-        )
-      );
-    }
-    try {
-      const from = pool[pool.length - 1] || requested || cfg.llmModel;
-      opts.onModelSwitch?.(
-        from,
-        cfg.commandCodeModel,
-        ccPaidError?.message || lastErr?.message || "free pool exhausted"
-      );
-      const { commandCodeChat } = await import("./commandcode");
-      return await commandCodeChat(messages, { model: cfg.commandCodeModel, ...ccOpts });
-    } catch (ccErr) {
-      const why = ccErr instanceof Error ? ccErr.message : String(ccErr);
-      const paidNote = ccPaidError
-        ? `Command Code (${requested}) failed first: ${ccPaidError.message}; then free pool failed: ${lastErr?.message ?? "unknown"}.`
-        : "";
-      throw new LlmError(
-        paidNote ||
-          `All OpenRouter free models failed, and the Command Code fallback (${cfg.commandCodeModel}) also failed: ${why}`
-      );
-    }
+  if (ccErr) {
+    throw new LlmError(
+      `Command Code (${requested}) failed: ${ccErr.message}; free pool also exhausted` +
+        (lastErr ? ` (${lastErr.message})` : "") +
+        "."
+    );
   }
-
   throw lastErr ?? new LlmError("All models in the fallback pool failed.");
 }
 

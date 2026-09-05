@@ -92,6 +92,11 @@ export async function POST(req: NextRequest) {
             title: body.title ? String(body.title) : "Untitled requirement",
             content: body.content ? String(body.content) : "",
             startFrom: body.startFrom ? Number(body.startFrom) : undefined,
+            // Resume continuity: the same runId merges the pre-pause half into
+            // one history entry; testResults carries real Docker results so
+            // EX/DO record actual executions instead of "not executed".
+            runId: body.runId ? String(body.runId) : undefined,
+            testResults: body.testResults ? String(body.testResults) : undefined,
             workspaceId: body.workspaceId ? String(body.workspaceId) : undefined,
             env: body.env && typeof body.env === "object" ? (body.env as Record<string, string>) : undefined,
             signal: req.signal,

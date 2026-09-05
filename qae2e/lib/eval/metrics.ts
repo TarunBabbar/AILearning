@@ -117,10 +117,10 @@ Return ONLY a JSON object, no markdown, no prose:
   const user = `Stage: ${rubric.title}
 ${rubric.inputDescription}
 --- INPUT (what was asked) ---
-${inputText.slice(0, 8000)}
+${inputText.slice(0, 4000)}
 ${rubric.outputDescription}
 --- OUTPUT (what was delivered) ---
-${outputText.slice(0, 12000)}
+${outputText.slice(0, 6000)}
 
 Precision question: ${rubric.precisionQuestion}
 Accuracy question: ${rubric.accuracyQuestion}

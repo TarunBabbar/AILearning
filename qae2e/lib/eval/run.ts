@@ -122,7 +122,7 @@ export async function evaluateStage(opts: EvaluateStageOptions): Promise<Evaluat
     const res = await chatCompletion(messages, {
       model: cfg.evalModel,
       temperature: 0.1,
-      maxTokens: 2048,
+      maxTokens: 1024,
     });
     const text = res.choices[0]?.message?.content;
     if (typeof text !== "string" || !text.trim()) throw new LlmError("empty judge reply");
