@@ -35,6 +35,18 @@ function buildBody(
   cfg: ReturnType<typeof getConfig>,
   opts: { temperature?: number; maxTokens?: number; tools?: ChatTool[]; toolChoice?: ChatCompletionOptions["toolChoice"] }
 ): Record<string, unknown> {
+  // Command Code provider DeepSeek models run in thinking mode, which rejects
+  // a FORCED SPECIFIC tool_choice (tool_choice: {type:"function",...}) with a
+  // 400 ("Thinking mode does not support this tool_choice"). The established
+  // provider fix (omp, Amazon Bedrock, openai-completions) is to downgrade the
+  // named-function force to "auto" — the tool stays advertised and the strong
+  // system prompt steers the call. "required" (no specific function) is left
+  // alone. OpenRouter is unaffected (this is the CC client).
+  let toolChoice = opts.toolChoice;
+  if (typeof toolChoice === "object" && toolChoice && "function" in toolChoice) {
+    toolChoice = "auto";
+  }
+
   return {
     model,
     messages,
@@ -43,7 +55,7 @@ function buildBody(
     ...(opts.tools?.length
       ? {
           tools: opts.tools,
-          ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}),
+          ...(toolChoice ? { tool_choice: toolChoice } : {}),
         }
       : {}),
   };
