@@ -4,13 +4,13 @@
 
 QAE2E is an **end-to-end agentic QA platform**. Paste a requirement and six specialist AI agents
 orchestrate the whole pipeline: analyze → test coverage → Playwright automation → execution →
-release confidence. Every stage is verified by an **in-app AI evaluation judge** (precision/accuracy/
-completeness) and re-runs with feedback until the output matches the requirement.
+release confidence. Every stage is checked by an **in-app AI evaluation judge** (precision/accuracy/
+completeness) whose scores and improvement notes are surfaced in the run report.
 
 > **Current scope: copy-pasted requirements only.** MCP connector integrations (Jira, Confluence,
 > GitHub, Zephyr, TestRail, Pinecone) are placeholders — external connections are coming soon. The
-> official DeepEval framework integration is tracked as work-in-progress; stage evaluation runs on a
-> free in-app LLM judge today (see [AI Evaluation](#ai-evaluation-llm-judge)).
+> official DeepEval framework integration is tracked as work-in-progress; stage evaluation runs on an
+> in-app LLM judge today (see [AI Evaluation](#ai-evaluation-llm-judge)).
 
 ---
 
@@ -35,11 +35,14 @@ judge at every stage:
 2. **Test case generation** — the MT agent drafts editable, review-ready manual test cases.
 3. **Automation coverage** — the AS agent generates a complete Playwright + TypeScript POM suite
    server-side from that coverage.
-4. **Test execution** — the suite runs in Docker (local or a remote runner) with LLM auto-fix.
+4. **Test execution (optional, at EX)** — when the app runs on a machine with Docker, the UI offers to
+   run the generated suite before the execution agents work; real pass/fail results are then recorded
+   by EX/DO. Without Docker (e.g. Vercel), the suite is handed to you to run locally and the execution
+   agents honestly report "not executed".
 5. **Release confidence** — the IQ agent correlates everything into a confidence score with a
    transparent "why this score" breakdown.
-6. **AI evaluation after every agent** — an in-app LLM judge scores precision / accuracy /
-   completeness and **re-runs the agent with feedback** until the output matches the requirement.
+6. **AI evaluation after each agent** — an in-app LLM judge scores precision / accuracy /
+   completeness; scores and improvement notes are flagged in the log and run report.
 
 Every artifact is editable and traceable back to one `requirementId`, so quality is provable end to end.
 
@@ -53,9 +56,9 @@ Every artifact is editable and traceable back to one `requirementId`, so quality
 |-------|------|
 | **Framework** | Next.js 16 (App Router, Turbopack), React, TypeScript |
 | **AI agents** | Six-agent pipeline (RI / MT / AS / EX / DO / IQ) over an LLM tool-calling loop |
-| **LLM** | Bring your own model — set the agent model (`LLM_MODEL`) + AI-evaluation judge (`EVAL_MODEL`) |
+| **LLM** | Command Code Provider API (fast `deepseek-v4-flash-fast` default) with OpenRouter `:free` fallback; agents + judge configurable via `LLM_MODEL` / `EVAL_MODEL` |
 | **Automation** | Playwright + TypeScript Page Object Model, generated server-side |
-| **Test execution** | Docker (`mcr.microsoft.com/playwright`), LLM auto-fix, optional remote runner |
+| **Test execution** | Interactive Docker run at EX (local), optional remote runner; parses Playwright JSON |
 | **Database** | Neon serverless Postgres via `@vercel/postgres` (JSON-file fallback for local dev) |
 | **Persistence** | Users, sessions, workspaces, artifacts (incl. evaluations), run history |
 | **UI** | Tailwind CSS v4 (beige/amber theme), lucide-react icons |
@@ -126,8 +129,9 @@ Every artifact is editable and traceable back to one `requirementId`, so quality
 - **AI Evaluation at every stage** — an in-app LLM judge (configured via `EVAL_MODEL`) scores each agent's output
   against the previous stage's ask: **precision** (correct & relevant output), **accuracy** (nothing
   missed), plus **completeness**, hallucinated/missed counts, per-item verdicts, and judge confidence.
-- **Eval-driven retry loop** — if a stage scores below threshold, the judge's feedback is fed back to the
-  agent and it re-runs (up to 2 retries) until it matches the requirement.
+- **Fast Command Code default** — agents + judge default to `deepseek-v4-flash-fast` over the Command
+  Code Provider API (works on Vercel); the OpenRouter free pool is the fallback when Command Code is
+  unavailable, so runs stay quick and reliable.
 - **Live pipeline trace + live logs** — every stage, tool call, artifact, and evaluation
   score streamed to the UI in real time with an app-themed, auto-scrolling log.
 - **Run detail page** — every history entry opens a full artifact view (requirement, analysis,
@@ -135,14 +139,17 @@ Every artifact is editable and traceable back to one `requirementId`, so quality
 - **Server-side Playwright POM** — AS builds a full runnable suite under `tests/` from coverage via
   `automation_framework_generate` (free LLMs truncate huge `script_save` payloads; quality gates reject
   empty/`{` stubs; orchestrator retries AS then falls back to deterministic scripts).
-- **Local Docker test runner** — runs the generated Playwright suite in a container (auto-pulls the
-  image, preflights node/npm/Chromium), parses Playwright JSON results, LLM auto-fix on failure.
+- **Interactive Docker test run** — after AS generates the suite, the UI pauses and asks whether to
+  run it on Docker before EX/DO execute. On a Docker machine (local dev) it runs the real suite and
+  feeds results to EX/DO; on Vercel (no Docker) it skips and the agents honestly report "not executed".
+  Docker status is probed via `/api/docker-status`.
 - **Remote Docker runner** — point `TEST_RUNNER_URL` at any machine with Docker (your dev box, a VPS)
   so Vercel (no Docker) can still run real Playwright suites. Without Docker or a runner, the pipeline
   completes but reports "tests were not run" — surfaced clearly in the UI and the execute-stage eval.
 - **Traceability by design** — every artifact links back to one `requirementId`.
 - **Stoppable pipeline** — Stop stays active until the NDJSON stream fully ends.
-- **Bring your own LLM** — the agent model and evaluation judge are configured via `LLM_MODEL` / `EVAL_MODEL`; point them at any model you have access to.
+- **Bring your own LLM** — `LLM_SOURCE=auto` prefers the fast Command Code model
+  (`deepseek-v4-flash-fast` by default); `LLM_SOURCE=openrouter` uses only OpenRouter `:free` models.
 - **Neon/Postgres-backed persistence** — users, sessions, workspaces, artifacts, evaluations, and run
   history live in serverless Postgres (Neon); local dev falls back to `data/db.json`.
 
@@ -151,9 +158,9 @@ Every artifact is editable and traceable back to one `requirementId`, so quality
 ```
 Requirement ──▶ AI Analysis ──▶ Test Coverage ──▶ Automation Scripts ──▶ Test Cycle ──▶ Release Confidence
    (pasted)       (RI)            (MT, editable)        (AS)             (EX + DO)        (IQ)
-                   │                 │                    │                 │                │
-                AI Eval ◀───────── AI Eval ◀─────────── AI Eval ◀──────── AI Eval ◀─────── AI Eval
-              (retry w/ feedback if score < 60%)
+                    │                 │                    │                 │                │
+                 AI Eval ◀───────── AI Eval ◀─────────── AI Eval ◀──────── AI Eval ◀─────── AI Eval
+                (advisory scores + improvement notes, flagged in the run report)
 ```
 
 Run the **6-step pipeline** from the workspace:
@@ -170,16 +177,20 @@ Run the **6-step pipeline** from the workspace:
 4. **Automate** — the Automation Script Agent (AS) loads coverage (`coverage_get`), then calls
    `automation_framework_generate` to persist a **complete Playwright + TypeScript POM** (pages,
    fixtures, specs, config) under `tests/e2e`, `tests/pages`, `tests/fixtures`, `tests/utils`.
-5. **Execute** — after AS, the orchestrator **materializes scripts and runs them** (local Docker or the
-   remote runner; autofix up to 3 attempts). EX records those real results on a cycle; failures become
-   defects. DO links real automated evidence — never invents CI/build numbers.
+5. **Execute** — the pipeline pauses after AS and asks **"Run the generated suite on Docker?"**.
+   On a Docker machine it runs the suite (via `/api/run`) and feeds the real pass/fail results into EX,
+   which records them on a cycle and raises defects for real failures; DO links the real evidence. If
+   you skip (or there's no Docker, e.g. Vercel), EX/DO honestly report "not executed" — no fabricated
+   results.
 6. **Release** — the Quality Intelligence Agent (IQ) computes confidence, pass rate, coverage, risk.
    The release gauge explains **why** the confidence score is what it is (coverage 40% + pass rate 40% +
    defects 20%) and what to do to reach 100%.
 
-After each agent finishes, **AI Evaluation** scores its output. Below-threshold scores re-run the agent
-with the judge's feedback (visible in the logs and trace). The **live log** shows everything happening:
-agent start/finish, tools called, artifacts saved, evaluation scores, and retries.
+After each agent finishes, **AI Evaluation** scores its output. Scores are advisory — they're surfaced
+in the log and run report with improvement notes, and low-scoring stages are flagged, but the pipeline
+continues rather than re-running the agent (keeps runs fast and under the serverless limit). The
+**live log** shows everything happening: agent start/finish, tools called, artifacts saved, evaluation
+scores, and the test-run decision.
 
 ## The 6 agents
 
@@ -220,23 +231,25 @@ Each stage is scored against the previous stage's ask:
 - **Per-item verdicts** — pass/fail/partial with reasons (expandable in the UI).
 - **Overall + improvements** — plain-language explanation and actionable ways to raise the score.
 
-**Retry loop:** if precision OR accuracy < 60%, the agent is re-run (up to 2 times) with the judge's
-feedback injected into its prompt. The re-run, the feedback, and the final score are all visible in the
-live log and pipeline trace.
+**Advisory scoring:** after each agent, the judge scores the output once. Scores below the 60% bar are
+flagged in the log and run report with the judge's improvement notes, but the pipeline continues to the
+next agent — no eval-driven re-runs. This keeps a full run fast and inside the serverless window while
+still surfacing exactly which stage needs attention.
 
-**Fallback:** if the judge model is unavailable (free provider down / no API key), a deterministic
+**Fallback:** if the judge model is unavailable (provider down / no API key), a deterministic
 lexical-overlap score is used so the pipeline never blocks.
 
 ## Live logs & pipeline trace
 
 - **Live logs** (right rail) — an app-themed, auto-scrolling feed of everything happening: agent
   start/finish, tools called (in plain language, e.g. "Read requirement", "Save test coverage"),
-  artifacts saved, evaluation scores, retries, and test-run results. No GUIDs or raw JSON — user-facing
+  artifacts saved, evaluation scores, and test-run results. No GUIDs or raw JSON — user-facing
   summaries only. Pause / jump-to-latest / copy controls included.
-- **Pipeline trace** (left column) — every stage with its status (Queued / Working / Completed /
-  Stopped / Failed), the tools it called, artifacts it produced, and the interleaved **AI Evaluation**
-  row showing the live score (P.. · A..) or "Scoring…" state. Re-runs show "Re-running with AI
-  evaluation feedback (attempt 1/2)…".
+- **Train pipeline visual** — a train rides a straight rail through the six agent stations. It leaves
+  RI the moment you hit Run, rolls toward each station while the agent works, dips to the AI-judge gate
+  between stations, and (on a re-run) returns along a dashed lower rail. Station dots are colored by
+  state — red (not reached), amber (moving toward / working), green (reached); click a dot to expand
+  that agent's hidden output.
 - **Status banner** — one banner shows either the running agent ("Agent 1/6: RI — Requirement
   Intelligence Agent running…") or the evaluator ("AI Evaluation — checking the analyze output against
   the requirement…"). Never both.
@@ -283,11 +296,15 @@ RAG) are **MCP placeholders**: they keep the MCP shape so the surface is stable,
 
 ## Running tests (local Docker / remote runner)
 
-### Local Docker
+### Local Docker (interactive, at EX)
 
-The pipeline runs the generated Playwright suite automatically after AS in a
-**local Docker container** using `mcr.microsoft.com/playwright:v1.51.0-jammy`. The runner handles
-everything needed to make the tests actually execute:
+When you run the pipeline on a machine with Docker, the pipeline **pauses after AS generates the
+suite** and asks **"Run the generated Playwright suite?"** in the workspace UI. Clicking **Run on
+Docker** executes the suite in a local container; clicking **Skip** (or running where no Docker
+exists, e.g. Vercel) makes the execution agents honestly report "not executed". The app probes Docker
+availability via `GET /api/docker-status`.
+
+The runner uses `mcr.microsoft.com/playwright:v1.51.0-jammy` and handles everything needed to execute:
 
 1. **Docker** — if the Docker engine is not running, a clear "Start Docker Desktop, then retry" error.
 2. **Image** — auto-pulls the configured image when missing.
@@ -295,8 +312,12 @@ everything needed to make the tests actually execute:
    `playwright install chromium` when the browser is missing.
 4. **Test command** — defaults to `npm test || npx --yes playwright@1.51.0 test --project=chromium`
    (override with `TEST_COMMAND`). Results parsed from Playwright's JSON reporter.
-5. **Auto-fix** — failing tests are passed to the free LLM (up to 3 attempts) to fix locators/assertions
-   and re-run.
+5. **Feed results to EX** — the real pass/fail summary is injected into the Execution agents, which
+   record executions on the cycle and raise defects for real failures.
+
+When the suite is skipped (or there's no Docker), EX/DO return a clear "no real test execution was
+available — tests were not run" statement instead of fabricating results, and the UI explains how to
+enable execution.
 
 ### Remote Docker runner (for Vercel / machines without Docker)
 
@@ -330,7 +351,7 @@ runner.
 npm install
 
 # 2. Configure environment (see Configuration)
-cp .env.example .env   # add OPENROUTER_API_KEY (required) + EVAL_MODEL, POSTGRES_URL, etc.
+cp .env.example .env   # add COMMAND_CODE_API_KEY (fast path) + POSTGRES_URL, etc.
 
 # 3. Run the dev server
 npm run dev            # http://localhost:3001 (Next.js may pick 3001 if 3000 is taken)
@@ -338,8 +359,9 @@ npm run dev            # http://localhost:3001 (Next.js may pick 3001 if 3000 is
 
 Open **http://localhost:3001** → landing page → **Get started / Sign in** → create an account → create
 a workspace → open it → the requirement is pre-filled with a SauceDemo login sample (or paste your own)
-→ **Run pipeline**. Watch the live logs + pipeline trace, edit coverage, export CSV/XLSX, and see the
-release-confidence gauge with its "why this score" breakdown and per-stage AI evaluation cards.
+→ **Run pipeline**. Watch the train visual + live logs, edit coverage, export CSV/XLSX, run the suite
+on Docker when prompted (local only), and see the release-confidence gauge with its "why this score"
+breakdown and per-stage AI evaluation cards.
 
 ### User accounts & workspaces
 
@@ -354,10 +376,13 @@ release-confidence gauge with its "why this score" breakdown and per-stage AI ev
 ### Hosting on Vercel
 
 - Import the repo, set **Root Directory** to `qae2e` (Next.js preset auto-detected).
-- Add env vars in **Project → Settings → Environment Variables**: `OPENROUTER_API_KEY`, `EVAL_MODEL`
-  (optional), `POSTGRES_URL` (your Neon connection string — tables auto-create), and optionally
-  `TEST_RUNNER_URL`/`TEST_RUNNER_TOKEN` for real test execution.
-- Hobby plan caps serverless functions at **300s** — routes already respect this (`maxDuration = 300`).
+- Add env vars in **Project → Settings → Environment Variables**: `COMMAND_CODE_API_KEY` (required for
+  the fast Command Code path — create one at https://commandcode.ai/settings/keys), `POSTGRES_URL`
+  (your Neon connection string — tables auto-create). `OPENROUTER_API_KEY` is only needed if you use
+  the OpenRouter free fallback pool. Docker test execution does **not** run on Vercel (no Docker
+  daemon) — the pipeline pauses at EX and reports "not executed" unless a `TEST_RUNNER_URL` is set.
+- Hobby plan caps serverless functions at **300s** — routes already respect this (`maxDuration = 300`),
+  and the pipeline is tuned (fast model + advisory evals + capped steps) to finish inside it.
 
 **MCP smoke test** (requires the dev server running):
 
@@ -369,9 +394,13 @@ node scripts/mcp-smoke.mjs
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `OPENROUTER_API_KEY` | — | **Required.** API key for LLM calls. |
-| `LLM_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | The LLM model the agents use — set this to any model you have access to. |
-| `EVAL_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | The LLM model used as the AI-evaluation judge (scores each stage). |
+| `COMMAND_CODE_API_KEY` | — | **Fast path.** Command Code Provider API key (https://commandcode.ai/settings/keys). Required to use the default `deepseek-v4-flash-fast` models. |
+| `LLM_SOURCE` | `auto` | `auto` prefers the fast Command Code model and falls back to the OpenRouter free pool; `commandcode` uses Command Code only; `openrouter` uses only OpenRouter `:free` models. |
+| `COMMAND_CODE_MODEL` | `deepseek/deepseek-v4-flash-fast` | Model used over the Command Code Provider API. |
+| `LLM_MODEL` | `deepseek/deepseek-v4-flash-fast` | The LLM model the agents use (a Command Code id → fast path; an OpenRouter `:free` id → free pool). |
+| `EVAL_MODEL` | `deepseek/deepseek-v4-flash-fast` | The LLM model used as the AI-evaluation judge (scores each stage). |
+| `LLM_MODELS` / `EVAL_MODELS` | OpenRouter `:free` list | Fallback pool of OpenRouter free models used only when the primary model is unavailable. |
+| `OPENROUTER_API_KEY` | — | API key for the OpenRouter free fallback pool. |
 | `VISION_MODEL` | `google/gemma-4-26b-a4b-it:free` | Vision model for image → text extraction. |
 | `DATA_DIR` | `data` | Where the dev JSON fallback persists (`data/db.json`). |
 | `NEXT_PUBLIC_APP_NAME` | `QAE2E Agentic Quality Engineering` | App name shown in UI/headers. |
@@ -383,8 +412,9 @@ node scripts/mcp-smoke.mjs
 | `TEST_RUNNER_TOKEN` | — | Optional bearer token shared with the remote runner. |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Optional LLM provider base URL override. |
 
-> **LLM model:** the app calls your configured provider with the model you set in `LLM_MODEL` /
-> `EVAL_MODEL`. Bring any model you have access to — the defaults are just sensible starting points.
+> **LLM model:** the default `deepseek/deepseek-v4-flash-fast` runs over the Command Code Provider API
+> (needs `COMMAND_CODE_API_KEY`) and is several times faster than the free pool. To use only free
+> OpenRouter models, set `LLM_SOURCE=openrouter` and point `LLM_MODEL`/`EVAL_MODEL` at `:free` models.
 
 > **Removed with the MCP-placeholder refactor** (no longer present): connector REST clients
 > (`lib/connectors/client.ts`, `test.ts`), encrypted secrets storage (`lib/secrets/`), Pinecone RAG
@@ -398,7 +428,7 @@ qae2e/
 ├── app/
 │   ├── page.tsx                       # Landing page
 │   ├── login/page.tsx, signup/page.tsx  # Auth pages
-│   ├── workspaces/page.tsx            # Workspace dashboard (create / list / open)
+│   ├── workspaces/page.tsx            # Workspace dashboard (create / list / open — status cards)
 │   ├── history/page.tsx               # User-scoped run history (with eval score chips)
 │   ├── history/[id]/page.tsx          # Run detail (Suspense wrapper)
 │   ├── history/[id]/RunDetailClient.tsx  # Full artifact view of one run + AI eval mapping
@@ -406,25 +436,27 @@ qae2e/
 │   ├── settings/page.tsx              # Settings (Account + Integrations tabs only)
 │   └── api/
 │       ├── agents/[agentId]/route.ts    # POST → NDJSON event stream per agent
-│       ├── pipeline/route.ts            # POST → NDJSON full 6-agent run (one-click)
+│       ├── pipeline/route.ts            # POST → NDJSON full 6-agent run (one-click / resume)
+│       ├── docker-status/route.ts       # GET → { available } local Docker probe (for the EX consent)
 │       ├── artifacts/route.ts           # GET/PUT artifacts (workspace-scoped, incl. evaluations)
 │       ├── auth/{signup,login,logout,me}/route.ts  # Session auth
-│       ├── workspaces/route.ts          # GET list / POST create
+│       ├── workspaces/route.ts          # GET list / POST create / DELETE
 │       ├── export/route.ts              # GET CSV/XLSX download
 │       ├── run/route.ts                 # POST streaming local/remote Docker test run
 │       ├── upload/route.ts              # POST image upload → vision text extraction
 │       └── mcp/sse/route.ts             # Real MCP server (Streamable HTTP)
 ├── components/
 │   ├── landing/                       # Hero, FlowSteps, AgentCards, Integrations, CtaPanel, Header
-│   ├── workspace/                     # Stepper, LiveLogs (terminal feed), PipelineTrace (stages +
-│   │                                  #   eval rows), PipelineSummary, AnalysisView, TestCasesEditor,
-│   │                                  #   ScriptView, ReleaseGauge (why-this-score breakdown),
-│   │                                  #   TraceabilityRail, McpConnectionsCard, EvaluationCard,
-│   │                                  #   TestRunner, TestRunReport
+│   ├── workspace/                     # Stepper, TrainPipeline (train visual + station dots),
+│   │                                  #   LiveLogs (themed live feed), PipelineSummary,
+│   │                                  #   AnalysisView, TestCasesEditor, ScriptView, ReleaseGauge
+│   │                                  #   (why-this-score breakdown), TraceabilityRail,
+│   │                                  #   McpConnectionsCard, EvaluationCard, TestRunReport
 │   ├── settings/                      # IntegrationsTab (MCP + DeepEval WIP placeholders)
 │   └── ui/                            # Button, Card, Badge
 ├── lib/
-│   ├── llm/openrouter.ts              # LLM chat + tool-call primitives (model config via env)
+│   ├── llm/                            # openrouter.ts (routing: Command Code fast path + OpenRouter
+│   │                                  #   free fallback), commandcode.ts (CC Provider API client)
 │   ├── eval/                          # metrics.ts (stage rubrics + judge prompt + fallback),
 │   │                                  #   run.ts (judge call, metrics derivation, persistence)
 │   ├── connectors/                    # registry.ts (defs), index.ts (placeholder status), defs.ts
@@ -439,7 +471,8 @@ qae2e/
 │   ├── agents/                        # registry (6 agents), runner (tool loop + nudges),
 │   │                                  #   tools.ts (core tools), tools.integrations.ts (MCP
 │   │                                  #   placeholder integration tools), prompts/playwright-pom.ts,
-│   │                                  #   persist.ts, orchestrator (chain + AI eval retry loop)
+│   │                                  #   persist.ts, orchestrator (chain + advisory AI eval +
+│   │                                  #   interactive Docker pause at EX + run checkpoints)
 │   ├── auth/                          # password.ts (scrypt), session.ts (httpOnly cookie), guard.ts
 │   ├── db.ts                          # Postgres layer (users/sessions/workspaces/artifacts/runs) +
 │   │                                  #   data/db.json fallback
@@ -459,15 +492,16 @@ qae2e/
 
 **Phase 1 — Core pipeline ✅ (built)**
 - ✅ Copy-paste requirement → 6-agent pipeline (RI → MT → AS → EX → DO → IQ)
-- ✅ LLM tool-calling loop (bring-your-own model), server-side POM generation, local Docker run
+- ✅ LLM tool-calling loop (Command Code fast path + OpenRouter free fallback), server-side POM
+  generation, interactive local Docker run at EX
 - ✅ Editable coverage, CSV/XLSX export, release-confidence gauge
 - ✅ User accounts, workspaces, Neon Postgres persistence, run history
 
 **Phase 2 — AI Evaluation ✅ (built)**
 - ✅ Per-stage LLM judge: precision / accuracy / completeness / hallucinated / missed / judge confidence
 - ✅ Per-item verdicts + "how to improve" guidance
-- ✅ Eval-driven retry loop (agent re-runs with judge feedback until ≥60%)
-- ✅ Live logs + pipeline trace showing evaluation state and scores in real time
+- ✅ Advisory scoring (fast, no eval-driven re-runs) with low-scoring stages flagged in the report
+- ✅ Train pipeline visual + live logs showing evaluation state and scores in real time
 - ✅ Release gauge "why this score" breakdown (coverage 40% + pass rate 40% + defects 20%)
 
 **Phase 3 — Real DeepEval framework (work in progress)**
