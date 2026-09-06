@@ -5,8 +5,9 @@ import { motion } from "framer-motion";
 const roles = [
   {
     date: "Aug 2026 — Present",
-    title: "AI QA Architect | Test Automation Lead",
-    company: "Coforge Limited (Viman Nagar, Pune) · at Xplor Technologies (Kharadi, Pune)",
+    title: "Solutions Architect",
+    company:
+      "Coforge Limited (Viman Nagar, Pune) · currently at client location Xplor Technologies, Kharadi, Pune",
     tag: "Current",
     details: [
       "Built a Playwright + TypeScript UI test automation framework for a Blazor-based application — with Azure DevOps, TFS, and YAML pipelines for CI.",
