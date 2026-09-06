@@ -93,7 +93,7 @@ export default function ChatWidget() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="mb-3 w-[min(92vw,380px)] rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden flex flex-col"
+            className="mb-3 w-[min(92vw,380px)] rounded-2xl bg-bg-card border border-border shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-400 text-white">
@@ -144,7 +144,7 @@ export default function ChatWidget() {
 
             {/* Welcome screen — pick a mode before chatting */}
             {mode === null ? (
-              <div className="h-80 overflow-y-auto px-4 py-4 bg-cream/60">
+              <div className="h-80 overflow-y-auto px-4 py-4 bg-bg-soft/80">
                 <div className="mb-1 text-sm font-semibold text-text">
                   Hi! 👋 What would you like to do?
                 </div>
@@ -157,7 +157,7 @@ export default function ChatWidget() {
                 <button
                   type="button"
                   onClick={() => setMode("question")}
-                  className="mb-2 w-full flex items-start gap-2.5 rounded-xl border border-border bg-white px-3 py-2.5 text-left transition-colors hover:border-amber-400 hover:bg-amber-50"
+                  className="mb-2 w-full flex items-start gap-2.5 rounded-xl border border-border bg-bg-card px-3 py-2.5 text-left transition-colors hover:border-amber-500/60 hover:bg-bg-soft"
                 >
                   <span className="mt-0.5 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 text-sm">
                     💬
@@ -166,7 +166,7 @@ export default function ChatWidget() {
                     <span className="block text-[13px] font-semibold text-text">
                       Ask a question
                     </span>
-                    <span className="block text-[11px] text-text-secondary">
+                    <span className="block text-[11px] text-text-muted">
                       About Tarun&apos;s experience, projects, skills, or how to get in touch.
                     </span>
                   </span>
@@ -175,7 +175,7 @@ export default function ChatWidget() {
                 <button
                   type="button"
                   onClick={() => setMode("message")}
-                  className="w-full flex items-start gap-2.5 rounded-xl border border-border bg-white px-3 py-2.5 text-left transition-colors hover:border-amber-400 hover:bg-amber-50"
+                  className="w-full flex items-start gap-2.5 rounded-xl border border-border bg-bg-card px-3 py-2.5 text-left transition-colors hover:border-amber-500/60 hover:bg-bg-soft"
                 >
                   <span className="mt-0.5 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 text-sm">
                     ✉️
@@ -184,20 +184,20 @@ export default function ChatWidget() {
                     <span className="block text-[13px] font-semibold text-text">
                       Send a message to Tarun
                     </span>
-                    <span className="block text-[11px] text-text-secondary">
+                    <span className="block text-[11px] text-text-muted">
                       A message, question, or hello — goes straight to his WhatsApp.
                     </span>
                   </span>
                 </button>
 
-                <div className="mt-3 rounded-xl bg-white border border-border px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
+                <div className="mt-3 rounded-xl bg-bg-card border border-border px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
                   {WELCOME.content.replace(/\*\*/g, "")}
                 </div>
               </div>
             ) : (
               <>
                 {/* Messages */}
-                <div ref={scrollRef} className="h-80 overflow-y-auto px-4 py-4 space-y-3 bg-cream/60">
+                <div ref={scrollRef} className="h-80 overflow-y-auto px-4 py-4 space-y-3 bg-bg-soft/80">
                   {messages.map((m, i) => (
                     <MessageBubble key={i} msg={m} />
                   ))}
@@ -210,7 +210,7 @@ export default function ChatWidget() {
                     e.preventDefault();
                     send(input);
                   }}
-                  className="flex items-center gap-2 px-3 py-3 border-t border-border bg-surface"
+                  className="flex items-center gap-2 px-3 py-3 border-t border-border bg-bg-card"
                 >
                   <input
                     value={input}
@@ -219,7 +219,7 @@ export default function ChatWidget() {
                       mode === "message" ? "Message for Tarun…" : "Ask about Tarun…"
                     }
                     disabled={loading}
-                    className="flex-1 text-sm px-3 py-2 rounded-lg bg-cream border border-border outline-none focus:border-amber-400 disabled:opacity-50"
+                    className="flex-1 text-sm px-3 py-2 rounded-lg bg-bg-soft border border-border outline-none focus:border-amber-500/60 text-text placeholder:text-text-muted disabled:opacity-50"
                   />
                   <button
                     type="submit"
@@ -258,14 +258,14 @@ function MessageBubble({ msg }: { msg: ChatMsg }) {
       <div
         className={`max-w-[85%] w-fit min-w-[60px] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
           isUser
-            ? "bg-amber-500 text-white rounded-br-sm"
-            : "bg-white border border-border rounded-bl-sm text-text"
+            ? "bg-amber-500 text-white font-medium rounded-br-sm"
+            : "bg-bg-soft border border-border rounded-bl-sm text-text"
         }`}
       >
         {isUser ? (
           <div className="whitespace-pre-wrap break-words">{msg.content}</div>
         ) : (
-          <div className="prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-1 [&_strong]:text-text">
+          <div className="prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-1 [&_strong]:text-text [&_a]:text-amber-600">
             <ReactMarkdown
               urlTransform={(url) => url}
               components={{
@@ -305,7 +305,7 @@ function MessageBubble({ msg }: { msg: ChatMsg }) {
 function TypingBubble() {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-white border border-border rounded-bl-sm">
+      <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-bg-soft border border-border rounded-bl-sm">
         <div className="flex items-center gap-1">
           {[0, 1, 2].map((i) => (
             <motion.span

@@ -4,17 +4,17 @@ import "./globals.css";
 import ChatWidget from "@/components/ChatWidget";
 
 export const metadata: Metadata = {
-  title: "Tarun Kumar Babbar — Test Automation Architect | AI-Augmented QA",
+  title: "Tarun Kumar Babbar — AI QA Architect | 1st Place, AI Tester Blueprint 3x",
   description:
-    "Test Automation Architect with 18+ years building enterprise-grade automation frameworks, AI-augmented QA systems, and multi-agent AI test platforms. Currently building an AI Test Copilot.",
+    "AI QA Architect and Test Automation Engineer with 18+ years. 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon. Building multi-agent QA orchestration frameworks with Playwright, TypeScript, DeepEval, and Azure DevOps.",
   icons: {
     icon: "/tarunfavicon.png",
     shortcut: "/tarunfavicon.png",
   },
   openGraph: {
-    title: "Tarun Kumar Babbar — Test Automation Architect",
+    title: "Tarun Kumar Babbar — AI QA Architect",
     description:
-      "Architecting the future of AI-powered test automation. 18+ years, 6 AI platforms, enterprise frameworks.",
+      "1st place, AI Tester Blueprint 3x hackathon · AI applications built with Playwright, TypeScript, DeepEval & agent orchestration. 18+ years in QA.",
     type: "website",
     locale: "en_IN",
   },

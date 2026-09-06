@@ -1,55 +1,78 @@
 @import "tailwindcss";
 
 :root {
-  --amber-50: #fffbeb;
-  --amber-100: #fef3c7;
-  --amber-200: #fde68a;
-  --amber-400: #fbbf24;
-  --amber-500: #f59e0b;
-  --amber-600: #d97706;
-  --amber-700: #b45309;
-  --cream: #faf7f5;
-  --cream-alt: #f5f0eb;
-  --cream-deep: #f0e8dd;
-  --surface: #ffffff;
-  --border: #ede3da;
-  --text: #1a1410;
-  --text-secondary: #6b5d51;
-  --text-muted: #9c8f82;
+  /* Warm beige "Claude paper" palette */
+  --bg: #faf9f5;
+  --bg-soft: #f2efe7;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fdfbf7;
+  --border: #e8e3d7;
+  --border-strong: #d8d0be;
+  --text: #2a2520;
+  --text-secondary: #5c554b;
+  --text-muted: #8d8577;
+
+  /* Terracotta accent ramp (Claude-style rust/coral) */
+  --amber-300: #e09a7b;
+  --amber-400: #b54a2a;
+  --amber-500: #c96442;
+  --amber-600: #a23e20;
+  --amber-700: #863217;
 }
 
 @theme inline {
-  --color-amber-50: #fffbeb;
-  --color-amber-100: #fef3c7;
-  --color-amber-200: #fde68a;
-  --color-amber-400: #fbbf24;
-  --color-amber-500: #f59e0b;
-  --color-amber-600: #d97706;
-  --color-amber-700: #b45309;
-  --color-cream: #faf7f5;
-  --color-cream-alt: #f5f0eb;
-  --color-cream-deep: #f0e8dd;
-  --color-surface: #ffffff;
-  --color-border: #ede3da;
-  --color-text: #1a1410;
-  --color-text-secondary: #6b5d51;
-  --color-text-muted: #9c8f82;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --color-bg: #faf9f5;
+  --color-bg-soft: #f2efe7;
+  --color-bg-card: #ffffff;
+  --color-bg-card-hover: #fdfbf7;
+  --color-border: #e8e3d7;
+  --color-border-strong: #d8d0be;
+  --color-text: #2a2520;
+  --color-text-secondary: #5c554b;
+  --color-text-muted: #8d8577;
+  --color-amber-300: #e09a7b;
+  --color-amber-400: #b54a2a;
+  --color-amber-500: #c96442;
+  --color-amber-600: #a23e20;
+  --color-amber-700: #863217;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 }
 
-* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+* { scrollbar-width: thin; scrollbar-color: #d8d0be transparent; }
 
 html { scroll-behavior: smooth; }
 
 body {
-  background: var(--cream);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: rgba(217, 119, 6, 0.2);
+  background: rgba(201, 100, 66, 0.18);
   color: var(--text);
+}
+
+/* Soft grid used behind hero */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(201, 100, 66, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(201, 100, 66, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Subtle top accent on cards */
+.card-accent {
+  position: relative;
+  overflow: hidden;
+}
+.card-accent::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 100, 66, 0.45), transparent);
+  pointer-events: none;
 }

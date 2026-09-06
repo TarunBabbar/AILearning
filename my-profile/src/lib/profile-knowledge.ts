@@ -9,7 +9,7 @@ export type ProfileKnowledge = {
   aiPlatformsBuilt: string;
   stats: { num: string; label: string }[];
   highlights: string[];
-  roles: { date: string; title: string; company: string; details: string[] }[];
+  roles: { date: string; title: string; company: string; tag?: string; details: string[] }[];
   education: string;
   skills: { title: string; top: string[]; rest: string[] }[];
   projects: { title: string; desc: string; tech: string[]; repo: string; demo: string | null }[];
@@ -19,51 +19,53 @@ export type ProfileKnowledge = {
 export const profileKnowledge: ProfileKnowledge = {
   owner: "Tarun Kumar Babbar",
   headline:
-    "Test Automation Architect with 18+ years building enterprise-grade automation frameworks (Selenium, Playwright, C#.NET, TypeScript) across UI, API, database, and E2E. Designed a skills-based AI automation framework fusing classical test automation with RAG, MCP, and Vector DBs. Built 8+ AI platforms and agentic QA systems — from RAG pipelines to multi-agent test copilots.",
+    "AI QA Architect and Test Automation Engineer with 18+ years. Currently at Coforge Limited (Viman Nagar, Pune) working for client Xplor Technologies (Kharadi, Pune), building AI-powered quality engineering systems. 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon (60 participants) with QAE2E, an agentic QA pipeline.",
   location: "Pune, India",
   yearsExperience: "18+",
-  aiPlatformsBuilt: "8+",
+  aiPlatformsBuilt: "10+",
   stats: [
     { num: "18+", label: "Years in QA Engineering" },
-    { num: "8", label: "AI Platforms Built" },
-    { num: "100%", label: "Automation Adoption" },
-    { num: "~40%", label: "Prod Defect Reduction" },
-    { num: "9", label: "Projects Built" },
+    { num: "10+", label: "AI Apps & Agents Built" },
+    { num: "#1", label: "AI Tester Blueprint 3x Hackathon" },
+    { num: "100%", label: "Automation Adoption at Scale" },
   ],
   highlights: [
-    "Service & Product Org Leadership",
-    "0 → 100% Automation Adoption",
-    "AI QA Transformation",
-    "Selenium WebDriver & Playwright",
+    "AI-Powered QA Platforms",
+    "Multi-Agent Orchestration",
+    "DeepEval-Driven Output Validation",
+    "Playwright + TypeScript Frameworks",
+    "Figma → Requirements → Test Cases",
+    "TFS / Azure DevOps Integration",
     "RAG & Vector DBs (ChromaDB, Pinecone)",
-    "Multi-Agent Orchestration (LangGraph)",
-    "MCP Protocol for Tool Integration",
-    "Azure DevOps & GitHub Actions",
-    "C#, TypeScript, Python",
-    "BDD / SpecFlow / Cucumber",
-    "CI/CD & Quality Gates",
+    "LLM Evaluation & Guardrails",
+    "Enterprise CI/CD & YAML Pipelines",
+    "0 → 100% Automation Adoption",
     "Framework Architecture & Mentorship",
+    "MCP Protocol for Tool Integration",
   ],
   roles: [
     {
       date: "Aug 2026 — Present",
-      title: "Solutions Architect",
-      company: "Coforge Limited, Pune (Hybrid)",
+      title: "AI QA Architect | Test Automation Lead",
+      company: "Coforge Limited (Viman Nagar, Pune) · at Xplor Technologies (Kharadi, Pune)",
+      tag: "Current",
       details: [
-        "Solutions Architect focused on test automation strategy, bringing prior experience leading QA teams and driving quality initiatives",
-        "Designing scalable automation frameworks, integrating continuous testing into CI/CD pipelines, and modernizing tooling across web, API, performance, and mobile",
-        "Committed to quality governance — establishing standards and best practices that scale across cross-functional teams",
-        "Mentoring engineers and building a strong quality-first culture, now applied at an architectural level",
+        "Built a Playwright + TypeScript UI test automation framework for a Blazor-based application, using Azure DevOps, TFS, and YAML pipelines for CI",
+        "Building a Multi-Agent Orchestration Framework that generates requirements from Figma designs, converts them into test cases, and publishes them to TFS through REST APIs using token auth",
+        "Every AI-generated output is evaluated against quality metrics with DeepEval, with auto-duplicate scenario/test detection to stop similar scenarios from multiplying",
+        "Generating automation code that follows the framework structure on Azure DevOps, with the full UI automation pipeline in place",
+        "Reading user stories and converting them into test cases — identifying which existing tests belong to each story by reading the test-case repository",
+        "Triggering automation runs automatically based on the scenarios under test, and presenting reports built with Cursor",
       ],
     },
     {
       date: "Jul 2025 — Jul 2026",
-      title: "Career Transition — Solutions Architect (Test Automation)",
+      title: "Career Transition — AI + Test Automation R&D",
       company: "Self-Directed Learning, Pune",
       details: [
-        "Focused year diving deep into LLMs, RAG, MCP, AI agents, and orchestration tools like n8n and Langflow, plus LangChain, Playwright, and TypeScript",
-        "Built a POC framework combining AI-driven skills-based prompting with E2E test automation — github.com/TarunBabbar",
-        "Core focus: test architecture & strategy, CI/CD integration & DevOps, tooling & modernization (AI-native tooling like RAG and agent orchestration), and quality governance",
+        "Deep-dived into LLMs, RAG, MCP, AI agents and orchestration tools while strengthening LangChain, Playwright and TypeScript",
+        "Shipped 10+ AI applications — RAG pipelines, agentic QA copilots and the QAE2E pipeline that took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon",
+        "Core focus: test architecture & strategy, CI/CD and DevOps, and AI-native quality engineering",
       ],
     },
     {
@@ -84,7 +86,7 @@ export const profileKnowledge: ProfileKnowledge = {
       company: "Varian Medical Systems, Pune",
       details: [
         "Designed Selenium UI automation + VSTS performance frameworks, reducing regression time by 30%",
-        "Built WPF, MVC, and JavaScript integration testing utilities, saving ~4 hours/week across QA team",
+        "Built WPF, MVC, and JavaScript integration testing utilities, saving ~4 hours/week across the QA team",
         "Spearheaded cross-team API automation strategy, reducing manual API testing by 50%",
         "Championed SOLID principles and coding standards across 2 engineering teams",
       ],
@@ -95,7 +97,7 @@ export const profileKnowledge: ProfileKnowledge = {
       company: "Tata Consultancy Services, Pune",
       details: [
         "Architected enterprise test automation frameworks (C#.NET, Selenium, SpecFlow, Coded UI) — cut manual testing by 50%, boosted coverage by 20%",
-        "Migrated legacy KAF to Selenium with Abstract Factory pattern — 40% faster test execution",
+        "Migrated legacy KAF to Selenium with the Abstract Factory pattern — 40% faster test execution",
         "Owned CI/CD pipeline architecture and BDD strategy across 3+ development teams",
         "Reduced onboarding time by 30% through structured training for 10+ new hires",
       ],
@@ -114,14 +116,24 @@ export const profileKnowledge: ProfileKnowledge = {
   education: "Bachelor of Engineering, Computer Science — Modi Institute of Technology, Kota",
   skills: [
     {
-      title: "Automation & Testing",
-      top: ["Selenium WebDriver", "Playwright", "SpecFlow / BDD"],
-      rest: ["Cypress", "Appium", "REST Assured", "Postman", "TestNG / JUnit", "Pytest", "Performance (k6, JMeter)"],
+      title: "AI & Agentic QA",
+      top: ["Multi-Agent Orchestration", "DeepEval (AI Output Evaluation)", "LLM-as-a-Judge", "RAG Pipelines", "Prompt Engineering"],
+      rest: ["LangGraph", "CrewAI", "MCP Protocol", "Self-Healing Tests", "AI Observability", "Model Routing"],
     },
     {
-      title: "AI & LLM",
-      top: ["RAG Pipelines", "Multi-Agent Orchestration", "LangGraph", "MCP Protocol"],
-      rest: ["LLM Evaluation", "Prompt Engineering", "LLM-as-Judge", "Self-Healing Tests", "AI Observability"],
+      title: "Test Automation",
+      top: ["Playwright", "TypeScript", "Selenium WebDriver", "BDD / SpecFlow / Cucumber"],
+      rest: ["Pytest", "Cypress", "Appium", "REST Assured", "Postman", "NUnit / TestNG / JUnit", "k6 / JMeter"],
+    },
+    {
+      title: "Platforms & Workflow",
+      top: ["Azure DevOps", "TFS", "YAML Pipelines (CI/CD)", "Blazor App Testing"],
+      rest: ["GitHub Actions", "Jenkins", "Docker", "Kubernetes", "Git", "Figma-to-Code Workflows"],
+    },
+    {
+      title: "Languages",
+      top: ["TypeScript", "C# .NET", "Python"],
+      rest: ["JavaScript", "Java", "SQL"],
     },
     {
       title: "Vector DBs & Data",
@@ -129,81 +141,78 @@ export const profileKnowledge: ProfileKnowledge = {
       rest: ["pgvector", "PostgreSQL", "SQLite", "Neon", "ETL Testing"],
     },
     {
-      title: "Languages",
-      top: ["C# .NET", "TypeScript", "Python"],
-      rest: ["JavaScript", "Java", "SQL"],
-    },
-    {
-      title: "CI/CD & DevOps",
-      top: ["Azure DevOps", "GitHub Actions"],
-      rest: ["Jenkins", "Docker", "Kubernetes", "Git"],
-    },
-    {
       title: "Frameworks & Architecture",
-      top: ["Page Object Model", "SOLID Principles"],
-      rest: ["Abstract Factory", "Microservices", "Next.js", "FastAPI", "Express"],
+      top: ["Page Object Model", "SOLID Principles", "8-Layer Framework Architecture"],
+      rest: ["Microservices", "Next.js", "FastAPI", "Express", "REST APIs & Token Auth"],
     },
   ],
   projects: [
     {
-      title: "QAE2E — Agentic Quality Engineering",
-      desc: "End-to-end agentic QA platform: 6 specialist agents (RI → MT → AS → EX → DO → IQ) turn a requirement into analysis, editable coverage, Playwright automation, Docker-executed evidence, and release-confidence intelligence. Connects Jira, Confluence, Figma, GitHub, Zephyr, TestRail, and ships a real MCP server.",
-      tech: ["Next.js 15", "OpenRouter", "Vercel Postgres", "Pinecone", "MCP", "Docker"],
+      title: "QAE2E — AI-Powered QA Pipeline (1st Place, AI Tester Blueprint 3x)",
+      desc: "An agentic QA platform that takes a requirement end-to-end — generating test cases, Playwright automation, executing them, and scoring release confidence. A team of specialist agents works each stage while an AI judge evaluates and refines every step. 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon.",
+      tech: ["Next.js", "OpenRouter", "Agent Orchestration", "Pinecone", "MCP", "Docker"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/qae2e",
       demo: "https://qae2e.vercel.app",
     },
     {
-      title: "QA AI Dashboard",
-      desc: "Unified platform: resume-job matcher (LLM-scored), QA interview prep RAG chat, test case generator from PRDs, AI learning tutor, document Q&A.",
-      tech: ["Next.js 15", "Neon PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
-      repo: "https://github.com/TarunBabbar/AILearning/tree/main/qadashboard",
-      demo: "https://qadashboard-lime.vercel.app",
-    },
-    {
       title: "QA Jobs Portal",
-      desc: "Free daily India QA jobs portal. AI-extracted QA job listings from multiple sources — company, location, posted date, and eligibility — curated for QA engineers and refreshed every day.",
-      tech: ["Next.js 16", "PostgreSQL", "Prisma", "OpenRouter", "AI Extraction"],
+      desc: "Free daily India QA jobs portal — AI-extracted QA listings from multiple sources, curated and refreshed every day.",
+      tech: ["Next.js", "PostgreSQL", "Prisma", "OpenRouter", "AI Extraction"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/job-details",
       demo: "https://qajobs.vercel.app",
     },
     {
-      title: "QA Interview Preparation Kit",
-      desc: "RAG-powered interview prep: PDF/DOCX knowledge base indexed into Pinecone, streaming QA assistant with grounded citations, and topic-organized Q&A browser.",
-      tech: ["Next.js 14", "OpenRouter", "Pinecone", "Tailwind"],
-      repo: "https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit",
-      demo: "https://qa-interview-preparation.vercel.app",
+      title: "QA AI Dashboard",
+      desc: "Unified AI platform — LLM-scored resume-job matcher, QA interview RAG chat, PRD test-case generator, AI tutor and document Q&A.",
+      tech: ["Next.js", "PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
+      repo: "https://github.com/TarunBabbar/AILearning/tree/main/qadashboard",
+      demo: "https://qadashboard-lime.vercel.app",
     },
     {
       title: "QA RAG Platform",
-      desc: "Upload documents, ask AI-powered questions with grounded citations. Supports PDF/DOCX/TXT/MD, smart chunking, configurable embeddings, Pinecone vector search.",
-      tech: ["Next.js 14", "OpenRouter", "Pinecone", "Mammoth", "Tailwind"],
+      desc: "Upload documents and ask AI questions with grounded citations — smart chunking, configurable embeddings and Pinecone vector search.",
+      tech: ["Next.js", "OpenRouter", "Pinecone", "Vector Search"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform",
       demo: "https://qaragplatform.vercel.app",
     },
     {
-      title: "AI Test Architect (QA Copilot)",
-      desc: "Multi-agent LangGraph system: PRD → test case generation, bug → regression selection, framework migration (Selenium → Playwright), Docker-sandboxed test execution.",
-      tech: ["LangGraph", "FastAPI", "ChromaDB", "Next.js", "Docker"],
-      repo: "https://github.com/TarunBabbar/AILearning/tree/main/ai-testarchitect",
-      demo: null,
+      title: "QA Interview Preparation Kit",
+      desc: "RAG-powered interview prep — PDF/DOCX knowledge base indexed into Pinecone with a streaming QA assistant and grounded citations.",
+      tech: ["Next.js", "OpenRouter", "Pinecone", "RAG"],
+      repo: "https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit",
+      demo: "https://qa-interview-preparation.vercel.app",
     },
     {
-      title: "Resume Job RAG",
-      desc: "Full-stack RAG pipeline for QA job seekers. Upload resume → AI profile extraction → multi-source job search → eligibility filtering → LLM-ranked matches.",
+      title: "Jira QA Crew",
+      desc: "QA pipeline driven by a crew of AI agents — connects to Jira stories and walks through analysis, test generation and execution workflows.",
+      tech: ["Next.js", "Agent Crew", "TypeScript", "AI Pipeline"],
+      repo: "https://github.com/TarunBabbar/jira-qa-crew-next",
+      demo: "https://jira-qa-crew-next.vercel.app",
+    },
+    {
+      title: "Resume → Job RAG Pipeline",
+      desc: "Full-stack RAG pipeline: upload resume → AI profile extraction → multi-source job search → eligibility filter → LLM-ranked matches.",
       tech: ["React", "Express", "ChromaDB", "OpenRouter"],
       repo: "https://github.com/TarunBabbar/resume-job-rag",
       demo: null,
     },
     {
+      title: "Chroma RAG Pipeline Visualizer",
+      desc: "RAG visualizer with a live 3-panel UI — ingest PDFs/DOCX, embed via OpenRouter, vector search, and see the LLM answer with real-time progress.",
+      tech: ["React", "Express", "ChromaDB", "SSE"],
+      repo: "https://github.com/TarunBabbar/chroma-react-rag-pipeline",
+      demo: null,
+    },
+    {
       title: "8-Layer Playwright Framework",
-      desc: "Enterprise-grade Playwright framework with strict 8-layer architecture — POM, modules, fixtures, API layer, custom reporting, Docker, and sharding.",
-      tech: ["Playwright", "TypeScript", "Docker", "GitHub Actions"],
+      desc: "Enterprise-grade Playwright framework with strict 8-layer architecture — POM, fixtures, API layer, reporting, Docker and CI-ready.",
+      tech: ["Playwright", "TypeScript", "Docker", "CI/CD"],
       repo: "https://github.com/TarunBabbar/8layer-advance-playwright-framework",
       demo: null,
     },
     {
-      title: "Self-Healing Playwright Framework",
-      desc: "AI-powered self-healing test framework using GPT-4 to detect and fix broken locators automatically when UI changes.",
+      title: "Self-Healing Playwright",
+      desc: "AI-powered self-healing test framework that detects broken locators and repairs them automatically when the UI changes.",
       tech: ["Playwright", "GPT-4", "OpenAI", "TypeScript"],
       repo: "https://github.com/TarunBabbar/SelfHealingPlaywrightFramework",
       demo: null,
@@ -211,9 +220,9 @@ export const profileKnowledge: ProfileKnowledge = {
   ],
   contact: [
     { label: "LinkedIn", value: "linkedin.com/in/tarunbabbar", href: "https://linkedin.com/in/tarunbabbar" },
+    { label: "GitHub", value: "github.com/TarunBabbar", href: "https://github.com/TarunBabbar" },
     { label: "WhatsApp", value: "+91 9623252365", href: "https://wa.me/919623252365" },
     { label: "Phone", value: "+91 9623252365", href: "tel:+919623252365" },
-    { label: "GitHub", value: "github.com/TarunBabbar", href: "https://github.com/TarunBabbar" },
   ],
 };
 
@@ -221,7 +230,8 @@ function renderProfile(k: ProfileKnowledge): string {
   return `# About
 ${k.headline}
 Location: ${k.location}
-Experience: ${k.yearsExperience} years in QA engineering; ${k.aiPlatformsBuilt} AI platforms built.
+Experience: ${k.yearsExperience} years in QA engineering; ${k.aiPlatformsBuilt} AI applications and agentic systems built.
+Hackathon: 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon (60+ participants) with QAE2E, an AI-powered QA pipeline. Results page: https://ai-tester-blueprint-3x-resultsandsu.vercel.app/
 
 ## Highlights
 ${k.highlights.map((h) => `- ${h}`).join("\n")}
@@ -230,7 +240,7 @@ ${k.highlights.map((h) => `- ${h}`).join("\n")}
 ${k.roles
   .map(
     (r) =>
-      `### ${r.title} — ${r.company} (${r.date})\n${r.details.map((d) => `- ${d}`).join("\n")}`
+      `### ${r.title} — ${r.company} (${r.date})${r.tag ? ` [${r.tag}]` : ""}\n${r.details.map((d) => `- ${d}`).join("\n")}`
   )
   .join("\n\n")}
 
@@ -258,6 +268,8 @@ ${k.contact
   .map((c) => `- ${c.label}: [${c.value}](${c.href})`)
   .join("\n")}
 
+Open to Architect / Principal SDET / Senior Principal SDET / QA Head roles — building one scalable, maintainable AI solution that serves multiple teams, onboarding them onto a shared QA AI Platform that delivers consistent, quality outputs organisation-wide.
+
 ## Stats
 ${k.stats.map((s) => `${s.label}: ${s.num}`).join(" | ")}`;
 }
@@ -270,6 +282,8 @@ A visitor is chatting with you to learn about ${profileKnowledge.owner}. Answer 
 Rules:
 - Be friendly, concise, and professional. Use short markdown (bold, bullets) for readability.
 - If asked about anything covered by the profile (experience, skills, projects, education, contact, stats, location), answer directly from it.
+- If asked about his current work or role, mention he works at Coforge Limited for client Xplor Technologies, building multi-agent AI QA frameworks (Figma → requirements → test cases on TFS via REST API, DeepEval evaluation, Playwright + TypeScript, Azure DevOps YAML pipelines).
+- If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline), and link the results page https://ai-tester-blueprint-3x-resultsandsu.vercel.app/
 - When a visitor asks how to reach or contact Tarun, ALWAYS output the contact list as markdown links, one per line, with WhatsApp FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the number/username as the link text — never the word "link". Example format (use these exact URLs):
   - 💬 [WhatsApp: +91 9623252365](https://wa.me/919623252365)
   - 📞 [Phone: +91 9623252365](tel:+919623252365)

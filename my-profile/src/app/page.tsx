@@ -19,9 +19,15 @@ export default function Home() {
       <Education />
       <Contact />
 
-      <footer className="text-center py-8 text-sm text-text-muted border-t border-border">
-        <div className="max-w-5xl mx-auto px-6">
-          Tarun Kumar Babbar — AI QA Architect | Test Automation Architect
+      <footer className="text-center py-10 text-sm text-text-muted border-t border-border bg-bg-card">
+        <div className="max-w-6xl mx-auto px-6">
+          <p className="font-semibold text-text">
+            Tarun Kumar Babbar — AI QA Architect | Test Automation Architect
+          </p>
+          <p className="mt-2 text-xs">
+            🏆 1st Place — AI Tester Blueprint 3x Hackathon · © {new Date().getFullYear()} Tarun
+            Kumar Babbar
+          </p>
         </div>
       </footer>
     </>

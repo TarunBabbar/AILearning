@@ -6,127 +6,238 @@ type Project = {
   title: string;
   desc: string;
   tech: string[];
-  repo: string | null;
+  repo: string;
   demo: string | null;
-  featured?: boolean;
+  tag?: string;
   emoji: string;
-  gradient: string;
 };
 
-const projects: Project[] = [
+const featured: Project = {
+  title: "QAE2E — AI-Powered QA Pipeline",
+  desc: "An agentic QA pipeline — requirement to release confidence, every step judged by an AI agent team.",
+  tech: ["Next.js", "OpenRouter", "Agent Orchestration", "Pinecone", "MCP", "Docker"],
+  repo: "https://github.com/TarunBabbar/AILearning/tree/main/qae2e",
+  demo: "https://qae2e.vercel.app",
+  tag: "1st Place · AI Tester Blueprint 3x",
+  emoji: "🤖",
+};
+
+const apps: Project[] = [
   {
-    title: "QAE2E — Agentic Quality Engineering",
-    desc: "End-to-end agentic QA platform: 6 specialist agents (RI → MT → AS → EX → DO → IQ) turn a requirement into analysis, editable coverage, Playwright automation, Docker-executed evidence, and release-confidence intelligence. Connects Jira, Confluence, Figma, GitHub, Zephyr, TestRail, and ships a real MCP server.",
-    tech: ["Next.js 16", "OpenRouter", "Vercel Postgres", "Pinecone", "MCP", "Docker"],
-    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qae2e",
-    demo: "https://qae2e.vercel.app",
-    featured: true,
-    emoji: "🤖",
-    gradient: "from-amber-500 to-orange-400",
+    title: "QA Jobs Portal",
+    desc: "Free daily India QA jobs portal — AI-extracted QA listings from multiple sources, curated and refreshed every day for QA engineers.",
+    tech: ["Next.js", "PostgreSQL", "Prisma", "OpenRouter", "AI Extraction"],
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/job-details",
+    demo: "https://qajobs.vercel.app",
+    emoji: "💼",
   },
   {
     title: "QA AI Dashboard",
-    desc: "Unified platform: resume-job matcher (LLM-scored), QA interview prep RAG chat, test case generator from PRDs, AI learning tutor, document Q&A.",
-    tech: ["Next.js 16", "PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
+    desc: "Unified AI platform — LLM-scored resume-job matcher, QA interview RAG chat, PRD test-case generator, AI tutor and document Q&A.",
+    tech: ["Next.js", "PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
     repo: "https://github.com/TarunBabbar/AILearning/tree/main/qadashboard",
     demo: "https://qadashboard-lime.vercel.app",
     emoji: "📊",
-    gradient: "from-sky-500 to-blue-400",
-  },
-  {
-    title: "QA Jobs Portal",
-    desc: "Free daily India QA jobs portal. AI-extracted QA job listings from multiple sources — company, location, posted date, and eligibility — curated for QA engineers and refreshed every day.",
-    tech: ["Next.js 16", "PostgreSQL", "Prisma", "OpenRouter", "AI Extraction"],
-    repo: "https://github.com/TarunBabbar/AILearning/tree/main/job-details",
-    demo: "https://qajobs.vercel.app",
-    featured: true,
-    emoji: "💼",
-    gradient: "from-emerald-500 to-teal-400",
-  },
-  {
-    title: "QA Interview Preparation Kit",
-    desc: "RAG-powered interview prep: PDF/DOCX knowledge base indexed into Pinecone, streaming QA assistant with grounded citations, and topic-organized Q&A browser.",
-    tech: ["Next.js 14", "OpenRouter", "Pinecone", "Tailwind"],
-    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit",
-    demo: "https://qa-interview-preparation.vercel.app",
-    emoji: "🎯",
-    gradient: "from-violet-500 to-purple-400",
   },
   {
     title: "QA RAG Platform",
-    desc: "Upload documents, ask AI-powered questions with grounded citations. Supports PDF/DOCX/TXT/MD, smart chunking, configurable embeddings, Pinecone vector search.",
-    tech: ["Next.js 14", "OpenRouter", "Pinecone", "Mammoth", "Tailwind"],
+    desc: "Upload documents and ask AI questions with grounded citations — smart chunking, configurable embeddings and Pinecone vector search.",
+    tech: ["Next.js", "OpenRouter", "Pinecone", "Vector Search"],
     repo: "https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform",
     demo: "https://qaragplatform.vercel.app",
     emoji: "📚",
-    gradient: "from-rose-500 to-pink-400",
   },
   {
-    title: "AI Test Architect (QA Copilot)",
-    desc: "Multi-agent LangGraph system: PRD → test case generation, bug → regression selection, framework migration (Selenium → Playwright), Docker-sandboxed test execution.",
-    tech: ["LangGraph", "FastAPI", "ChromaDB", "Next.js", "Docker"],
-    repo: "https://github.com/TarunBabbar/AILearning/tree/main/ai-testarchitect",
-    demo: null,
-    emoji: "🧠",
-    gradient: "from-indigo-500 to-blue-400",
+    title: "QA Interview Prep Kit",
+    desc: "RAG-powered interview preparation — PDF/DOCX knowledge base indexed into Pinecone with a streaming QA assistant and grounded citations.",
+    tech: ["Next.js", "OpenRouter", "Pinecone", "RAG"],
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit",
+    demo: "https://qa-interview-preparation.vercel.app",
+    emoji: "🎯",
   },
   {
-    title: "Resume Job RAG",
-    desc: "Full-stack RAG pipeline for QA job seekers. Upload resume → AI profile extraction → multi-source job search → eligibility filtering → LLM-ranked matches.",
+    title: "Jira QA Crew",
+    desc: "QA pipeline driven by a crew of AI agents — connects to Jira stories and walks through analysis, test generation and execution workflows.",
+    tech: ["Next.js", "Agent Crew", "TypeScript", "AI Pipeline"],
+    repo: "https://github.com/TarunBabbar/jira-qa-crew-next",
+    demo: "https://jira-qa-crew-next.vercel.app",
+    emoji: "🛰",
+  },
+  {
+    title: "Resume → Job RAG Pipeline",
+    desc: "Full-stack RAG pipeline: upload resume → AI profile extraction → multi-source job search → eligibility filter → LLM-ranked matches.",
     tech: ["React", "Express", "ChromaDB", "OpenRouter"],
     repo: "https://github.com/TarunBabbar/resume-job-rag",
     demo: null,
     emoji: "📄",
-    gradient: "from-teal-500 to-emerald-400",
+  },
+  {
+    title: "Chroma RAG Pipeline Visualizer",
+    desc: "RAG visualizer with a live 3-panel UI — ingest PDFs/DOCX, embed via OpenRouter, vector search, and see the LLM answer with real-time progress.",
+    tech: ["React", "Express", "ChromaDB", "SSE"],
+    repo: "https://github.com/TarunBabbar/chroma-react-rag-pipeline",
+    demo: null,
+    emoji: "🔍",
   },
   {
     title: "8-Layer Playwright Framework",
-    desc: "Enterprise-grade Playwright framework with strict 8-layer architecture — POM, modules, fixtures, API layer, custom reporting, Docker, and sharding.",
-    tech: ["Playwright", "TypeScript", "Docker", "GitHub Actions"],
+    desc: "Enterprise-grade Playwright framework with strict 8-layer architecture — POM, fixtures, API layer, reporting, Docker and CI-ready.",
+    tech: ["Playwright", "TypeScript", "Docker", "CI/CD"],
     repo: "https://github.com/TarunBabbar/8layer-advance-playwright-framework",
     demo: null,
+    tag: "Framework",
     emoji: "🎭",
-    gradient: "from-orange-500 to-amber-400",
   },
   {
-    title: "Self-Healing Playwright Framework",
-    desc: "AI-powered self-healing test framework using GPT-4 to detect and fix broken locators automatically when UI changes.",
+    title: "Self-Healing Playwright",
+    desc: "AI-powered self-healing test framework that detects broken locators and repairs them automatically when the UI changes.",
     tech: ["Playwright", "GPT-4", "OpenAI", "TypeScript"],
     repo: "https://github.com/TarunBabbar/SelfHealingPlaywrightFramework",
     demo: null,
+    tag: "Framework",
     emoji: "🩹",
-    gradient: "from-fuchsia-500 to-pink-400",
   },
 ];
 
 export default function Projects() {
   return (
-    <section id="projects" className="py-14 sm:py-16">
-      <div className="max-w-5xl mx-auto px-6">
+    <section id="apps" className="py-20 sm:py-24 bg-bg-soft">
+      <div className="max-w-6xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="mb-8"
+          className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6"
         >
-          <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">
-            Projects
+          <div>
+            <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">
+              AI Applications
+            </div>
+            <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] font-extrabold tracking-[-0.02em] mb-3">
+              AI Apps You Can Run Today
+            </h2>
+            <p className="text-text-secondary max-w-2xl leading-relaxed">
+              Live applications I designed and built end-to-end. No code walls
+              here — every card opens a working demo, its source on GitHub, or
+              both. Explore what 18 years of QA thinking plus agentic AI can
+              ship.
+            </p>
           </div>
-          <h2 className="text-[clamp(1.6rem,3vw,2.3rem)] font-extrabold tracking-[-0.03em] mb-2">
-            Built to Solve Real Problems
-          </h2>
-          <p className="text-text-secondary max-w-xl leading-relaxed">
-            AI-augmented QA platforms, RAG pipelines, agent systems, and
-            production-grade test frameworks — all built in the last year.
-          </p>
+          <a
+            href="https://github.com/TarunBabbar"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 inline-flex items-center gap-2 text-sm font-semibold text-amber-600 border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 px-4 py-2 rounded-lg transition-all w-fit"
+          >
+            Explore all repos on GitHub
+            <span aria-hidden>→</span>
+          </a>
         </motion.div>
 
+        {/* 🏆 Featured — QAE2E, 1st place */}
+        <motion.article
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="relative mb-12 rounded-2xl border border-amber-500/25 bg-bg-card p-6 sm:p-8 overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+          <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-amber-500/8 blur-3xl pointer-events-none" />
+
+          <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
+            <div className="flex-1 min-w-0">
+              <a
+                href="https://ai-tester-blueprint-3x-resultsandsu.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-amber-500 text-white text-xs font-bold uppercase tracking-wide px-3.5 py-1.5 mb-4 hover:bg-amber-600 transition-colors shadow-sm"
+              >
+                🏆 1st Place — AI Tester Blueprint 3x
+              </a>
+              <h3 className="text-xl sm:text-2xl font-extrabold tracking-[-0.02em] mb-3">
+                {featured.emoji} {featured.title}
+              </h3>
+              <p className="text-text-secondary leading-relaxed mb-4 max-w-3xl">
+                {featured.desc}
+              </p>
+
+              {/* Pipeline */}
+              <div className="flex flex-wrap items-center gap-2 mb-5 text-xs">
+                {["Requirement", "Test Cases", "Playwright Code", "Execution", "Release Confidence"].map(
+                  (step, i) => (
+                    <span key={step} className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-700 font-medium">
+                        {step}
+                      </span>
+                      {i < 4 && <span className="text-amber-500">→</span>}
+                    </span>
+                  )
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 mb-6">
+                {featured.tech.map((t) => (
+                  <span
+                    key={t}
+                    className="text-[11px] font-medium bg-bg-soft border border-border text-text-secondary px-2 py-0.5 rounded"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href={featured.demo!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-all shadow-sm"
+                >
+                  Live Demo
+                </a>
+                <a
+                  href="https://ai-tester-blueprint-3x-resultsandsu.vercel.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-bg-card border border-amber-500/40 text-amber-700 hover:bg-amber-500/10 font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
+                >
+                  🏆 Results Page
+                </a>
+                <a
+                  href={featured.repo}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-amber-500 text-text font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
+                >
+                  <GitHubIcon className="w-4 h-4" />
+                  Source on GitHub
+                </a>
+              </div>
+            </div>
+          </div>
+        </motion.article>
+
+        {/* Grid of apps */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((p, i) => (
+          {apps.map((p, i) => (
             <ProjectCard key={p.title} project={p} i={i} />
           ))}
         </div>
+
+        <p className="mt-8 text-center text-sm text-text-muted">
+          Plus 20+ more repositories — Selenium & Appium suites, API automation,
+          C#/.NET frameworks and agent experiments.{" "}
+          <a
+            href="https://github.com/TarunBabbar"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-amber-600 hover:underline font-medium"
+          >
+            Explore everything on GitHub →
+          </a>
+        </p>
       </div>
     </section>
   );
@@ -140,27 +251,27 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.4, delay: i * 0.05 }}
-      className={`relative flex flex-col bg-surface border rounded-xl p-5 transition-all group ${
-        p.featured
-          ? "border-amber-400/60 shadow-md shadow-amber-500/10 hover:shadow-xl hover:-translate-y-1"
-          : "border-border hover:shadow-lg hover:-translate-y-1"
-      }`}
+      className="card-accent relative flex flex-col bg-bg-card border border-border rounded-xl p-5 transition-all group hover:border-amber-400 hover:bg-bg-card-hover hover:-translate-y-1 hover:shadow-md"
     >
-      {/* Top accent gradient */}
-      <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-xl bg-gradient-to-r ${p.gradient}`} />
-
-      {/* Icon + title */}
       <div className="flex items-start gap-3 mb-3">
-        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${p.gradient} flex items-center justify-center text-lg text-white shadow-sm shrink-0`}>
+        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-lg shrink-0">
           {p.emoji}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-[15px] leading-snug">{p.title}</h4>
-          {p.featured && (
-            <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
-              ★ Featured
-            </span>
-          )}
+          <h4 className="font-bold text-[15px] leading-snug text-text">{p.title}</h4>
+          <span className="inline-flex mt-1.5 items-center gap-1.5">
+            {p.demo && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Live
+              </span>
+            )}
+            {p.tag && (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                {p.tag}
+              </span>
+            )}
+          </span>
         </div>
       </div>
 
@@ -170,27 +281,43 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
         {p.tech.map((t) => (
           <span
             key={t}
-            className="text-[11px] font-mono font-medium bg-cream-alt border border-border px-2 py-0.5 rounded"
+            className="text-[11px] font-medium bg-bg-soft border border-border text-text-secondary px-2 py-0.5 rounded"
           >
             {t}
           </span>
         ))}
       </div>
 
-      <div className="flex gap-3 border-t border-border pt-3">
-        {p.repo && (
-          <a href={p.repo} target="_blank" className="text-xs font-semibold text-amber-600 group-hover:underline inline-flex items-center gap-1">
-            GitHub
-            <span aria-hidden>→</span>
-          </a>
-        )}
+      <div className="flex gap-4 border-t border-border pt-3">
         {p.demo && (
-          <a href={p.demo} target="_blank" className="text-xs font-semibold text-text-secondary group-hover:text-amber-700 group-hover:underline inline-flex items-center gap-1">
+          <a
+            href={p.demo}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-amber-600 group-hover:text-amber-700 inline-flex items-center gap-1"
+          >
             Live Demo
             <span aria-hidden>→</span>
           </a>
         )}
+        <a
+          href={p.repo}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-semibold text-text-secondary group-hover:text-amber-700 inline-flex items-center gap-1"
+        >
+          GitHub
+          <span aria-hidden>→</span>
+        </a>
       </div>
     </motion.div>
+  );
+}
+
+function GitHubIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+    </svg>
   );
 }
