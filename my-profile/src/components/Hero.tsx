@@ -53,16 +53,13 @@ export default function Hero() {
               variants={stagger}
               className="max-w-2xl text-center lg:text-left"
             >
-              <motion.a
+              <motion.div
                 variants={fadeUp}
-                href="https://ai-tester-blueprint-3x-resultsandsu.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-700 border border-amber-500/25 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5 hover:bg-amber-500/20 transition-colors"
+                className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-700 border border-amber-500/25 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5"
               >
                 <span>🏆</span>
                 1st Place · AI Tester Blueprint 3x Hackathon · The Testing Academy
-              </motion.a>
+              </motion.div>
 
               <motion.h1
                 variants={fadeUp}

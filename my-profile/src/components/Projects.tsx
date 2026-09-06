@@ -148,14 +148,9 @@ export default function Projects() {
 
           <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
             <div className="flex-1 min-w-0">
-              <a
-                href="https://ai-tester-blueprint-3x-resultsandsu.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-amber-500 text-white text-xs font-bold uppercase tracking-wide px-3.5 py-1.5 mb-4 hover:bg-amber-600 transition-colors shadow-sm"
-              >
+              <span className="inline-flex items-center gap-2 rounded-full bg-amber-500 text-white text-xs font-bold uppercase tracking-wide px-3.5 py-1.5 mb-4">
                 🏆 1st Place — AI Tester Blueprint 3x
-              </a>
+              </span>
               <h3 className="text-xl sm:text-2xl font-extrabold tracking-[-0.02em] mb-3">
                 {featured.emoji} {featured.title}
               </h3>
@@ -196,14 +191,6 @@ export default function Projects() {
                   className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-all shadow-sm"
                 >
                   Live Demo
-                </a>
-                <a
-                  href="https://ai-tester-blueprint-3x-resultsandsu.vercel.app/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-bg-card border border-amber-500/40 text-amber-700 hover:bg-amber-500/10 font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
-                >
-                  🏆 Results Page
                 </a>
                 <a
                   href={featured.repo}

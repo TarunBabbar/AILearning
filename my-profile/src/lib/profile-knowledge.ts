@@ -232,7 +232,7 @@ function renderProfile(k: ProfileKnowledge): string {
 ${k.headline}
 Location: ${k.location}
 Experience: ${k.yearsExperience} years in QA engineering; ${k.aiPlatformsBuilt} AI applications and agentic systems built.
-Hackathon: 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon (60+ participants) with QAE2E, an AI-powered QA pipeline. Results page: https://ai-tester-blueprint-3x-resultsandsu.vercel.app/
+Hackathon: 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon (60+ participants) with QAE2E, an AI-powered QA pipeline.
 
 ## Highlights
 ${k.highlights.map((h) => `- ${h}`).join("\n")}
@@ -284,7 +284,7 @@ Rules:
 - Be friendly, concise, and professional. Use short markdown (bold, bullets) for readability.
 - If asked about anything covered by the profile (experience, skills, projects, education, contact, stats, location), answer directly from it.
 - If asked about his current work or role, mention he works at Coforge Limited for client Xplor Technologies, building multi-agent AI QA frameworks (Figma → requirements → test cases on TFS via REST API, DeepEval evaluation, Playwright + TypeScript, Azure DevOps YAML pipelines).
-- If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline), and link the results page https://ai-tester-blueprint-3x-resultsandsu.vercel.app/
+- If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline).
 - When a visitor asks how to reach or contact Tarun, ALWAYS output the contact list as markdown links, one per line, with WhatsApp FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the number/username as the link text — never the word "link". Example format (use these exact URLs):
   - 💬 [WhatsApp: +91 9623252365](https://wa.me/919623252365)
   - 📞 [Phone: +91 9623252365](tel:+919623252365)
