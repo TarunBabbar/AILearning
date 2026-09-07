@@ -1,6 +1,6 @@
 # Tarun Kumar Babbar — Personal Profile
 
-A stunning, Claude-themed portfolio website built with **Next.js 16**, **Tailwind CSS v4**, and **Framer Motion**. Showcases 18+ years of QA engineering experience, AI-augmented automation frameworks, and open-source projects.
+A warm, Claude-inspired portfolio website built with **Next.js 16**, **Tailwind CSS v4**, and **Framer Motion**. Showcases 18+ years of QA engineering experience, AI-powered QA applications, an agentic QA pipeline that took **1st place at the AI Tester Blueprint 3x hackathon**, and the current work at **Coforge Limited for client Xplor Technologies**.
 
 ## Tech Stack
 
@@ -9,34 +9,34 @@ A stunning, Claude-themed portfolio website built with **Next.js 16**, **Tailwin
 | Framework | Next.js 16 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS v4 |
-| Animations | Framer Motion 12 |
-| Fonts | Inter (UI), JetBrains Mono (code) |
+| Animations | Framer Motion |
+| Fonts | Inter (UI), JetBrains Mono (code tags) |
 | Deployment | Vercel |
 
 ## Sections
 
-- **Hero** — Name, title, photo, stats bar (18+ years, 6 AI platforms, 100% automation adoption, ~40% defect reduction, 3 enterprise frameworks)
-- **About** — Bio with highlights grid of core skills
-- **Projects** — 9 project cards with GitHub links and live demos:
-  - QAE2E (Agentic Quality Engineering)
-  - QA AI Dashboard
+- **Hero** — Name-first intro with photo, 1st-place hackathon badge, AI QA Architect / Test Automation Architect headline, CTAs (Explore AI Apps, QAE2E Live Demo, GitHub), and stats bar (18+ years, 10+ AI apps built, #1 hackathon, 100% automation adoption)
+- **About** — Bio focused on multi-agent pipelines: AI-generated requirements → test cases with auto duplicate-scenario detection → DeepEval output evaluation → model-driven decisions via agentic prompting → automation. Highlights grid included.
+- **AI Applications** (`#apps`) — Featured spotlight for **QAE2E** (1st place, AI Tester Blueprint 3x) with live demo, source links, and pipeline chips, followed by cards for live AI apps:
   - QA Jobs Portal
-  - QA Interview Preparation Kit
+  - QA AI Dashboard
   - QA RAG Platform
-  - AI Test Architect (QA Copilot)
-  - Resume Job RAG
+  - QA Interview Prep Kit
+  - Jira QA Crew
+  - Resume → Job RAG Pipeline
+  - Chroma RAG Pipeline Visualizer
   - 8-Layer Playwright Framework
-  - Self-Healing Playwright Framework
-- **Skills** — 6 category grids (Automation, AI/LLM, Vector DBs, Languages, CI/CD, Architecture)
-- **Career** — Timeline with 4 roles (Coupa, Varian, TCS, Infosys) with bullet-point achievements
+  - Self-Healing Playwright
+- **Skills** — 6 category grids: AI & Agentic QA (DeepEval, multi-agent orchestration), Test Automation, Platforms & Workflow (Azure DevOps, TFS, YAML pipelines, Blazor), Languages, Vector DBs & Data, Frameworks & Architecture
+- **Career** — Timeline: Solutions Architect at Coforge Limited (client: Xplor Technologies), AI + Test Automation R&D, Coupa Software, Varian Medical Systems, TCS, Infosys
 - **Education** — BE Computer Science, Modi Institute of Technology, Kota
-- **Contact** — Phone, Email, LinkedIn, GitHub
+- **Contact** — LinkedIn, GitHub, WhatsApp, Phone, plus org-level positioning (open to Architect / Principal SDET / QA Head roles building org-wide QA AI platforms)
 - **Header** — Sticky nav with scroll-aware background, mobile hamburger menu
 
 ## Design
 
-- **Theme:** Claude-inspired warm cream palette (`#faf7f5` background, `#d97706` amber accent, `#ede3da` borders)
-- **Typography:** Inter for body, JetBrains Mono for code tags
+- **Theme:** Claude-inspired warm beige palette (`#faf9f5` background, terracotta `#c96442` accent, `#e8e3d7` borders, white cards)
+- **Typography:** Inter for body text; JetBrains Mono for tech chips
 - **Animations:** Framer Motion scroll-triggered fade/slide/stagger on every section
 - **Responsive:** Mobile-first layout with adaptive grids
 
