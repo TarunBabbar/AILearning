@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/enrich-jobs",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/jobs-digest",
+      "schedule": "30 15 * * 1-5"
     }
   ]
 }

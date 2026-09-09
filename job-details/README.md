@@ -146,6 +146,11 @@
 - **Smart scoping**: if ≤ 30 jobs are incomplete, it enriches them all; if hundreds are missing data, it restricts to **today's new jobs** so the run doesn't burn LLM quota on the backlog.
 - Protected by `CRON_SECRET` bearer token; can also be triggered manually via curl.
 
+### 📬 Architect-jobs digest (cron)
+- A weekday cron (`/api/cron/jobs-digest`, Mon–Fri 9 PM IST — Vercel expresses it as `30 15 * * 1-5` UTC) emails **today's new QA / Test / Automation architect jobs** (title contains "architect") with full details — company, contact email, location, experience, description — to `DIGEST_TO_EMAIL`.
+- Sent through the same Gmail SMTP identity as the welcome email. On a weekday with **zero** architect matches it sends a short "no architect jobs today" confirmation instead.
+- Protected by `CRON_SECRET` (Vercel Cron attaches it automatically as a Bearer header); triggers via GET from Vercel, or GET/POST with curl.
+
 ### 🛡 Security hardening
 - `DELETE /api/jobs/[id]` and `POST /api/companies/resolve` now require **admin auth**.
 - Session tokens reject **empty/hardcoded secrets** (no more `jobdetails-dev-secret` fallback).
@@ -199,6 +204,7 @@ job-details/
 │  │  ├─ users/                 # GET admin user list (USERS_ADMIN_API_KEY)
 │  │  ├─ chat/                  # POST chat assistant · GET context snapshot
 │  │  ├─ cron/enrich-jobs/      # POST — daily LLM fill of missing job fields (CRON_SECRET)
+│  │  ├─ cron/jobs-digest/      # GET/POST — Mon–Fri 9 PM IST architect-jobs email (CRON_SECRET)
 │  │  ├─ settings/              # GET — config status (key configured, model)
 │  │  └─ extract-preview/       # POST — word count for pasted text
 │  ├─ layout.tsx                # root layout (font, metadata, Analytics)
@@ -315,7 +321,8 @@ npm run dev
 | `SMTP_PASS`          | ❌       | SMTP app password (Gmail App Password, not the account password)            | `xxxx xxxx xxxx xxxx`                                         |
 | `SMTP_FROM_NAME`     | ❌       | "From" display name on emails (default `QA Jobs Portal`)                     | `QA Jobs Portal`                                              |
 | `SMTP_FROM_EMAIL`    | ❌       | "From" email (defaults to `SMTP_USER`)                                      | `qajobs.portal@gmail.com`                                     |
-| `CRON_SECRET`        | ❌       | Bearer token protecting `/api/cron/enrich-jobs`                              | `your-secret`                                                 |
+| `DIGEST_TO_EMAIL`    | ❌       | Recipient of the daily architect-jobs digest (defaults to `SMTP_USER`)       | `me@gmail.com`                                                |
+| `CRON_SECRET`        | ❌       | Bearer token protecting `/api/cron/*` (auto-attached to Vercel Cron calls)   | `your-secret`                                                 |
 | `RATE_LIMIT_FORGOT_PASSWORD` | ❌ | Max forgot-password requests per IP per 15 min (default `5`)               | `5`                                                           |
 
 ---
@@ -501,6 +508,7 @@ a pause takes a few seconds to wake the DB. That's normal.
 | `POST` | `/api/chat`              | Chat assistant — answer a question or forward a message to the owner's Telegram | `{ message, mode?, history?, context? }` |
 | `GET`  | `/api/chat/context`      | User job-data context snapshot (cached client-side)  | —                                                   |
 | `POST` | `/api/cron/enrich-jobs`  | Fill missing job fields via LLM (bearer `CRON_SECRET`) | `{ limit? }`                                      |
+| `GET/POST` | `/api/cron/jobs-digest` | Email today's architect jobs to `DIGEST_TO_EMAIL` (bearer `CRON_SECRET`) | — |
 
 > List GET routes that say **edge-cached** return `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`. The browser client still uses `cache: "no-store"` so SWR owns freshness after uploads.
 

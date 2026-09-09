@@ -57,6 +57,8 @@ export function getConfig() {
       fromName: process.env.SMTP_FROM_NAME || "QA Jobs Portal",
       fromEmail: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "",
     },
+    // Recipient of the daily architect-jobs digest (defaults to the SMTP user).
+    digestToEmail: (process.env.DIGEST_TO_EMAIL || process.env.SMTP_USER || "").trim(),
     isProduction: process.env.NODE_ENV === "production",
   };
 }
