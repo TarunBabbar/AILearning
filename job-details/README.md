@@ -58,6 +58,7 @@
 ### 🧠 LLM extraction (Command Code provider — DeepSeek V4 Flash Fast)
 - **Primary LLM path**: when `CMD_API_KEY` is set, all LLM calls (extraction, scoring, chat, enrichment) route through the **Command Code provider API** (`https://api.commandcode.ai/provider/v1`) with `CMD_MODEL` (default `deepseek/deepseek-v4-flash-fast` — the low-latency variant, ~4× faster extraction than standard flash). OpenRouter free models are **not** used — they're flaky and 429-prone.
 - Extraction runs chunks in parallel across the model; large documents are split into overlapping chunks so output never exceeds the model's token limit.
+- **Streaming + resumable batches**: each LLM call streams (so a long generation keeps its gateway connection alive instead of dying with HTTP 524), and extraction runs in bounded batches — the browser resumes from the server's `nextChunk` until the document is done, so huge PDFs and slow/flaky upstreams can never hit the function timeout. Tune with `EXTRACT_CONCURRENCY`, `EXTRACT_CHUNK_SIZE` and `EXTRACT_BATCH_*`.
 - Results are deduplicated (by title + email + company) against existing rows.
 - Strict-JSON prompting with fallback-safe parsing (handles markdown fences / prose around JSON).
 
@@ -431,7 +432,7 @@ a pause takes a few seconds to wake the DB. That's normal.
          │                         ├──────────────────────────▶│  POST /api/upload     │
          │                         │  { fileName, text }       │  (text only, no bin) │
          │                         │                           ├──────────────────────▶│
-         │                         │                           │  chunk text (~6k)    │
+         │                         │                           │  chunk text (~4k)    │
          │                         │                           │  LLM → strict JSON   │
          │                         │                           │  dedupe vs existing  │
          │                         │                           │  createMany jobs     │
@@ -522,7 +523,7 @@ a pause takes a few seconds to wake the DB. That's normal.
 | `No OpenRouter API key configured` | Only relevant in OpenRouter mode — set `OPENROUTER_API_KEY` in `.env` (local) or Vercel env vars. |
 | `Command Code rejected the API key (401)` | The `CMD_API_KEY` must be the `user_...` key from `~/.commandcode/auth.json`. |
 | `OpenRouter returned 402` | The model needs credits or has no free variant — pick a free model id on the Upload page (OpenRouter mode). |
-| `Command Code API 524` / extraction very slow | The gateway timed out because a single chunk response took too long (~2 min). Lower `EXTRACT_CHUNK_SIZE` (e.g. `3000`) and `EXTRACT_MAX_TOKENS` (e.g. `6000`), or raise `EXTRACT_CONCURRENCY`. |
+| `Command Code API 524` / extraction very slow | Long generations are cut off by the provider gateway. Extraction now **streams** (keeps the connection alive) and runs in **resumable batches**, so this should not happen — if it does, lower `EXTRACT_CHUNK_SIZE` and raise `EXTRACT_BATCH_BUDGET_MS` so each request does less work. |
 | `OpenRouter rejected the API key (401)` | Double-check the key at [openrouter.ai/keys](https://openrouter.ai/keys); it must be `sk-or-v1-…`. |
 | `DATABASE_URL is not set` | Add `DATABASE_URL` to `.env` / Vercel env vars. |
 | `P1010: User was denied access` / SSL errors | The app uses `rejectUnauthorized: false` in production; verify the direct connection string and DB credentials. |

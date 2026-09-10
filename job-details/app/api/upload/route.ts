@@ -1,5 +1,5 @@
 import { resolveApiKey } from "@/lib/auth";
-import { extractJobsFromText } from "@/lib/extract-jobs";
+import { extractJobsBatch, type ExtractedJob } from "@/lib/extract-jobs";
 import { parseJobDate } from "@/lib/extract";
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db";
@@ -94,7 +94,13 @@ export async function POST(req: Request) {
           fileName?: string;
           text?: string;
           model?: string;
+          chunkOffset?: number;
         };
+        // Resume point for batched extraction (0 on the first call).
+        const chunkOffset =
+          typeof body.chunkOffset === "number" && Number.isFinite(body.chunkOffset)
+            ? Math.max(0, Math.floor(body.chunkOffset))
+            : 0;
 
         if (!text || typeof text !== "string" || text.trim().length < 50) {
           send({ type: "error", message: "Extracted text is empty or too short to parse." });
@@ -143,8 +149,8 @@ export async function POST(req: Request) {
         let added = 0;
         let duplicateCount = 0;
 
-        const saveJobs = async (jobs: Awaited<ReturnType<typeof extractJobsFromText>>) => {
-          const newJobs: Awaited<ReturnType<typeof extractJobsFromText>> = [];
+        const saveJobs = async (jobs: ExtractedJob[]) => {
+          const newJobs: ExtractedJob[] = [];
           for (const j of jobs) {
             const key = dupKey(j.company, j.description);
             if (existingKeys.has(key)) {
@@ -184,18 +190,24 @@ export async function POST(req: Request) {
           }
         };
 
-        // ── Parallel LLM extraction — each chunk is saved to the DB as
-        //    soon as its response lands, no waiting for all chunks. ──
-        // Budget the run below the platform function limit so a slow upstream
-        // returns the chunks already saved instead of being killed mid-stream.
-        const extractBudgetMs = Math.max(
-          30_000,
-          Number(process.env.EXTRACT_BUDGET_MS) || 240_000
+        // ── One bounded batch of chunks. Each chunk is saved to the DB as soon
+        //    as its response lands. The caller resumes from `nextChunk` until
+        //    the document is done, so a large document (or a slow/flaky
+        //    upstream) can never exceed the platform function timeout. ──
+        const batchBudgetMs = Math.max(
+          20_000,
+          Number(process.env.EXTRACT_BATCH_BUDGET_MS) || 150_000
+        );
+        const batchChunks = Math.max(
+          1,
+          Number(process.env.EXTRACT_BATCH_CHUNKS) || 8
         );
         let chunksTotalSent = false;
-        const jobs = await extractJobsFromText(text, apiKey, useModel, {
+        const outcome = await extractJobsBatch(text, apiKey, useModel, {
           log,
-          deadlineMs: Date.now() + extractBudgetMs,
+          chunkOffset,
+          maxChunks: batchChunks,
+          deadlineMs: Date.now() + batchBudgetMs,
           onProgress: (p) => {
             progress(p.message);
             // Send the chunk total up front so the client can render a
@@ -208,22 +220,28 @@ export async function POST(req: Request) {
           onChunk: async (chunkJobs) => saveJobs(chunkJobs),
         });
 
+        const done = outcome.nextChunk == null;
         const total = await prisma.job.count();
         log.info(
           "upload",
-          "Done",
-          `extracted ${jobs.length}, added ${added}, duplicates ${duplicateCount}, total ${total}`
+          done ? "Done" : "Batch done",
+          `batch ${chunkOffset}-${outcome.nextChunk ?? outcome.totalChunks}/${outcome.totalChunks}, extracted ${outcome.jobs.length}, added ${added}, duplicates ${duplicateCount}, total ${total}`
         );
 
         send({
           type: "result",
           data: {
-            message: `Extracted ${jobs.length} job(s): ${added} new, ${duplicateCount} duplicate(s). Total jobs: ${total}.`,
-            extracted: jobs.length,
+            message: done
+              ? `Extracted ${outcome.jobs.length} job(s): ${added} new, ${duplicateCount} duplicate(s). Total jobs: ${total}.`
+              : `Batch done — ${added} new, ${duplicateCount} duplicate(s) so far; continuing…`,
+            extracted: outcome.jobs.length,
             added,
             duplicates: duplicateCount,
             total,
             apiKeySource: source,
+            nextChunk: outcome.nextChunk,
+            done,
+            totalChunks: outcome.totalChunks,
           },
         });
         controller.close();

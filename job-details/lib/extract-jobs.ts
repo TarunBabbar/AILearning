@@ -134,7 +134,24 @@ function pickNextModel(models: string[], tried: Set<string>): string | null {
   return models.find((m) => !tried.has(m)) ?? null;
 }
 
-export async function extractJobsFromText(
+export type ExtractBatchOutcome = {
+  jobs: ExtractedJob[];
+  /** Total chunks the document splits into (stable across batches). */
+  totalChunks: number;
+  /**
+   * First chunk index NOT processed in this batch, or null when the document
+   * is finished. Callers resume with `chunkOffset: nextChunk`.
+   */
+  nextChunk: number | null;
+};
+
+/**
+ * Extract one batch of chunks. Chunking is deterministic, so a caller can
+ * resume with `chunkOffset`: every request stays comfortably inside the
+ * platform's function timeout no matter how large the document is or how slow
+ * the upstream model runs.
+ */
+export async function extractJobsBatch(
   rawText: string,
   apiKey: string,
   preferredModel: string,
@@ -144,13 +161,16 @@ export async function extractJobsFromText(
     /** Called with each chunk's extracted jobs as soon as that chunk lands. */
     onChunk?: (jobs: ExtractedJob[], chunkNum: number, totalChunks: number) => void | Promise<void>;
     /**
-     * Absolute epoch-ms budget. Once passed, no new chunk is dispatched and
-     * in-flight calls stop retrying, so the run returns the chunks already
-     * saved instead of being killed by the platform timeout.
+     * Absolute epoch-ms budget for THIS batch. Once passed, no further chunk is
+     * dispatched — at least one always runs, so batches always make progress.
      */
     deadlineMs?: number;
+    /** Chunk index to start at (0-based). Defaults to 0. */
+    chunkOffset?: number;
+    /** Max chunks to process in this batch. Defaults to all remaining. */
+    maxChunks?: number;
   } = {}
-): Promise<ExtractedJob[]> {
+): Promise<ExtractBatchOutcome> {
   const log = opts.log ?? createLogger();
 
   // Chunk size drives how long each model response takes. The Command Code
@@ -163,9 +183,17 @@ export async function extractJobsFromText(
   const chunks = chunkText(rawText, chunkSize, chunkOverlap);
   const totalChunks = chunks.length;
 
+  // This batch's slice of the document.
+  const start = Math.min(Math.max(0, Math.floor(opts.chunkOffset ?? 0)), totalChunks);
+  const requestedEnd =
+    opts.maxChunks && opts.maxChunks > 0
+      ? Math.min(totalChunks, start + Math.floor(opts.maxChunks))
+      : totalChunks;
+  const batchChunks = chunks.slice(start, requestedEnd);
+
   log.info(
     "extract",
-    `Starting parallel extraction · ${rawText.length.toLocaleString()} chars → ${totalChunks} chunk(s)`,
+    `Extracting chunks ${start + 1}-${requestedEnd} of ${totalChunks} · ${rawText.length.toLocaleString()} chars`,
     `preferred=${preferredModel || "none"}`
   );
 
@@ -175,18 +203,18 @@ export async function extractJobsFromText(
   const modelPool = await buildModelPool(preferredModel, log);
   if (!modelPool.length) {
     log.error("extract", "No free models available", "aborting");
-    return [];
+    return { jobs: [], totalChunks, nextChunk: null };
   }
   const firstModel = modelPool[0];
-  if (!firstModel) return [];
+  if (!firstModel) return { jobs: [], totalChunks, nextChunk: null };
   const startOffset = Math.floor(Math.random() * modelPool.length);
 
   // ── Parallel extraction, bounded concurrency ──
   // Firing every chunk at once against a rate-limited provider slams it with
   // a burst of requests → aggregate 429s. Cap how many chunks hit the model
-  // simultaneously (3 is fast but gentle); the retry/jitter layer then
-  // handles any residual rate limits. Tune via env if needed.
-  const MAX_PARALLEL = Number(process.env.EXTRACT_CONCURRENCY) || 3;
+  // simultaneously. Higher = faster; the retry/jitter layer absorbs residual
+  // rate limits. Tune via env if needed.
+  const MAX_PARALLEL = Math.max(1, Number(process.env.EXTRACT_CONCURRENCY) || 5);
 
   // Output budget per chunk. This was 24,000 to dodge "finish_reason: length"
   // truncation, but that lets a single response generate for minutes — which
@@ -194,26 +222,33 @@ export async function extractJobsFromText(
   // chunks a few thousand tokens is ample for the JSON payload.
   const extractMaxTokens = Math.max(1000, Number(process.env.EXTRACT_MAX_TOKENS) || 8000);
 
+  // How far this batch got. Dispatch is sequential (shared cursor), so this is
+  // the resume point handed back to the caller.
+  let dispatched = 0;
+
   const results = await mapWithConcurrency(
-    chunks,
+    batchChunks,
     MAX_PARALLEL,
     async (chunkText, i) => {
-      const chunkNum = i + 1;
+      // Document-wide chunk number, so progress and resume points align.
+      const chunkNum = start + i + 1;
 
-      // Stop dispatching once the time budget is spent — chunks already saved
-      // are kept, so the upload still returns a useful partial result.
-      if (opts.deadlineMs && Date.now() >= opts.deadlineMs) {
+      // Stop dispatching once the batch budget is spent — chunks already saved
+      // are kept and the caller resumes at `dispatched`. The first chunk of a
+      // batch always runs, so a batch can never spin without making progress.
+      if (opts.deadlineMs && dispatched > 0 && Date.now() >= opts.deadlineMs) {
         log.warn(
           "extract",
-          `Skipping chunk ${chunkNum}/${totalChunks} — time budget exhausted`,
-          "chunks already extracted are kept"
+          `Skipping chunk ${chunkNum}/${totalChunks} — batch time budget exhausted`,
+          "resuming here in the next batch"
         );
         return [] as ExtractedJob[];
       }
+      dispatched = i + 1;
 
       const prompt = buildExtractionPrompt(chunkText);
       const tried = new Set<string>();
-      let model = modelPool[(startOffset + i) % modelPool.length];
+      let model = modelPool[(startOffset + chunkNum) % modelPool.length];
 
       opts.onProgress?.({
         phase: "chunk_start",
@@ -246,6 +281,9 @@ export async function extractJobsFromText(
               maxRetries: Number(process.env.EXTRACT_MAX_RETRIES) || 3,
               maxRetryDelayMs: 60_000,
               deadlineMs: opts.deadlineMs,
+              // Stream so long generations keep the gateway connection alive
+              // (a silent non-streamed request is what returns HTTP 524).
+              stream: true,
             },
             log
           );
@@ -335,9 +373,9 @@ export async function extractJobsFromText(
   );
 
   const allJobs = results.flat();
-  log.info("extract", `All ${totalChunks} chunk(s) finished`, `${allJobs.length} raw job(s)`);
 
-  // Dedupe by title|email|company
+  // Dedupe by title|email|company within this batch. Cross-batch duplicates are
+  // caught when the caller persists (it dedupes against the database).
   const seen = new Set<string>();
   const unique: ExtractedJob[] = [];
   for (const j of allJobs) {
@@ -347,24 +385,25 @@ export async function extractJobsFromText(
     unique.push(j);
   }
 
-  if (allJobs.length !== unique.length) {
-    log.info(
-      "extract",
-      `Deduped ${allJobs.length} → ${unique.length} job(s)`,
-      `${allJobs.length - unique.length} duplicate(s) removed`
-    );
-  } else {
-    log.info("extract", `Extraction complete — ${unique.length} job(s)`, "no duplicates");
-  }
+  const resumeAt = Math.min(start + dispatched, totalChunks);
+  const nextChunk = resumeAt >= totalChunks ? null : resumeAt;
+  log.info(
+    "extract",
+    `Batch finished · chunks ${start + 1}-${start + dispatched} of ${totalChunks} → ${unique.length} job(s)`,
+    nextChunk == null ? "document complete" : `resume at chunk ${nextChunk + 1}`
+  );
   opts.onProgress?.({
     phase: "dedupe",
-    chunk: totalChunks,
+    chunk: resumeAt,
     totalChunks,
     foundJobs: unique.length,
-    message: `Filtering done — ${unique.length} unique job(s).`,
+    message:
+      nextChunk == null
+        ? `Filtering done — ${unique.length} unique job(s).`
+        : `Filtering done — ${unique.length} unique job(s) in this batch; continuing…`,
   });
 
-  return unique;
+  return { jobs: unique, totalChunks, nextChunk };
 }
 
 /**

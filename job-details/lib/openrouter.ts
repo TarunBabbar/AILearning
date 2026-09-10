@@ -23,6 +23,13 @@ type CallOptions = {
    * (e.g. repeated gateway 524s during a long-running extraction).
    */
   deadlineMs?: number;
+  /**
+   * Stream the completion (SSE) instead of waiting for the whole body.
+   * Long generations otherwise sit silent for minutes, which the provider's
+   * gateway kills with HTTP 524. Streaming keeps bytes flowing so the
+   * connection stays alive. Falls back to non-streaming if streaming fails.
+   */
+  stream?: boolean;
 };
 
 /** A prior exchange in the conversation, for chat memory. */
@@ -69,6 +76,76 @@ function retryDelayMs(
 
 function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
+}
+
+type StreamChunk = {
+  choices?: {
+    delta?: { content?: string | null };
+    finish_reason?: string | null;
+  }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+};
+
+type StreamedCompletion = {
+  content: string;
+  finishReason?: string;
+  usage: string;
+};
+
+/**
+ * Read a streamed (SSE) chat completion, accumulating the assistant content.
+ * `onData` is called for every chunk so the caller can re-arm its idle
+ * watchdog while tokens are still flowing.
+ */
+async function readStreamedCompletion(
+  response: Response,
+  onData: () => void
+): Promise<StreamedCompletion> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Streaming response had no body");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+  let finishReason: string | undefined;
+  let promptTokens: number | undefined;
+  let completionTokens: number | undefined;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onData();
+    buffer += decoder.decode(value, { stream: true });
+    // SSE frames are newline-delimited; keep the trailing partial line.
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      let chunk: StreamChunk;
+      try {
+        chunk = JSON.parse(payload) as StreamChunk;
+      } catch {
+        continue; // partial/garbled frame — the next one carries the rest
+      }
+      const choice = chunk.choices?.[0];
+      const delta = choice?.delta?.content;
+      if (typeof delta === "string") content += delta;
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+      if (chunk.usage) {
+        promptTokens = chunk.usage.prompt_tokens;
+        completionTokens = chunk.usage.completion_tokens;
+      }
+    }
+  }
+
+  const usage =
+    completionTokens != null
+      ? `in:${promptTokens ?? "?"} out:${completionTokens}`
+      : "usage:n/a";
+  return { content, finishReason, usage };
 }
 
 /**
@@ -125,12 +202,23 @@ export async function callOpenRouter(
 
   let lastError: Error | null = null;
   const startedAt = Date.now();
+  // Streaming is what keeps long generations alive through the provider
+  // gateway. If it fails for any reason, the retry drops to non-streaming.
+  let streamEnabled = opts.stream === true;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const attemptStart = Date.now();
+    const controller = new AbortController();
+    // Idle watchdog: abort when the provider goes quiet for timeoutMs.
+    // Re-armed on every streamed chunk, so a long-but-healthy generation is
+    // never killed while silence never exceeds the timeout.
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const armIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => controller.abort(), timeoutMs);
+    };
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      armIdle();
 
       const response = await fetch(url, {
         signal: controller.signal,
@@ -155,7 +243,7 @@ export async function callOpenRouter(
           ],
           max_tokens: maxTokens,
           temperature,
-          stream: false,
+          stream: streamEnabled,
           // DeepSeek V4 Flash (reasoning model) thinks for minutes on
           // structured tasks and can return empty content when reasoning
           // eats the token budget. Disable reasoning for deterministic
@@ -163,8 +251,6 @@ export async function callOpenRouter(
           ...(usingCmd ? { reasoning: { enabled: false } } : {}),
         }),
       });
-
-      clearTimeout(timer);
 
       if (!response.ok) {
         const body = await response.text().catch(() => "");
@@ -194,12 +280,23 @@ export async function callOpenRouter(
         );
       }
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || "";
-      const finishReason = data.choices?.[0]?.finish_reason as string | undefined;
-      const usage = data.usage
-        ? `in:${data.usage.prompt_tokens ?? "?"} out:${data.usage.completion_tokens ?? "?"}`
-        : "usage:n/a";
+      let content: string;
+      let finishReason: string | undefined;
+      let usage: string;
+      if (streamEnabled) {
+        const streamed = await readStreamedCompletion(response, armIdle);
+        content = streamed.content;
+        finishReason = streamed.finishReason;
+        usage = streamed.usage;
+      } else {
+        armIdle();
+        const data = await response.json();
+        content = data.choices?.[0]?.message?.content || "";
+        finishReason = data.choices?.[0]?.finish_reason as string | undefined;
+        usage = data.usage
+          ? `in:${data.usage.prompt_tokens ?? "?"} out:${data.usage.completion_tokens ?? "?"}`
+          : "usage:n/a";
+      }
       if (!content.trim()) {
         throw new Error(
           finishReason === "length"
@@ -217,12 +314,25 @@ export async function callOpenRouter(
 
       log.info(
         "llm",
-        `${usingCmd ? "Command Code" : "OpenRouter"} responded OK in ${ms(Date.now() - startedAt)} (attempt ${attempt})`,
+        `${usingCmd ? "Command Code" : "OpenRouter"} responded OK in ${ms(Date.now() - startedAt)} (attempt ${attempt}${streamEnabled ? ", streamed" : ""})`,
         `${content.length} chars · ${usage}`
       );
+      if (idleTimer) clearTimeout(idleTimer);
       return content;
     } catch (err) {
+      if (idleTimer) clearTimeout(idleTimer);
       lastError = err instanceof Error ? err : new Error(String(err));
+
+      // Streaming is an optimisation; if the provider/gateway rejects or
+      // breaks it, retry the same call without streaming rather than failing.
+      if (streamEnabled) {
+        streamEnabled = false;
+        log.warn(
+          "llm",
+          `Streaming attempt failed (${lastError.message}) — retrying without streaming`,
+          `elapsed ${ms(Date.now() - attemptStart)}`
+        );
+      }
 
       const status =
         err instanceof OpenRouterError

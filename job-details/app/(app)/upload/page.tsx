@@ -55,6 +55,10 @@ type UploadResult = {
   duplicates?: number;
   total: number;
   message: string;
+  /** Resume point for the next batch; null once the document is finished. */
+  nextChunk: number | null;
+  done: boolean;
+  totalChunks: number;
 };
 
 type ActivityLine = {
@@ -286,11 +290,15 @@ export default function UploadPage() {
           `[${item.file.name}] Sending to LLM (${useModel || "default"}) — this can take a minute…`
         );
 
-        // ── One full upload attempt. Returns { result } on success, or
-        //    throws / returns { error } for retryable failures. ──
-        const attempt = async (): Promise<{
-          result: UploadResult;
-        } | { error: string }> => {
+        // Chunks completed across ALL batches — the progress bar spans the
+        // whole document, not just the current batch.
+        const completedRef = { current: 0 };
+
+        // ── One batch attempt. Returns { result } on success, or
+        //    { error } for retryable failures. ──
+        const attempt = async (
+          chunkOffset: number
+        ): Promise<{ result: UploadResult } | { error: string }> => {
           const res = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -298,6 +306,7 @@ export default function UploadPage() {
               fileName: item.file.name,
               text,
               model: useModel || undefined,
+              chunkOffset,
             }),
           });
 
@@ -320,7 +329,6 @@ export default function UploadPage() {
           let result: UploadResult | null = null;
           let streamError: string | null = null;
           let itemChunksTotal = 0;
-          let completedRef = { current: 0 };
 
           if (reader) {
             try {
@@ -404,54 +412,82 @@ export default function UploadPage() {
           return { result };
         };
 
-        // ── Auto-retry loop: up to 5 attempts on server errors. Already-
-        //    saved chunks are skipped server-side (dedupe), so retries never
-        //    create duplicates. ──
-        let lastError = "Unknown error";
-        for (let attemptNo = 1; attemptNo <= MAX_AUTO_RETRIES; attemptNo++) {
-          const out = await attempt().catch((e: unknown) => ({
-            error: e instanceof Error ? e.message : "Failed to process file.",
-          }));
+        // ── Batch loop: each request processes a bounded slice of chunks and
+        //    returns the resume point, so long documents always finish
+        //    regardless of the function timeout or upstream slowness. ──
+        let offset = 0;
+        let finished = false;
+        let totalAdded = 0;
+        let totalDuplicates = 0;
+        let totalExtracted = 0;
+        let lastTotal = 0;
 
-          if ("result" in out) {
-            const result = out.result;
-            updateItem(item.id, {
-              status: "done",
-              result: {
-                added: result.added,
-                extracted: result.extracted,
-                duplicates: result.duplicates ?? 0,
-                total: result.total,
-              },
-            });
-            pushActivity(
-              `[${item.file.name}] Done — +${result.added} new, ${result.duplicates ?? 0} duplicate(s).`,
-              "ok"
-            );
-            void invalidateListCaches();
-            return;
+        while (!finished) {
+          // ── Auto-retry loop: up to 5 attempts on server errors. Already-
+          //    saved chunks are skipped server-side (dedupe), so retries never
+          //    create duplicates. ──
+          let lastError = "Unknown error";
+          let advanced = false;
+
+          for (let attemptNo = 1; attemptNo <= MAX_AUTO_RETRIES; attemptNo++) {
+            const out = await attempt(offset).catch((e: unknown) => ({
+              error: e instanceof Error ? e.message : "Failed to process file.",
+            }));
+
+            if ("result" in out) {
+              const result = out.result;
+              totalAdded += result.added;
+              totalDuplicates += result.duplicates ?? 0;
+              totalExtracted += result.extracted;
+              lastTotal = result.total;
+              if (result.done || result.nextChunk == null) {
+                finished = true;
+              } else {
+                offset = result.nextChunk;
+              }
+              advanced = true;
+              break;
+            }
+
+            lastError = out.error;
+            if (attemptNo < MAX_AUTO_RETRIES) {
+              // Only auto-retry on retryable server errors (not auth/credits).
+              const retryable = !/API key|credits|401|402/i.test(lastError);
+              if (!retryable) break;
+              const delay = 2000 * attemptNo; // 2s, 4s, 6s, 8s
+              pushActivity(
+                `[${item.file.name}] Server error — retrying (${attemptNo}/${MAX_AUTO_RETRIES - 1}) in ${delay / 1000}s…`,
+                "warn"
+              );
+              await new Promise((r) => setTimeout(r, delay));
+            }
           }
 
-          lastError = out.error;
-          if (attemptNo < MAX_AUTO_RETRIES) {
-            // Only auto-retry on retryable server errors (not auth/credits).
-            const retryable = !/API key|credits|401|402/i.test(lastError);
-            if (!retryable) break;
-            const delay = 2000 * attemptNo; // 2s, 4s, 6s, 8s
-            pushActivity(
-              `[${item.file.name}] Server error — retrying (${attemptNo}/${MAX_AUTO_RETRIES - 1}) in ${delay / 1000}s…`,
-              "warn"
-            );
-            await new Promise((r) => setTimeout(r, delay));
+          if (!advanced) {
+            updateItem(item.id, {
+              status: "error",
+              error: lastError,
+              failStatus: 500,
+            });
+            pushActivity(`[${item.file.name}] ${lastError}`, "error");
+            return;
           }
         }
 
         updateItem(item.id, {
-          status: "error",
-          error: lastError,
-          failStatus: 500,
+          status: "done",
+          result: {
+            added: totalAdded,
+            extracted: totalExtracted,
+            duplicates: totalDuplicates,
+            total: lastTotal,
+          },
         });
-        pushActivity(`[${item.file.name}] ${lastError}`, "error");
+        pushActivity(
+          `[${item.file.name}] Done — +${totalAdded} new, ${totalDuplicates} duplicate(s).`,
+          "ok"
+        );
+        void invalidateListCaches();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to process file.";
         updateItem(item.id, { status: "error", error: msg });
