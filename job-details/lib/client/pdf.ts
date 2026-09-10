@@ -11,7 +11,14 @@ export async function extractPdfText(
   maxPages = 50,
   onProgress?: (page: number, totalPages: number) => void
 ): Promise<string> {
-  const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
+  // The LEGACY build is required: the modern build assumes very recent
+  // browser APIs (e.g. Promise.withResolvers, Safari 17.4+) and throws
+  // "undefined is not a function" on older iOS/macOS Safari. Legacy ships
+  // the core-js polyfills and works everywhere. The worker at
+  // /pdf.worker.min.mjs is the matching legacy build.
+  const { getDocument, GlobalWorkerOptions } = await import(
+    "pdfjs-dist/legacy/build/pdf.mjs"
+  );
 
   // Self-hosted worker (served from /public) — no external CDN dependency,
   // works with the site's CSP, and avoids CDN availability issues.

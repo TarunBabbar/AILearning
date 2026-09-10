@@ -23,6 +23,14 @@ import { cn } from "@/lib/utils";
 import { extractFileText } from "@/lib/client/pdf";
 import { invalidateListCaches } from "@/lib/use-list-swr";
 
+/** Unique upload-item id. crypto.randomUUID needs Safari 15.4+, so fall back. */
+function makeItemId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 type FileStatus = "queued" | "extracting" | "parsing" | "done" | "error";
 
 type UploadItem = {
@@ -206,7 +214,7 @@ export default function UploadPage() {
       });
       const tooBig = list.filter((f) => f.size > MAX_FILE_SIZE_MB * 1024 * 1024);
       const newItems: UploadItem[] = valid.map((file) => ({
-        id: crypto.randomUUID(),
+        id: makeItemId(),
         file,
         status: "queued",
       }));
