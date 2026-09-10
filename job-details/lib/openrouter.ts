@@ -17,6 +17,12 @@ type CallOptions = {
   maxRetries?: number;
   /** Hard cap on retry backoff in ms; defaults to 120s. */
   maxRetryDelayMs?: number;
+  /**
+   * Absolute epoch-ms after which retries stop. Prevents a slow upstream from
+   * burning the caller's whole time budget on attempts that cannot finish
+   * (e.g. repeated gateway 524s during a long-running extraction).
+   */
+  deadlineMs?: number;
 };
 
 /** A prior exchange in the conversation, for chat memory. */
@@ -105,6 +111,7 @@ export async function callOpenRouter(
   const timeoutMs = opts.timeoutMs ?? ABORT_TIMEOUT_MS;
   const maxRetries = opts.maxRetries ?? MAX_RETRIES;
   const maxRetryDelayMs = opts.maxRetryDelayMs ?? 60_000;
+  const deadlineMs = opts.deadlineMs;
   const baseUrl = usingCmd ? cfg.cmdBaseUrl : cfg.openrouterBaseUrl;
   const url = `${baseUrl}/chat/completions`;
   const keyPreview = key.length > 14 ? `${key.slice(0, 11)}…${key.slice(-3)}` : "***";
@@ -189,10 +196,24 @@ export async function callOpenRouter(
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || "";
+      const finishReason = data.choices?.[0]?.finish_reason as string | undefined;
       const usage = data.usage
         ? `in:${data.usage.prompt_tokens ?? "?"} out:${data.usage.completion_tokens ?? "?"}`
         : "usage:n/a";
-      if (!content.trim()) throw new Error("Empty response from model");
+      if (!content.trim()) {
+        throw new Error(
+          finishReason === "length"
+            ? `Model hit the output limit (finish_reason=length, max_tokens=${maxTokens}) and returned no content — raise EXTRACT_MAX_TOKENS or use smaller chunks.`
+            : `Empty response from model (finish_reason=${finishReason ?? "unknown"})`
+        );
+      }
+      if (finishReason === "length") {
+        log.warn(
+          "llm",
+          "Response was truncated at the output limit — JSON may be incomplete",
+          `max_tokens=${maxTokens}`
+        );
+      }
 
       log.info(
         "llm",
@@ -220,6 +241,16 @@ export async function callOpenRouter(
         const retryAfterMs =
           err instanceof OpenRouterError ? err.retryAfterMs : undefined;
         const delay = retryDelayMs(attempt, status, maxRetryDelayMs, retryAfterMs);
+        // Past the caller's budget the retry cannot finish in time — fail now
+        // so the chunk is skipped instead of stalling the whole run.
+        if (deadlineMs && Date.now() + delay >= deadlineMs) {
+          log.warn(
+            "llm",
+            `Attempt ${attempt}/${maxRetries} failed (${lastError.message}) — deadline reached, not retrying`,
+            `elapsed ${ms(Date.now() - attemptStart)}`
+          );
+          throw lastError;
+        }
         log.warn(
           "llm",
           `Attempt ${attempt}/${maxRetries} failed (${lastError.message}) — retrying in ${ms(delay)}`,

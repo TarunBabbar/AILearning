@@ -522,6 +522,7 @@ a pause takes a few seconds to wake the DB. That's normal.
 | `No OpenRouter API key configured` | Only relevant in OpenRouter mode — set `OPENROUTER_API_KEY` in `.env` (local) or Vercel env vars. |
 | `Command Code rejected the API key (401)` | The `CMD_API_KEY` must be the `user_...` key from `~/.commandcode/auth.json`. |
 | `OpenRouter returned 402` | The model needs credits or has no free variant — pick a free model id on the Upload page (OpenRouter mode). |
+| `Command Code API 524` / extraction very slow | The gateway timed out because a single chunk response took too long (~2 min). Lower `EXTRACT_CHUNK_SIZE` (e.g. `3000`) and `EXTRACT_MAX_TOKENS` (e.g. `6000`), or raise `EXTRACT_CONCURRENCY`. |
 | `OpenRouter rejected the API key (401)` | Double-check the key at [openrouter.ai/keys](https://openrouter.ai/keys); it must be `sk-or-v1-…`. |
 | `DATABASE_URL is not set` | Add `DATABASE_URL` to `.env` / Vercel env vars. |
 | `P1010: User was denied access` / SSL errors | The app uses `rejectUnauthorized: false` in production; verify the direct connection string and DB credentials. |

@@ -143,10 +143,24 @@ export async function extractJobsFromText(
     log?: Logger;
     /** Called with each chunk's extracted jobs as soon as that chunk lands. */
     onChunk?: (jobs: ExtractedJob[], chunkNum: number, totalChunks: number) => void | Promise<void>;
+    /**
+     * Absolute epoch-ms budget. Once passed, no new chunk is dispatched and
+     * in-flight calls stop retrying, so the run returns the chunks already
+     * saved instead of being killed by the platform timeout.
+     */
+    deadlineMs?: number;
   } = {}
 ): Promise<ExtractedJob[]> {
   const log = opts.log ?? createLogger();
-  const chunks = chunkText(rawText, 6000, 400);
+
+  // Chunk size drives how long each model response takes. The Command Code
+  // gateway (Cloudflare) returns 524 when a request produces no response for
+  // ~2 minutes, so a chunk must be small enough that the model finishes well
+  // inside that window — otherwise every attempt dies on the gateway timeout
+  // regardless of retries. 4,000 chars ≈ 1-3 job listings.
+  const chunkSize = Math.max(1000, Number(process.env.EXTRACT_CHUNK_SIZE) || 4000);
+  const chunkOverlap = Math.round(chunkSize * 0.075);
+  const chunks = chunkText(rawText, chunkSize, chunkOverlap);
   const totalChunks = chunks.length;
 
   log.info(
@@ -173,11 +187,30 @@ export async function extractJobsFromText(
   // simultaneously (3 is fast but gentle); the retry/jitter layer then
   // handles any residual rate limits. Tune via env if needed.
   const MAX_PARALLEL = Number(process.env.EXTRACT_CONCURRENCY) || 3;
+
+  // Output budget per chunk. This was 24,000 to dodge "finish_reason: length"
+  // truncation, but that lets a single response generate for minutes — which
+  // trips the gateway's ~120s timeout (HTTP 524) on every attempt. With 4k-char
+  // chunks a few thousand tokens is ample for the JSON payload.
+  const extractMaxTokens = Math.max(1000, Number(process.env.EXTRACT_MAX_TOKENS) || 8000);
+
   const results = await mapWithConcurrency(
     chunks,
     MAX_PARALLEL,
     async (chunkText, i) => {
       const chunkNum = i + 1;
+
+      // Stop dispatching once the time budget is spent — chunks already saved
+      // are kept, so the upload still returns a useful partial result.
+      if (opts.deadlineMs && Date.now() >= opts.deadlineMs) {
+        log.warn(
+          "extract",
+          `Skipping chunk ${chunkNum}/${totalChunks} — time budget exhausted`,
+          "chunks already extracted are kept"
+        );
+        return [] as ExtractedJob[];
+      }
+
       const prompt = buildExtractionPrompt(chunkText);
       const tried = new Set<string>();
       let model = modelPool[(startOffset + i) % modelPool.length];
@@ -202,13 +235,18 @@ export async function extractJobsFromText(
             prompt,
             EXTRACTION_SYSTEM_PROMPT,
             apiKey,
-            // 24k output budget: DeepSeek Flash writes verbose JSON (full job
-            // descriptions) and 8192 tokens gets exhausted under parallel
-            // chunks → finish_reason "length" with EMPTY content.
-            // Longer retry budget for 429s: provider rate-limits are transient
-            // and jittered backoff (added in callOpenRouter) desyncs the
-            // parallel chunks so they don't re-hammer upstream in lockstep.
-            { model, maxTokens: 24000, maxRetries: 5, maxRetryDelayMs: 60_000 },
+            // Per-chunk output budget (see extractMaxTokens above) plus a
+            // deadline so a slow upstream can't burn the whole function
+            // timeout on retries that can never finish in time.
+            // Jittered backoff (added in callOpenRouter) desyncs parallel
+            // chunks so they don't re-hammer upstream in lockstep.
+            {
+              model,
+              maxTokens: extractMaxTokens,
+              maxRetries: Number(process.env.EXTRACT_MAX_RETRIES) || 3,
+              maxRetryDelayMs: 60_000,
+              deadlineMs: opts.deadlineMs,
+            },
             log
           );
         } catch (e) {

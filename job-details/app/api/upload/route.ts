@@ -186,9 +186,16 @@ export async function POST(req: Request) {
 
         // ── Parallel LLM extraction — each chunk is saved to the DB as
         //    soon as its response lands, no waiting for all chunks. ──
+        // Budget the run below the platform function limit so a slow upstream
+        // returns the chunks already saved instead of being killed mid-stream.
+        const extractBudgetMs = Math.max(
+          30_000,
+          Number(process.env.EXTRACT_BUDGET_MS) || 240_000
+        );
         let chunksTotalSent = false;
         const jobs = await extractJobsFromText(text, apiKey, useModel, {
           log,
+          deadlineMs: Date.now() + extractBudgetMs,
           onProgress: (p) => {
             progress(p.message);
             // Send the chunk total up front so the client can render a
