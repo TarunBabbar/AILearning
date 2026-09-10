@@ -78,24 +78,59 @@ function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
+type StreamDelta = {
+  content?: string | null;
+  /** Some providers stream reasoning models with a separate field. */
+  reasoning_content?: string | null;
+  reasoning?: string | null;
+};
+
 type StreamChunk = {
   choices?: {
-    delta?: { content?: string | null };
+    delta?: StreamDelta;
+    message?: { content?: string | null };
     finish_reason?: string | null;
   }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+  error?: { message?: string; type?: string; code?: number | string };
 };
 
 type StreamedCompletion = {
   content: string;
   finishReason?: string;
   usage: string;
+  /** Diagnostics: SSE frames seen, and the raw body prefix (for empty results). */
+  frames: number;
+  rawPreview: string;
 };
+
+/** Extract text from a message.content that may be a string or content parts. */
+function readMessageContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) =>
+        part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string"
+          ? (part as { text: string }).text
+          : ""
+      )
+      .join("");
+  }
+  return "";
+}
 
 /**
  * Read a streamed (SSE) chat completion, accumulating the assistant content.
  * `onData` is called for every chunk so the caller can re-arm its idle
  * watchdog while tokens are still flowing.
+ *
+ * Deliberately tolerant, because providers vary here:
+ *  - mid-stream `{"error":...}` frames are surfaced (they used to be dropped,
+ *    which looked like an empty completion);
+ *  - a 200 response that is plain JSON rather than SSE (some gateways ignore
+ *    `stream:true`) is parsed as a normal completion;
+ *  - `reasoning_content`/`reasoning` deltas count as content when the model
+ *    puts no text in `content`.
  */
 async function readStreamedCompletion(
   response: Response,
@@ -106,16 +141,23 @@ async function readStreamedCompletion(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let raw = "";
   let content = "";
+  let reasoning = "";
   let finishReason: string | undefined;
   let promptTokens: number | undefined;
   let completionTokens: number | undefined;
+  let frames = 0;
+  let streamError: StreamChunk["error"] | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     onData();
-    buffer += decoder.decode(value, { stream: true });
+    const text = decoder.decode(value, { stream: true });
+    // Keep a bounded copy — enough for a non-SSE body or diagnostics.
+    if (raw.length < 128_000) raw += text;
+    buffer += text;
     // SSE frames are newline-delimited; keep the trailing partial line.
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
@@ -124,15 +166,22 @@ async function readStreamedCompletion(
       if (!trimmed.startsWith("data:")) continue;
       const payload = trimmed.slice(5).trim();
       if (!payload || payload === "[DONE]") continue;
+      frames++;
       let chunk: StreamChunk;
       try {
         chunk = JSON.parse(payload) as StreamChunk;
       } catch {
         continue; // partial/garbled frame — the next one carries the rest
       }
+      if (chunk.error) {
+        streamError = chunk.error;
+        continue;
+      }
       const choice = chunk.choices?.[0];
-      const delta = choice?.delta?.content;
-      if (typeof delta === "string") content += delta;
+      const delta = choice?.delta;
+      if (typeof delta?.content === "string") content += delta.content;
+      const reasoningDelta = delta?.reasoning_content ?? delta?.reasoning;
+      if (typeof reasoningDelta === "string") reasoning += reasoningDelta;
       if (choice?.finish_reason) finishReason = choice.finish_reason;
       if (chunk.usage) {
         promptTokens = chunk.usage.prompt_tokens;
@@ -141,11 +190,52 @@ async function readStreamedCompletion(
     }
   }
 
+  // No SSE frames at all — the gateway/Cmd provider sent a plain JSON body.
+  if (frames === 0) {
+    const trimmedRaw = raw.trim();
+    if (trimmedRaw) {
+      let body: StreamChunk | null = null;
+      try {
+        body = JSON.parse(trimmedRaw) as StreamChunk;
+      } catch {
+        body = null;
+      }
+      if (body?.error) {
+        throw new OpenRouterError(
+          `Provider stream error: ${body.error.message ?? "unknown error"}`,
+          typeof body.error.code === "number" ? body.error.code : 500
+        );
+      }
+      const message = body?.choices?.[0]?.message?.content;
+      const fromBody = readMessageContent(message);
+      if (fromBody) {
+        if (body?.usage) {
+          promptTokens = body.usage.prompt_tokens;
+          completionTokens = body.usage.completion_tokens;
+        }
+        finishReason = body?.choices?.[0]?.finish_reason ?? undefined;
+        content = fromBody;
+      }
+    }
+  }
+
+  // A mid-stream error frame: surface it so the retry layer can react
+  // (5xx is retryable) instead of silently returning nothing.
+  if (streamError && !content) {
+    throw new OpenRouterError(
+      `Provider stream error: ${streamError.message ?? "unknown error"}`,
+      typeof streamError.code === "number" ? streamError.code : 500
+    );
+  }
+
+  // Fall back to reasoning text when the model emitted no user-visible content.
+  if (!content && reasoning) content = reasoning;
+
   const usage =
     completionTokens != null
       ? `in:${promptTokens ?? "?"} out:${completionTokens}`
       : "usage:n/a";
-  return { content, finishReason, usage };
+  return { content, finishReason, usage, frames, rawPreview: raw.slice(0, 200) };
 }
 
 /**
@@ -203,8 +293,10 @@ export async function callOpenRouter(
   let lastError: Error | null = null;
   const startedAt = Date.now();
   // Streaming is what keeps long generations alive through the provider
-  // gateway. If it fails for any reason, the retry drops to non-streaming.
+  // gateway. It is retried on failure, and only abandoned after repeated
+  // failures (then the call falls back to non-streamed requests).
   let streamEnabled = opts.stream === true;
+  let streamFailures = 0;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const attemptStart = Date.now();
@@ -283,15 +375,17 @@ export async function callOpenRouter(
       let content: string;
       let finishReason: string | undefined;
       let usage: string;
+      let streamDiag = "";
       if (streamEnabled) {
         const streamed = await readStreamedCompletion(response, armIdle);
         content = streamed.content;
         finishReason = streamed.finishReason;
         usage = streamed.usage;
+        streamDiag = ` frames=${streamed.frames} raw=${JSON.stringify(streamed.rawPreview)}`;
       } else {
         armIdle();
         const data = await response.json();
-        content = data.choices?.[0]?.message?.content || "";
+        content = readMessageContent(data.choices?.[0]?.message?.content);
         finishReason = data.choices?.[0]?.finish_reason as string | undefined;
         usage = data.usage
           ? `in:${data.usage.prompt_tokens ?? "?"} out:${data.usage.completion_tokens ?? "?"}`
@@ -301,7 +395,7 @@ export async function callOpenRouter(
         throw new Error(
           finishReason === "length"
             ? `Model hit the output limit (finish_reason=length, max_tokens=${maxTokens}) and returned no content — raise EXTRACT_MAX_TOKENS or use smaller chunks.`
-            : `Empty response from model (finish_reason=${finishReason ?? "unknown"})`
+            : `Empty response from model (finish_reason=${finishReason ?? "unknown"}${streamEnabled ? ", streamed" : ""})${streamDiag}`
         );
       }
       if (finishReason === "length") {
@@ -323,15 +417,25 @@ export async function callOpenRouter(
       if (idleTimer) clearTimeout(idleTimer);
       lastError = err instanceof Error ? err : new Error(String(err));
 
-      // Streaming is an optimisation; if the provider/gateway rejects or
-      // breaks it, retry the same call without streaming rather than failing.
+      // Streaming is what keeps long generations from being cut off by the
+      // gateway, so prefer retrying WITH streaming. Only fall back to plain
+      // (non-streamed) requests after it fails repeatedly.
       if (streamEnabled) {
-        streamEnabled = false;
-        log.warn(
-          "llm",
-          `Streaming attempt failed (${lastError.message}) — retrying without streaming`,
-          `elapsed ${ms(Date.now() - attemptStart)}`
-        );
+        streamFailures += 1;
+        if (streamFailures >= 2) {
+          streamEnabled = false;
+          log.warn(
+            "llm",
+            `Streaming failed ${streamFailures}× (${lastError.message}) — falling back to non-streamed requests`,
+            `elapsed ${ms(Date.now() - attemptStart)}`
+          );
+        } else {
+          log.warn(
+            "llm",
+            `Streaming attempt failed (${lastError.message}) — retrying with streaming`,
+            `elapsed ${ms(Date.now() - attemptStart)}`
+          );
+        }
       }
 
       const status =
