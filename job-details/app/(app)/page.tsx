@@ -2,9 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Building2,
-  Briefcase,
-  FileText,
   Sparkles,
   Inbox,
   Database,
@@ -91,15 +88,6 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
-  const stats = useMemo(() => {
-    if (!data) return { total: 0, companies: 0, sources: 0 };
-    return {
-      total: data.total,
-      companies: data.companyCount ?? 0,
-      sources: data.sourceCount ?? 0,
-    };
-  }, [data]);
-
   const pageCount = data?.pageCount ?? 1;
 
   const filterValue: JobFilterValue = { search, company, location, sort, today };
@@ -137,24 +125,10 @@ export default function Dashboard() {
               AI Job Finder
             </h1>
             <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
-              <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-medium text-claude-accent">
-                <Briefcase size={12} />
-                {stats.total.toLocaleString()} jobs
+              <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-semibold text-claude-accent">
+                <Sparkles size={12} />
+                {(data?.todayCount ?? 0).toLocaleString()} new jobs today
               </span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-[#e6edf5] px-2 py-1 font-medium text-[#4a6d8c]">
-                <Building2 size={12} />
-                {stats.companies.toLocaleString()} companies
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-[#e3efe3] px-2 py-1 font-medium text-[#3d7a3d]">
-                <FileText size={12} />
-                {stats.sources.toLocaleString()} sources
-              </span>
-              {data?.todayCount != null && data.todayCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-semibold text-claude-accent">
-                  <Sparkles size={12} />
-                  {data.todayCount.toLocaleString()} new jobs today
-                </span>
-              )}
               {refreshing && (
                 <span className="fade-up inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-1 font-medium text-claude-muted shadow-sm">
                   <Loader2 size={11} className="animate-spin text-claude-accent" />
