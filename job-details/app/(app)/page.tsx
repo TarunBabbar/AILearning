@@ -125,10 +125,12 @@ export default function Dashboard() {
               AI Job Finder
             </h1>
             <div className="flex flex-wrap items-center gap-1.5 text-xs text-claude-muted">
-              <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-semibold text-claude-accent">
-                <Sparkles size={12} />
-                {(data?.todayCount ?? 0).toLocaleString()} new jobs today
-              </span>
+              {(data?.todayCount ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-claude-accent-soft px-2 py-1 font-semibold text-claude-accent">
+                  <Sparkles size={12} />
+                  {(data?.todayCount ?? 0).toLocaleString()} new jobs today
+                </span>
+              )}
               {refreshing && (
                 <span className="fade-up inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-1 font-medium text-claude-muted shadow-sm">
                   <Loader2 size={11} className="animate-spin text-claude-accent" />
