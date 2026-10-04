@@ -20,9 +20,9 @@ const highlights = [
 
 export default function About() {
   return (
-    <section id="about" className="py-20 sm:py-24 bg-bg">
+    <section id="about" className="py-12 sm:py-16 bg-bg">
       <div className="max-w-6xl mx-auto px-6">
-        <div className="grid md:grid-cols-2 gap-12 items-start">
+        <div className="grid md:grid-cols-2 gap-8 items-center">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -32,10 +32,10 @@ export default function About() {
             <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">
               About
             </div>
-            <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] font-extrabold tracking-[-0.02em] mb-5 leading-tight">
+            <h2 className="text-[clamp(1.5rem,2.6vw,2rem)] font-extrabold tracking-[-0.02em] mb-3 leading-tight">
               Architect of Quality. Builder of AI Systems.
             </h2>
-            <p className="text-text-secondary leading-relaxed mb-4">
+            <p className="text-sm text-text-secondary leading-relaxed mb-3">
               I&apos;m an AI QA Architect and Test Automation Engineer with 18+
               years of experience — currently designing AI-driven quality
               engineering at{" "}
@@ -52,7 +52,7 @@ export default function About() {
               <strong className="text-text">agentic prompting</strong> — before
               driving the automation itself.
             </p>
-            <p className="text-text-secondary leading-relaxed">
+            <p className="text-sm text-text-secondary leading-relaxed">
               From service-based orgs to product companies, I&apos;ve taken teams
               from <strong className="text-text">no automation to 100%
               automation adoption</strong>. Today I combine enterprise Playwright
@@ -65,7 +65,7 @@ export default function About() {
               onboard to, delivering consistent quality outputs across the
               enterprise.
             </p>
-            <p className="text-text-secondary leading-relaxed mt-4">
+            <p className="text-sm text-text-secondary leading-relaxed mt-3">
               <strong className="text-text">1st place</strong> at The Testing
               Academy&apos;s <em>AI Tester Blueprint 3x</em> hackathon (60+
               participants) for{" "}
@@ -80,7 +80,7 @@ export default function About() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-2"
           >
             {highlights.map((h, i) => (
               <motion.div
@@ -89,7 +89,7 @@ export default function About() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.3, delay: i * 0.04 }}
-                className="flex items-center gap-2.5 bg-bg-card border border-border px-4 py-3 rounded-lg text-sm font-medium text-text-secondary hover:border-amber-400 hover:text-text transition-colors"
+                className="flex items-center gap-2 bg-bg-card border border-border px-3 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:border-amber-400 hover:text-text transition-colors"
               >
                 <span className="w-1.5 h-1.5 min-w-[6px] rounded-full bg-amber-500" />
                 {h}

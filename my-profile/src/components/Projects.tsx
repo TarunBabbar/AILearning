@@ -8,32 +8,35 @@ type Project = {
   tech: string[];
   repo: string;
   demo: string | null;
-  tag?: string;
+  badge?: string;
+  accent?: "amber" | "emerald";
   emoji: string;
 };
 
-const featured: Project = {
-  title: "QAE2E — AI-Powered QA Pipeline",
-  desc: "An agentic QA pipeline — requirement to release confidence, every step judged by an AI agent team.",
-  tech: ["Next.js", "OpenRouter", "Agent Orchestration", "Pinecone", "MCP", "Docker"],
-  repo: "https://github.com/TarunBabbar/AILearning/tree/main/qae2e",
-  demo: "https://qae2e.vercel.app",
-  tag: "1st Place · AI Tester Blueprint 3x",
-  emoji: "🤖",
-};
-
-// Second highlight, shown directly under the 1st-place QAE2E card.
-const highlight: Project = {
-  title: "QABuddy — Hybrid RAG QA Assistant",
-  desc: "Ask one question, get one cited answer from the whole QA knowledge base — Jira stories, test cases and bugs plus the real Playwright automation code. Hybrid dense + BM25 retrieval fused client-side, hosted reranking, and model-agnostic grounding that verifies every answer against the sources it was given.",
-  tech: ["FastAPI", "Pinecone", "OpenRouter", "Hybrid RAG", "Vercel"],
-  repo: "https://github.com/TarunBabbar/qa-rag",
-  demo: "https://qa-rag-five.vercel.app",
-  tag: "Grounded RAG",
-  emoji: "💬",
-};
-
-const apps: Project[] = [
+// One uniform grid: every project is the same card. The two headline projects
+// carry a badge (and a coloured ring) instead of their own oversized blocks, so
+// the section keeps a single rhythm and no dead space.
+const projects: Project[] = [
+  {
+    title: "QAE2E — AI-Powered QA Pipeline",
+    desc: "An agentic QA pipeline — requirement to release confidence, every step judged by an AI agent team.",
+    tech: ["Next.js", "OpenRouter", "Agent Orchestration", "Pinecone", "MCP", "Docker"],
+    repo: "https://github.com/TarunBabbar/AILearning/tree/main/qae2e",
+    demo: "https://qae2e.vercel.app",
+    badge: "🏆 1st Place",
+    accent: "amber",
+    emoji: "🤖",
+  },
+  {
+    title: "QABuddy — Hybrid RAG QA Assistant",
+    desc: "One question, one cited answer from the QA knowledge base — Jira stories, test cases and bugs plus the real Playwright code. Hybrid dense + BM25 retrieval with model-agnostic grounding.",
+    tech: ["FastAPI", "Pinecone", "OpenRouter", "Hybrid RAG", "Vercel"],
+    repo: "https://github.com/TarunBabbar/qa-rag",
+    demo: "https://qa-rag-five.vercel.app",
+    badge: "Flagship",
+    accent: "emerald",
+    emoji: "💬",
+  },
   {
     title: "QA Jobs Portal",
     desc: "Free daily India QA jobs portal — AI-extracted QA listings from multiple sources, curated and refreshed every day for QA engineers.",
@@ -96,7 +99,7 @@ const apps: Project[] = [
     tech: ["Playwright", "TypeScript", "Docker", "CI/CD"],
     repo: "https://github.com/TarunBabbar/8layer-advance-playwright-framework",
     demo: null,
-    tag: "Framework",
+    badge: "Framework",
     emoji: "🎭",
   },
   {
@@ -105,34 +108,43 @@ const apps: Project[] = [
     tech: ["Playwright", "GPT-4", "OpenAI", "TypeScript"],
     repo: "https://github.com/TarunBabbar/SelfHealingPlaywrightFramework",
     demo: null,
-    tag: "Framework",
+    badge: "Framework",
     emoji: "🩹",
   },
 ];
 
+const RING: Record<string, string> = {
+  emerald: "border-emerald-500/35 hover:border-emerald-500",
+  amber: "border-amber-500/35 hover:border-amber-500",
+};
+
+const BADGE: Record<string, string> = {
+  emerald: "bg-emerald-500/10 border-emerald-500/25 text-emerald-700",
+  amber: "bg-amber-500/10 border-amber-500/25 text-amber-700",
+};
+
 export default function Projects() {
   return (
-    <section id="apps" className="py-20 sm:py-24 bg-bg-soft">
+    <section id="apps" className="py-12 sm:py-16 bg-bg-soft">
       <div className="max-w-6xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6"
+          className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-5"
         >
           <div>
             <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">
               AI Applications
             </div>
-            <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] font-extrabold tracking-[-0.02em] mb-3">
+            <h2 className="text-[clamp(1.5rem,2.6vw,2rem)] font-extrabold tracking-[-0.02em] mb-2">
               AI Apps You Can Run Today
             </h2>
-            <p className="text-text-secondary max-w-2xl leading-relaxed">
+            <p className="text-sm text-text-secondary max-w-2xl leading-relaxed">
               Live applications I designed and built end-to-end. No code walls
               here — every card opens a working demo, its source on GitHub, or
-              both. Explore what 18 years of QA thinking plus agentic AI can
-              ship.
+              both.
             </p>
           </div>
           <a
@@ -146,136 +158,13 @@ export default function Projects() {
           </a>
         </motion.div>
 
-        {/* 🏆 Featured — QAE2E, 1st place */}
-        <motion.article
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="relative mb-12 rounded-2xl border border-amber-500/25 bg-bg-card p-6 sm:p-8 overflow-hidden"
-        >
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
-          <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-amber-500/8 blur-3xl pointer-events-none" />
-
-          <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
-            <div className="flex-1 min-w-0">
-              <span className="inline-flex items-center gap-2 rounded-full bg-amber-500 text-white text-xs font-bold uppercase tracking-wide px-3.5 py-1.5 mb-4">
-                🏆 1st Place — AI Tester Blueprint 3x
-              </span>
-              <h3 className="text-xl sm:text-2xl font-extrabold tracking-[-0.02em] mb-3">
-                {featured.emoji} {featured.title}
-              </h3>
-              <p className="text-text-secondary leading-relaxed mb-4 max-w-3xl">
-                {featured.desc}
-              </p>
-
-              {/* Pipeline */}
-              <div className="flex flex-wrap items-center gap-2 mb-5 text-xs">
-                {["Requirement", "Test Cases", "Playwright Code", "Execution", "Release Confidence"].map(
-                  (step, i) => (
-                    <span key={step} className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-700 font-medium">
-                        {step}
-                      </span>
-                      {i < 4 && <span className="text-amber-500">→</span>}
-                    </span>
-                  )
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-1.5 mb-6">
-                {featured.tech.map((t) => (
-                  <span
-                    key={t}
-                    className="text-[11px] font-medium bg-bg-soft border border-border text-text-secondary px-2 py-0.5 rounded"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <a
-                  href={featured.demo!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-all shadow-sm"
-                >
-                  Live Demo
-                </a>
-                <a
-                  href={featured.repo}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-amber-500 text-text font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
-                >
-                  <GitHubIcon className="w-4 h-4" />
-                  Source on GitHub
-                </a>
-              </div>
-            </div>
-          </div>
-        </motion.article>
-
-        {/* ⭐ Second highlight — QABuddy (compact strip, deliberately lighter than the 1st-place card) */}
-        <motion.article
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.45, delay: 0.05 }}
-          className="relative mb-8 rounded-2xl border border-emerald-500/25 bg-bg-card p-5 sm:p-6 overflow-hidden"
-        >
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
-          <div className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-emerald-500/8 blur-3xl pointer-events-none" />
-
-          <div className="relative">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 mb-3">
-              {highlight.emoji} Flagship — Grounded RAG
-            </span>
-            <h3 className="text-lg sm:text-xl font-extrabold tracking-[-0.02em] mb-2">{highlight.title}</h3>
-            <p className="text-sm text-text-secondary leading-relaxed mb-4 max-w-3xl">{highlight.desc}</p>
-
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {highlight.tech.map((t) => (
-                <span
-                  key={t}
-                  className="text-[11px] font-medium bg-bg-soft border border-border text-text-secondary px-2 py-0.5 rounded"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2.5">
-              <a
-                href={highlight.demo!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2 rounded-lg transition-all shadow-sm"
-              >
-                Live Demo
-              </a>
-              <a
-                href={highlight.repo}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-emerald-500 text-text font-semibold text-sm px-4 py-2 rounded-lg transition-all"
-              >
-                <GitHubIcon className="w-4 h-4" />
-                Source on GitHub
-              </a>
-            </div>
-          </div>
-        </motion.article>
-
-        {/* Grid of apps */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {apps.map((p, i) => (
+          {projects.map((p, i) => (
             <ProjectCard key={p.title} project={p} i={i} />
           ))}
         </div>
 
-        <p className="mt-8 text-center text-sm text-text-muted">
+        <p className="mt-6 text-center text-xs text-text-muted">
           Plus 20+ more repositories — Selenium & Appium suites, API automation,
           C#/.NET frameworks and agent experiments.{" "}
           <a
@@ -294,56 +183,61 @@ export default function Projects() {
 
 function ProjectCard({ project, i }: { project: Project; i: number }) {
   const p = project;
+  const ring = RING[p.accent ?? ""] ?? "border-border hover:border-amber-400";
+  const badge = BADGE[p.accent ?? ""] ?? "bg-bg-soft border-border text-text-muted";
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.4, delay: i * 0.05 }}
-      className="card-accent relative flex flex-col bg-bg-card border border-border rounded-xl p-5 transition-all group hover:border-amber-400 hover:bg-bg-card-hover hover:-translate-y-1 hover:shadow-md"
+      transition={{ duration: 0.35, delay: Math.min(i * 0.03, 0.3) }}
+      className={`card-accent group relative flex flex-col rounded-xl border bg-bg-card p-3.5 transition-all hover:bg-bg-card-hover hover:-translate-y-0.5 hover:shadow-md ${ring}`}
     >
-      <div className="flex items-start gap-3 mb-3">
-        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-lg shrink-0">
+      <div className="flex items-start gap-2.5 mb-2.5">
+        <div className="w-9 h-9 rounded-lg bg-bg-soft border border-border flex items-center justify-center text-base shrink-0">
           {p.emoji}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-[15px] leading-snug text-text">{p.title}</h4>
-          <span className="inline-flex mt-1.5 items-center gap-1.5">
+          <h4 className="font-bold text-[13.5px] leading-snug text-text">{p.title}</h4>
+          <span className="mt-1 flex flex-wrap items-center gap-1.5">
             {p.demo && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Live
               </span>
             )}
-            {p.tag && (
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                {p.tag}
+            {p.badge && (
+              <span
+                className={`text-[9.5px] font-bold uppercase tracking-wider border px-1.5 py-[1px] rounded ${badge}`}
+              >
+                {p.badge}
               </span>
             )}
           </span>
         </div>
       </div>
 
-      <p className="text-[13px] text-text-secondary leading-relaxed mb-4 flex-1">{p.desc}</p>
+      <p className="mb-3 flex-1 text-[12.5px] text-text-secondary leading-relaxed">{p.desc}</p>
 
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="flex flex-wrap gap-1 mb-3">
         {p.tech.map((t) => (
           <span
             key={t}
-            className="text-[11px] font-medium bg-bg-soft border border-border text-text-secondary px-2 py-0.5 rounded"
+            className="text-[10px] font-medium bg-bg-soft border border-border text-text-secondary px-1.5 py-[2px] rounded"
           >
             {t}
           </span>
         ))}
       </div>
 
-      <div className="flex gap-4 border-t border-border pt-3">
+      <div className="flex gap-3.5 border-t border-border pt-2.5">
         {p.demo && (
           <a
             href={p.demo}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-semibold text-amber-600 group-hover:text-amber-700 inline-flex items-center gap-1"
+            className="text-[11.5px] font-semibold text-amber-600 group-hover:text-amber-700 inline-flex items-center gap-1"
           >
             Live Demo
             <span aria-hidden>→</span>
@@ -353,7 +247,7 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
           href={p.repo}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs font-semibold text-text-secondary group-hover:text-amber-700 inline-flex items-center gap-1"
+          className="text-[11.5px] font-semibold text-text-secondary group-hover:text-amber-700 inline-flex items-center gap-1"
         >
           GitHub
           <span aria-hidden>→</span>

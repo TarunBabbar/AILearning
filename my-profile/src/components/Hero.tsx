@@ -21,13 +21,13 @@ const stats = [
 export default function Hero() {
   return (
     <>
-      <section className="relative min-h-[92vh] flex items-center overflow-hidden bg-bg">
+      <section className="relative min-h-[60vh] flex items-center overflow-hidden bg-bg">
         <div className="absolute inset-0 bg-grid pointer-events-none" />
         <div className="absolute -top-1/4 -right-1/4 w-[600px] h-[600px] rounded-full bg-amber-500/5 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-1/4 -left-1/4 w-[500px] h-[500px] rounded-full bg-amber-500/5 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-6xl mx-auto px-6 pt-28 pb-16 w-full">
-          <div className="flex items-start lg:items-center gap-10 lg:gap-14 flex-col lg:flex-row">
+        <div className="relative z-10 max-w-6xl mx-auto px-6 pt-20 pb-10 w-full">
+          <div className="flex items-start lg:items-center gap-8 lg:gap-10 flex-col lg:flex-row">
             {/* Photo */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -37,7 +37,7 @@ export default function Hero() {
             >
               <div className="relative">
                 <div className="absolute -inset-2 rounded-full bg-amber-500/15 blur-xl" />
-                <div className="relative w-36 h-36 lg:w-48 lg:h-48 rounded-full overflow-hidden border-2 border-amber-500/30">
+                <div className="relative w-32 h-32 lg:w-40 lg:h-40 rounded-full overflow-hidden border-2 border-amber-500/30">
                   <img
                     src="/tarun-babbar.jpg"
                     alt="Tarun Kumar Babbar"
@@ -51,11 +51,11 @@ export default function Hero() {
               initial="initial"
               animate="animate"
               variants={stagger}
-              className="max-w-2xl text-center lg:text-left"
+              className="max-w-3xl flex-1 min-w-0 text-center lg:text-left"
             >
               <motion.div
                 variants={fadeUp}
-                className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-700 border border-amber-500/25 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5"
+                className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-700 border border-amber-500/25 text-[11px] font-semibold px-3 py-1 rounded-full mb-4"
               >
                 <span>🏆</span>
                 1st Place · AI Tester Blueprint 3x Hackathon · The Testing Academy
@@ -63,21 +63,21 @@ export default function Hero() {
 
               <motion.h1
                 variants={fadeUp}
-                className="text-[clamp(1.9rem,4.5vw,3rem)] font-extrabold leading-[1.1] tracking-[-0.02em] mb-3"
+                className="text-[clamp(1.7rem,3.6vw,2.5rem)] font-extrabold leading-[1.1] tracking-[-0.02em] mb-2"
               >
                 Tarun Kumar Babbar
               </motion.h1>
 
               <motion.p
                 variants={fadeUp}
-                className="text-lg text-text-secondary font-medium leading-relaxed mb-3"
+                className="text-base text-text-secondary font-medium leading-relaxed mb-2"
               >
                 AI QA Architect · Test Automation Architect
               </motion.p>
 
               <motion.p
                 variants={fadeUp}
-                className="text-base text-text-muted leading-relaxed mb-7"
+                className="text-sm text-text-muted leading-[1.5] mb-5"
               >
                 18+ years across QA engineering — building AI-powered QA
                 platforms, multi-agent orchestration frameworks, and enterprise
@@ -92,7 +92,7 @@ export default function Hero() {
               >
                 <a
                   href="#apps"
-                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-all shadow-sm"
+                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-[13px] px-4 py-2 rounded-lg transition-all shadow-sm"
                 >
                   Explore My AI Apps
                   <span aria-hidden>→</span>
@@ -101,7 +101,7 @@ export default function Hero() {
                   href="https://qae2e.vercel.app"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-amber-500 text-text font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
+                  className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-amber-500 text-text font-semibold text-[13px] px-4 py-2 rounded-lg transition-all"
                 >
                   QAE2E Live Demo
                 </a>
@@ -109,7 +109,7 @@ export default function Hero() {
                   href="https://github.com/TarunBabbar"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-amber-500 text-text font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
+                  className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-amber-500 text-text font-semibold text-[13px] px-4 py-2 rounded-lg transition-all"
                 >
                   <GitHubIcon className="w-4 h-4" />
                   GitHub
@@ -118,7 +118,7 @@ export default function Hero() {
 
               <motion.div
                 variants={fadeUp}
-                className="flex flex-wrap gap-x-5 gap-y-2 justify-center lg:justify-start text-sm text-text-muted"
+                className="flex flex-wrap gap-x-4 gap-y-2 justify-center lg:justify-start text-[13px] text-text-muted"
               >
                 <a href="https://linkedin.com/in/tarunbabbar" target="_blank" rel="noopener noreferrer" className="hover:text-amber-600 transition-colors">
                   in /tarunbabbar
@@ -144,8 +144,8 @@ export default function Hero() {
         transition={{ duration: 0.5 }}
         className="bg-bg-card border-y border-border"
       >
-        <div className="max-w-6xl mx-auto px-6 py-7">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="max-w-6xl mx-auto px-6 py-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {stats.map((s, i) => (
               <motion.div
                 key={s.label}
@@ -155,10 +155,10 @@ export default function Hero() {
                 transition={{ duration: 0.35, delay: i * 0.07 }}
                 className="text-center"
               >
-                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-amber-600">
+                <div className="text-xl sm:text-2xl font-extrabold tracking-tight text-amber-600">
                   {s.num}
                 </div>
-                <div className="text-xs text-text-muted font-medium mt-1">{s.label}</div>
+                <div className="text-[11px] text-text-muted font-medium mt-0.5">{s.label}</div>
               </motion.div>
             ))}
           </div>
