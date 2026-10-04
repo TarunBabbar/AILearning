@@ -29,7 +29,7 @@ const projects: Project[] = [
   },
   {
     title: "QABuddy — Hybrid RAG QA Assistant",
-    desc: "Ask a QA question, get one answer with its sources cited — drawn from your Jira stories, test cases, bugs and the real Playwright code, searched by meaning as well as keyword.",
+    desc: "Ask a QA question, get one answer with its sources cited — drawn from your Jira stories, test cases, bugs and the real Playwright UI and API automation code, searched by meaning as well as keyword.",
     tech: ["FastAPI", "Pinecone", "OpenRouter", "RAG", "Vercel"],
     repo: "https://github.com/TarunBabbar/qa-rag",
     demo: "https://qa-rag-five.vercel.app",
