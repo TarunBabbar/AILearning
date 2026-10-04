@@ -232,7 +232,8 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
       </div>
 
       <div className="flex gap-3.5 border-t border-border pt-2.5">
-        {p.demo && (
+        {/* live apps link to the running demo only; the rest link to source */}
+        {p.demo ? (
           <a
             href={p.demo}
             target="_blank"
@@ -242,16 +243,17 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
             Live Demo
             <span aria-hidden>→</span>
           </a>
+        ) : (
+          <a
+            href={p.repo}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11.5px] font-semibold text-text-secondary group-hover:text-amber-700 inline-flex items-center gap-1"
+          >
+            GitHub
+            <span aria-hidden>→</span>
+          </a>
         )}
-        <a
-          href={p.repo}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[11.5px] font-semibold text-text-secondary group-hover:text-amber-700 inline-flex items-center gap-1"
-        >
-          GitHub
-          <span aria-hidden>→</span>
-        </a>
       </div>
     </motion.div>
   );
