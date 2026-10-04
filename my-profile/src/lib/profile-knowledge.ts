@@ -156,6 +156,13 @@ export const profileKnowledge: ProfileKnowledge = {
       demo: "https://qae2e.vercel.app",
     },
     {
+      title: "QABuddy — Hybrid RAG QA Assistant",
+      desc: "Ask one question, get one cited answer from the whole QA knowledge base — Jira stories, test cases and bugs plus the real Playwright automation code. Hybrid dense + BM25 retrieval fused client-side, hosted reranking, and model-agnostic grounding that verifies every answer against the sources it was given.",
+      tech: ["FastAPI", "Pinecone", "OpenRouter", "Hybrid RAG", "Vercel"],
+      repo: "https://github.com/TarunBabbar/qa-rag",
+      demo: "https://qa-rag-five.vercel.app",
+    },
+    {
       title: "QA Jobs Portal",
       desc: "Free daily India QA jobs portal — AI-extracted QA listings from multiple sources, curated and refreshed every day.",
       tech: ["Next.js", "PostgreSQL", "Prisma", "OpenRouter", "AI Extraction"],

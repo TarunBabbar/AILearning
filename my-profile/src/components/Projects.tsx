@@ -22,6 +22,17 @@ const featured: Project = {
   emoji: "🤖",
 };
 
+// Second highlight, shown directly under the 1st-place QAE2E card.
+const highlight: Project = {
+  title: "QABuddy — Hybrid RAG QA Assistant",
+  desc: "Ask one question, get one cited answer from the whole QA knowledge base — Jira stories, test cases and bugs plus the real Playwright automation code. Hybrid dense + BM25 retrieval fused client-side, hosted reranking, and model-agnostic grounding that verifies every answer against the sources it was given.",
+  tech: ["FastAPI", "Pinecone", "OpenRouter", "Hybrid RAG", "Vercel"],
+  repo: "https://github.com/TarunBabbar/qa-rag",
+  demo: "https://qa-rag-five.vercel.app",
+  tag: "Grounded RAG",
+  emoji: "💬",
+};
+
 const apps: Project[] = [
   {
     title: "QA Jobs Portal",
@@ -197,6 +208,70 @@ export default function Projects() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-amber-500 text-text font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
+                >
+                  <GitHubIcon className="w-4 h-4" />
+                  Source on GitHub
+                </a>
+              </div>
+            </div>
+          </div>
+        </motion.article>
+
+        {/* ⭐ Second highlight — QABuddy */}
+        <motion.article
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.05 }}
+          className="relative mb-12 rounded-2xl border border-emerald-500/25 bg-bg-card p-6 sm:p-8 overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500 to-transparent" />
+          <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-emerald-500/8 blur-3xl pointer-events-none" />
+
+          <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
+            <div className="flex-1 min-w-0">
+              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white text-xs font-bold uppercase tracking-wide px-3.5 py-1.5 mb-4">
+                {highlight.emoji} Flagship — Grounded RAG
+              </span>
+              <h3 className="text-xl sm:text-2xl font-extrabold tracking-[-0.02em] mb-3">{highlight.title}</h3>
+              <p className="text-text-secondary leading-relaxed mb-4 max-w-3xl">{highlight.desc}</p>
+
+              <div className="flex flex-wrap items-center gap-2 mb-5 text-xs">
+                {["Jira + GitHub ingest", "Dense + BM25 RRF", "Rerank", "Grounded answer"].map((step, i) => (
+                  <span key={step} className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 font-medium">
+                      {step}
+                    </span>
+                    {i < 3 && <span className="text-emerald-500">→</span>}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 mb-6">
+                {highlight.tech.map((t) => (
+                  <span
+                    key={t}
+                    className="text-[11px] font-medium bg-bg-soft border border-border text-text-secondary px-2 py-0.5 rounded"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href={highlight.demo!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-all shadow-sm"
+                >
+                  Live Demo
+                </a>
+                <a
+                  href={highlight.repo}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-bg-card border border-border-strong hover:border-emerald-500 text-text font-semibold text-sm px-5 py-2.5 rounded-lg transition-all"
                 >
                   <GitHubIcon className="w-4 h-4" />
                   Source on GitHub
