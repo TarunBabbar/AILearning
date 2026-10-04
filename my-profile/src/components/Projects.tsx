@@ -29,8 +29,8 @@ const projects: Project[] = [
   },
   {
     title: "QABuddy — Hybrid RAG QA Assistant",
-    desc: "One question, one cited answer from the QA knowledge base — Jira stories, test cases and bugs plus the real Playwright code. Hybrid dense + BM25 retrieval with model-agnostic grounding.",
-    tech: ["FastAPI", "Pinecone", "OpenRouter", "Hybrid RAG", "Vercel"],
+    desc: "Ask a QA question, get one answer with its sources cited — drawn from your Jira stories, test cases, bugs and the real Playwright code, searched by meaning as well as keyword.",
+    tech: ["FastAPI", "Pinecone", "OpenRouter", "RAG", "Vercel"],
     repo: "https://github.com/TarunBabbar/qa-rag",
     demo: "https://qa-rag-five.vercel.app",
     badge: "Flagship",
