@@ -20,18 +20,18 @@ export interface Document extends RawDocument {}
 
 export const documentStore = {
   async add(doc: Document) {
-    globalStore.documents.set(doc.id, doc)
-
     // Generate summary chunk for document-level stats
     const summary = summarizeContent(doc.name, doc.content, doc.type)
     const allChunks = summary
       ? [summary.text, ...doc.chunks]
       : doc.chunks
 
-    try {
-      const store = await getVectorStore()
-      await store.indexChunks(doc.id, doc.name, allChunks.map((text, index) => ({ text, index })))
-    } catch {}
+    // Index first, then store. If embedding or the vector store fails the upload
+    // fails loudly, instead of leaving a document the assistant cannot search.
+    const store = await getVectorStore()
+    await store.indexChunks(doc.id, doc.name, allChunks.map((text, index) => ({ text, index })))
+
+    globalStore.documents.set(doc.id, doc)
   },
 
   get(id: string): Document | undefined {

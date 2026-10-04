@@ -2,11 +2,13 @@
 
 import { useState, useRef } from 'react'
 import { Upload, File, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { ACCEPT_ATTR, SUPPORTED_LABEL, isSupported } from '@/lib/formats'
 
 interface UploadedDoc {
   id: string
   name: string
   chunks: number
+  characters?: number
   uploadedAt: Date
 }
 
@@ -21,9 +23,7 @@ export default function UploadPage() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
-    const droppedFiles = Array.from(e.dataTransfer.files).filter(f =>
-      f.type === 'text/plain' || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.csv') || f.name.endsWith('.docx') || f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
-    )
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(f => isSupported(f.name))
     if (droppedFiles.length > 0) setFiles(prev => [...prev, ...droppedFiles])
   }
 
@@ -67,7 +67,7 @@ export default function UploadPage() {
     <div style={{ padding: 32, maxWidth: 800, margin: '0 auto' }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>Upload Documents</h1>
       <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 24px' }}>
-        Upload files to build your knowledge base. Supports .txt, .md, .csv, .docx, and .xlsx files.
+        Upload documents to build your knowledge base — {SUPPORTED_LABEL}. Each file is chunked, embedded and stored in the vector index, then you can ask questions about it.
       </p>
 
       {/* Drop Zone */}
@@ -88,9 +88,9 @@ export default function UploadPage() {
           <span style={{ color: '#D97706', fontWeight: 600 }}>Click to browse</span> or drag files here
         </p>
         <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '4px 0 0' }}>
-          TXT, MD, CSV, DOCX, XLSX files supported
+          {SUPPORTED_LABEL}
         </p>
-        <input ref={inputRef} type="file" multiple accept=".txt,.md,.csv,.docx,.xlsx,.xls,text/plain" onChange={handleFileSelect} style={{ display: 'none' }} />
+        <input ref={inputRef} type="file" multiple accept={ACCEPT_ATTR} onChange={handleFileSelect} style={{ display: 'none' }} />
       </div>
 
       {/* File List */}
@@ -151,7 +151,7 @@ export default function UploadPage() {
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{doc.name}</p>
                   <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>
-                    {doc.chunks} chunks processed
+                    {doc.chunks} chunks indexed{doc.characters ? ` · ${doc.characters.toLocaleString()} characters` : ''}
                   </p>
                 </div>
               </div>

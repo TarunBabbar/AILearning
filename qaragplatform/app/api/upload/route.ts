@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { documentStore } from '@/lib/document-store'
 import { chunkText } from '@/lib/rag'
+import { extractText, UnsupportedFileError } from '@/lib/extract'
+import { SUPPORTED_LABEL, extensionOf } from '@/lib/formats'
 import { generateId } from '@/lib/utils'
+
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+const MAX_BYTES = 25 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,44 +18,36 @@ export async function POST(req: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
-
-    // Extract text based on file type
-    let text: string
-    const ext = file.name.split('.').pop()?.toLowerCase()
-
-    if (ext === 'docx') {
-      const mammoth = require('mammoth')
-      const buffer = Buffer.from(await file.arrayBuffer())
-      const result = await mammoth.extractRawText({ buffer })
-      text = result.value
-    } else if (ext === 'xlsx' || ext === 'xls') {
-      const XLSX = require('xlsx')
-      const buffer = Buffer.from(await file.arrayBuffer())
-      const workbook = XLSX.read(buffer, { type: 'buffer' })
-      const sheets: string[] = []
-      for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName]
-        const csv = XLSX.utils.sheet_to_csv(sheet)
-        if (csv.trim()) {
-          sheets.push(`--- ${sheetName} ---\n${csv}`)
-        }
-      }
-      text = sheets.join('\n\n')
-    } else {
-      text = await file.text()
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json(
+        { error: `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is ${MAX_BYTES / 1024 / 1024} MB.` },
+        { status: 413 },
+      )
     }
 
-    if (!text || !text.trim()) {
-      return NextResponse.json({ error: 'No readable text found in file' }, { status: 400 })
+    let text: string
+    try {
+      text = await extractText(file)
+    } catch (err) {
+      if (err instanceof UnsupportedFileError) {
+        return NextResponse.json({ error: err.message }, { status: 415 })
+      }
+      throw err
+    }
+
+    if (!text.trim()) {
+      return NextResponse.json(
+        { error: `No readable text found in "${file.name}". If it is a scanned PDF it needs OCR first. Supported: ${SUPPORTED_LABEL}.` },
+        { status: 400 },
+      )
     }
 
     const chunks = chunkText(text)
     const docId = generateId()
-
     const doc = {
       id: docId,
       name: file.name,
-      type: file.type || 'text/plain',
+      type: file.type || `application/${extensionOf(file.name) || 'octet-stream'}`,
       size: file.size,
       content: text,
       chunks,
@@ -65,8 +64,9 @@ export async function POST(req: NextRequest) {
         type: doc.type,
         size: doc.size,
         chunks: doc.chunks.length,
+        characters: text.length,
         uploadedAt: doc.uploadedAt,
-      }
+      },
     })
   } catch (err) {
     return NextResponse.json({ error: 'Upload failed: ' + (err as Error).message }, { status: 500 })
