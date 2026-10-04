@@ -89,7 +89,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `EMBEDDING_MODEL` | `prompt` | `prompt` (free) or any OpenRouter embedding model ID |
 | `PINECONE_API_KEY` | — | Set to use Pinecone instead of in-memory vector store |
 | `PINECONE_INDEX` | `rag-embeddings` | Pinecone index name (dimension 1536, cosine metric) |
-| `NEXT_PUBLIC_DEFAULT_MODEL` | Nemotron-3 Super | Default chat model |
+| Chat model | Qwen 3.8 27B | The list lives in `lib/openrouter.ts`; the **first entry is the default**, so no env var is needed |
 
 ## Project Structure
 

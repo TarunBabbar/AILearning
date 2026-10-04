@@ -37,14 +37,18 @@ export async function chatCompletion(
   return data.choices?.[0]?.message?.content || ''
 }
 
+// Ordered: the first entry is the default (see DEFAULT_MODEL). Slugs rotate on
+// OpenRouter, so these were checked against the live free list; a plain instruct
+// model leads because reasoning models can spend the whole token budget on hidden
+// reasoning and return no answer at all.
 export const FREE_MODELS = [
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'NVIDIA Nemotron 3 Super', description: '120B param MoE, 1M context - Best for RAG Q&A' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Meta Llama 3.3 70B', description: 'Strong general purpose model' },
-  { id: 'tencent/hy3:free', name: 'Tencent Hy3', description: '295B MoE, strong reasoning' },
-  { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'NVIDIA Nemotron 3 Ultra', description: '550B MoE reasoning model' },
-  { id: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen 3 Next 80B', description: 'Fast MoE, good for chat' },
-  { id: 'google/gemma-4-31b-it:free', name: 'Google Gemma 4 31B', description: 'Dense 31B model' },
-  { id: 'openrouter/free', name: 'Auto Free Router', description: 'Picks best free model automatically' },
+  { id: 'qwen/qwen3.8-27b:free', name: 'Qwen 3.8 27B', description: 'Strong general instruct model - best default for RAG Q&A' },
+  { id: 'inclusionai/ling-3.0-flash-sante:free', name: 'Ling 3.0 Flash', description: 'Fast hybrid-reasoning MoE, reliable citations' },
+  { id: 'cohere/north-mini-code:free', name: 'Cohere North Mini', description: 'Compact, good for code and structured answers' },
+  { id: 'google/gemma-4-31b-it:free', name: 'Google Gemma 4 31B', description: 'Dense 31B general model' },
+  { id: 'dots-studio/dots-3-note-preview:free', name: 'Dots 3 Note', description: 'Long-context document model' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'NVIDIA Nemotron 3 Super', description: '120B MoE, 1M context (reasoning)' },
+  { id: 'openrouter/free', name: 'Auto Free Router', description: 'Lets OpenRouter pick a free model automatically' },
 ]
 
 export const DEFAULT_MODEL = FREE_MODELS[0].id
