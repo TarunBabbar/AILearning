@@ -1,52 +1,44 @@
 # QA RAG Platform
 
-A Retrieval-Augmented Generation (RAG) application that lets you upload documents and ask AI-powered questions about their content. Built with Next.js 14, OpenRouter free models, and Pinecone for vector search.
+A single-page Retrieval-Augmented Generation (RAG) demo: upload a document, it is chunked and embedded, the vectors are stored in Pinecone, and an LLM answers questions strictly from the retrieved chunks — with the sources cited. Built with Next.js 14, OpenRouter (embeddings + LLM) and Pinecone.
 
-## Screenshots
+## How it works
 
-| Dashboard | Upload Documents |
-|---|---|
-| ![Dashboard](screenshots/dashboard.png) | ![Upload](screenshots/upload.png) |
+Everything is on one page — no navigation:
 
-| AI Q&A Agent | Migration Studio |
-|---|---|
-| ![AI Q&A](screenshots/ai.png) | ![Migration](screenshots/migration.png) |
-
-| Project Scanner | Documents Manager |
-|---|---|
-| ![Scanner](screenshots/scanner.png) | ![Documents](screenshots/documents.png) |
+1. **Upload** — drag in a PDF, DOCX, XLSX/XLS, CSV or text file
+2. **Extract & chunk** — the text is pulled out and split into overlapping pieces
+3. **Embed** — each chunk is turned into a vector via OpenRouter
+4. **Store** — the vectors are upserted into Pinecone
+5. **Retrieve** — your question is embedded and the closest chunks are fetched
+6. **Answer** — an OpenRouter LLM answers from those chunks only, citing them
 
 ## Features
 
-- **Document Upload** — Upload `.txt`, `.md`, `.csv`, and `.docx` files via drag-and-drop
-- **Smart Chunking** — Documents are split into character-based chunks (configurable size) with overlap for context preservation
-- **AI Q&A** — Ask questions about your documents and get answers with source citations using RAG
-- **Model Selection** — Choose from 7+ free OpenRouter models (Nemotron, Llama, Qwen, Gemma, etc.)
-- **Configurable Embeddings** — Switch between free prompt-based embeddings or dedicated models like `text-embedding-3-small`
-- **Vector Search** — In-memory cosine similarity (free) or Pinecone (persistent, for production/serverless)
-- **Dashboard** — Live stats on documents, chunks, and storage
-- **Migration Studio** — Import test suites from 20+ enterprise sources (Git, CI/CD, cloud storage)
-- **Project Scanner** — Analyze framework, locator quality, and readiness before migration
+- **Any common document** — PDF, DOCX, XLSX/XLS, CSV, TXT, MD, JSON, HTML, XML, YAML, LOG, RTF
+- **Grounded answers** — the model answers only from retrieved chunks, and expands to show the sources it used
+- **Free LLM choice** — pick from the free OpenRouter models in the dropdown; the first entry is the default
+- **Real vector store** — Pinecone (1536-dim, cosine), with an in-memory fallback when no key is set
+- **Two numbers that matter** — documents and total chunks
 
 ## Tech Stack
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript 5 (strict) |
-| UI | React 18 + inline styles with CSS variables |
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Language | TypeScript 7 (strict) |
+| UI | React 19 + Tailwind CSS 4, inline styles with CSS variables |
 | Icons | Lucide React |
-| AI Provider | OpenRouter API |
-| Embeddings | Prompt-based (free) or text-embedding-3-small |
-| Vector Store | In-memory (default) or Pinecone |
-| Document Store | In-memory or Pinecone-backed (for serverless) |
-| DOCX Parsing | Mammoth |
+| Embeddings + LLM | OpenRouter API |
+| Vector Store | Pinecone (in-memory fallback) |
+| Document parsing | pdf-parse 2 (PDF), mammoth (DOCX), xlsx (XLSX/XLS) |
+| Hosting | Vercel |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.3+ (required by pdf-parse 2)
 - An [OpenRouter](https://openrouter.ai) API key (free tier works)
 
 ### Installation
@@ -94,23 +86,26 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Project Structure
 
 ```
-app/          # Next.js App Router (pages + API routes)
-  ai/         # AI Q&A chat interface
-  upload/     # Document upload
-  documents/  # Document manager
-  migration/  # Migration Studio
-  scanner/    # Project Scanner
-  settings/   # API key & model config
-  api/        # Backend endpoints (chat, upload, documents, migration)
-lib/          # Core libraries
-  openrouter.ts     # OpenRouter chat API
-  embeddings.ts     # Embedding abstraction (prompt or API-based)
-  vector-store.ts   # Vector store abstraction (in-memory or Pinecone)
-  rag.ts            # RAG pipeline (chunking, retrieval, Q&A)
-  document-store.ts # Document metadata storage
-components/   # Shared UI components
+app/
+  page.tsx          # The whole app: header + flow + stats + upload + ask
+  layout.tsx        # Shell
+  api/
+    upload/         # POST a file -> extract, chunk, embed, upsert
+    chat/           # POST a question -> retrieve, answer with sources
+    documents/      # GET the indexed documents (used for the stats)
+components/
+  UploadPanel.tsx   # Drop zone, file list, indexing results
+  AskPanel.tsx      # Chat with the model dropdown and per-answer sources
+lib/
+  openrouter.ts     # Chat completions + the free-model list (first = default)
+  embeddings.ts     # Embedding abstraction (API-based or prompt-based)
+  extract.ts        # One extractor per file format
+  formats.ts        # Supported extensions + <input accept>
+  vector-store.ts   # Pinecone or in-memory vector store
+  rag.ts            # Chunking, retrieval, answer assembly
+  document-store.ts # Document metadata
 ```
 
 ## License
 
-MIT
+Tarun Kumar Babbar License

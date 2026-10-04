@@ -1,130 +1,115 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FileText, MessageSquare, Database, HardDrive, Upload, Zap, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { FileText, Database, ArrowRight } from 'lucide-react'
+import { SUPPORTED_LABEL } from '@/lib/formats'
+import UploadPanel from '@/components/UploadPanel'
 
-interface Stats {
-  totalDocs: number
-  totalChunks: number
-  totalSize: number
-}
+const STACK = ['Next.js', 'OpenRouter', 'Pinecone', 'Vercel']
+
+// The point of the app: the whole RAG flow, named.
+const STEPS = [
+  { n: 1, title: 'Upload', detail: SUPPORTED_LABEL },
+  { n: 2, title: 'Extract & chunk', detail: 'Split into overlapping pieces' },
+  { n: 3, title: 'Embed', detail: 'OpenRouter turns each chunk into a vector' },
+  { n: 4, title: 'Store', detail: 'Vectors are upserted into Pinecone' },
+  { n: 5, title: 'Retrieve', detail: 'The closest chunks to your question' },
+  { n: 6, title: 'Answer', detail: 'An OpenRouter LLM answers from those chunks only' },
+]
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stats | null>(null)
+  const [stats, setStats] = useState<{ docs: number; chunks: number } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
+    setLoading(true)
     fetch('/api/documents')
       .then(r => r.json())
-      .then(data => setStats({
-        totalDocs: data.documents?.length || 0,
-        totalChunks: data.documents?.reduce((s: number, d: any) => s + (d.chunks || 0), 0) || 0,
-        totalSize: data.documents?.reduce((s: number, d: any) => s + d.size, 0) || 0,
-      }))
+      .then(data => {
+        const docs = data.documents || []
+        setStats({ docs: docs.length, chunks: docs.reduce((s: number, d: any) => s + (d.chunks || 0), 0) })
+      })
+      .catch(() => setStats({ docs: 0, chunks: 0 }))
       .finally(() => setLoading(false))
-  }, [])
+  }, [refreshKey])
 
   return (
-    <div style={{ padding: 32, maxWidth: 1200, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Dashboard</h1>
-        <p style={{ fontSize: 14, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>
-          Welcome to your QA RAG Platform. Upload documents and ask AI-powered questions.
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 28px 48px' }}>
+      <header style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.01em' }}>
+              QA RAG Platform
+            </h1>
+            <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+            {STACK.map((s, i) => (
+              <span key={s} style={{ fontSize: 10.5, color: 'var(--text-3)' }}>
+                {i > 0 && <span style={{ marginRight: 8, color: 'var(--border)' }}>·</span>}
+                {s}
+              </span>
+            ))}
+          </div>
+          <Link href="/ask" style={{
+            display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none',
+            padding: '7px 14px', borderRadius: 8, background: '#D97706', color: 'white',
+            fontSize: 12.5, fontWeight: 600
+          }}>
+            Ask a question <ArrowRight size={13} />
+          </Link>
+        </div>
+        <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '8px 0 0', lineHeight: 1.6, maxWidth: 720 }}>
+          Upload a document → it is chunked and embedded → the vectors go into Pinecone → an OpenRouter LLM answers
+          from the retrieved chunks only, citing its sources. Retrieval-augmented generation, end to end.
         </p>
+      </header>
+
+      {/* The flow */}
+      <section style={{
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+        padding: '14px 16px', marginBottom: 18,
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14
+      }}>
+        {STEPS.map(s => (
+          <div key={s.n}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{
+                width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.3)',
+                color: '#B45309', fontSize: 9.5, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>{s.n}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{s.title}</span>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0, lineHeight: 1.45, paddingLeft: 24 }}>
+              {s.detail}
+            </p>
+          </div>
+        ))}
+      </section>
+
+      {/* The two numbers that matter */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+        <MiniStat icon={FileText} label="Documents" value={loading ? '…' : stats?.docs ?? 0} color="#D97706" />
+        <MiniStat icon={Database} label="Total chunks" value={loading ? '…' : stats?.chunks ?? 0} color="#8B5CF6" />
       </div>
 
-      {/* Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 32 }}>
-        <StatCard icon={FileText} label="Documents" value={loading ? '...' : stats?.totalDocs || 0} color="#D97706" />
-        <StatCard icon={Database} label="Total Chunks" value={loading ? '...' : stats?.totalChunks || 0} color="#8B5CF6" />
-        <StatCard icon={HardDrive} label="Storage Used" value={loading ? '...' : formatSize(stats?.totalSize || 0)} color="#10B981" />
-        <StatCard icon={MessageSquare} label="Model" value="Nemotron-3" color="#3B82F6" />
-      </div>
-
-      {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-        <ActionCard
-          icon={Upload}
-          title="Upload Documents"
-          description="Upload PDF, TXT, or DOCX files to build your knowledge base"
-          href="/upload"
-          accent="#D97706"
-        />
-        <ActionCard
-          icon={Zap}
-          title="Ask Questions"
-          description="Ask AI-powered questions about your uploaded documents"
-          href="/ai"
-          accent="#8B5CF6"
-        />
-        <ActionCard
-          icon={FileText}
-          title="Browse Documents"
-          description="View and manage all your uploaded documents"
-          href="/documents"
-          accent="#10B981"
-        />
-      </div>
+      <UploadPanel onUploaded={() => setRefreshKey(k => k + 1)} />
     </div>
   )
 }
 
-function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color: string }) {
+function MiniStat({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color: string }) {
   return (
     <div style={{
-      background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)',
-      padding: 20, display: 'flex', alignItems: 'flex-start', gap: 14
+      display: 'flex', alignItems: 'center', gap: 8, flex: 1,
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 10, padding: '10px 14px'
     }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: 10,
-        background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0
-      }}>
-        <Icon size={18} color={color} />
-      </div>
-      <div>
-        <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-        <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '4px 0 0' }}>{value}</p>
-      </div>
+      <Icon size={15} color={color} />
+      <span style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{value}</span>
     </div>
   )
-}
-
-function ActionCard({ icon: Icon, title, description, href, accent }: { icon: any; title: string; description: string; href: string; accent: string }) {
-  return (
-    <Link href={href} style={{ textDecoration: 'none' }}>
-      <div style={{
-        background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)',
-        padding: 24, cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s',
-        display: 'flex', flexDirection: 'column', gap: 12
-      }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.boxShadow = `0 0 0 1px ${accent}20` }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 8,
-            background: `${accent}15`, display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <Icon size={16} color={accent} />
-          </div>
-          <ArrowRight size={16} color={accent} />
-        </div>
-        <div>
-          <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', margin: 0 }}>{title}</h3>
-          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '4px 0 0', lineHeight: 1.5 }}>{description}</p>
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-function formatSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }

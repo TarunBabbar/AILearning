@@ -35,12 +35,15 @@ export async function extractText(file: File): Promise<string> {
 }
 
 async function extractPdf(buffer: Buffer): Promise<string> {
-  // Require the inner module: the package entry point runs a debug block that
-  // tries to read a sample file on import.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const pdfParse = require('pdf-parse/lib/pdf-parse.js')
-  const data = await pdfParse(buffer)
-  return String(data.text || '').trim()
+  // pdf-parse 2.x replaced the v1 callable default export with a PDFParse class.
+  const { PDFParse } = require('pdf-parse')
+  const parser = new PDFParse({ data: buffer })
+  try {
+    const result = await parser.getText()
+    return String(result.text || '').trim()
+  } finally {
+    await parser.destroy()
+  }
 }
 
 async function extractDocx(buffer: Buffer): Promise<string> {
