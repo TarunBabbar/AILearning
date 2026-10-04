@@ -8,6 +8,8 @@ type Project = {
   tech: string[];
   repo: string;
   demo: string | null;
+  /** live apps show only their demo by default; set this to also show the source */
+  repoToo?: boolean;
   badge?: string;
   accent?: "amber" | "emerald";
   emoji: string;
@@ -59,6 +61,7 @@ const projects: Project[] = [
     tech: ["Next.js", "OpenRouter", "Pinecone", "Vector Search"],
     repo: "https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform",
     demo: "https://qaragplatform.vercel.app",
+    repoToo: true,
     emoji: "📚",
   },
   {
@@ -232,8 +235,8 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
       </div>
 
       <div className="flex gap-3.5 border-t border-border pt-2.5">
-        {/* live apps link to the running demo only; the rest link to source */}
-        {p.demo ? (
+        {/* live apps link to the running demo; the source shows too when asked for */}
+        {p.demo && (
           <a
             href={p.demo}
             target="_blank"
@@ -243,7 +246,8 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
             Live Demo
             <span aria-hidden>→</span>
           </a>
-        ) : (
+        )}
+        {(!p.demo || p.repoToo) && (
           <a
             href={p.repo}
             target="_blank"
