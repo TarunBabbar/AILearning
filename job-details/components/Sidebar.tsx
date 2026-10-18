@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Info, Contact, Target, FileUp, Star } from "lucide-react";
+import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Info, Contact, Target, FileUp, Star, Sparkles, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SESSION_KEY, swrFetcher } from "@/lib/swr-fetcher";
 import FeedbackModal from "@/components/FeedbackModal";
@@ -127,6 +127,34 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* New version announcement — links to the redesigned app */}
+      {!collapsed && (
+        <div className="px-3 pt-3">
+          <div className="rounded-lg border border-[#cfe1f7] bg-[#eef5fd] p-3">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={13} className="shrink-0 text-[#0a66c2]" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#0a4a8f]">
+                New version coming soon
+              </span>
+            </div>
+            <p className="mt-1.5 text-[10.5px] leading-relaxed text-[#1e4e7a]">
+              Save roles, a modern look, and dark / light themes. Your account,
+              resume and jobs move over automatically — nothing to re-enter.
+            </p>
+            <a
+              href="https://qajobsv2.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open the new version"
+              className="mt-2 flex items-center justify-center gap-1.5 rounded-md bg-[#0a66c2] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#004182]"
+            >
+              Try the new version
+              <ExternalLink size={12} className="shrink-0" />
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Built by credit */}
       {!collapsed && (
