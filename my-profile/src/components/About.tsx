@@ -7,6 +7,11 @@ const highlights = [
   "Multi-Agent Orchestration",
   "DeepEval-Driven Output Validation",
   "Auto Duplicate Scenario Detection",
+  "Test Case Generation: JIRA + Figma → TFS",
+  "Automation Generation into an Existing Framework",
+  "Skills.md-Driven Automation Recipes",
+  "Live DOM Healing via MCP Playwright",
+  "Generated Specs, Page Files & Helpers",
   "Playwright + TypeScript Frameworks",
   "Figma → Requirements → Test Cases",
   "TFS / Azure DevOps Integration",
@@ -51,6 +56,20 @@ export default function About() {
               model-driven decisions through{" "}
               <strong className="text-text">agentic prompting</strong> — before
               driving the automation itself.
+            </p>
+            <p className="text-sm text-text-secondary leading-relaxed mb-3">
+              That work is split into{" "}
+              <strong className="text-text">two pipelines</strong>. The first
+              takes <strong className="text-text">JIRA stories and Figma
+              designs</strong>, turns them into requirements and then into test
+              cases, de-duplicates near-identical scenarios, and publishes the
+              result to TFS. The second takes the selected test cases and{" "}
+              <strong className="text-text">generates the automation</strong> —
+              new specs, page files and helpers written into our existing
+              Playwright + TypeScript framework from the test cases, the
+              framework and the product code, run, healed against the{" "}
+              <strong className="text-text">live DOM over MCP Playwright</strong>,
+              and pushed to a new branch.
             </p>
             <p className="text-sm text-text-secondary leading-relaxed">
               From service-based orgs to product companies, I&apos;ve taken teams

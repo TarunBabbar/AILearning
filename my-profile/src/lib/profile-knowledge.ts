@@ -9,6 +9,13 @@ export type ProfileKnowledge = {
   aiPlatformsBuilt: string;
   stats: { num: string; label: string }[];
   highlights: string[];
+  pipelines: {
+    name: string;
+    purpose: string;
+    inputs: string[];
+    steps: string[];
+    outputs: string[];
+  }[];
   roles: { date: string; title: string; company: string; tag?: string; details: string[] }[];
   education: string;
   skills: { title: string; top: string[]; rest: string[] }[];
@@ -33,6 +40,12 @@ export const profileKnowledge: ProfileKnowledge = {
     "AI-Powered QA Platforms",
     "Multi-Agent Orchestration",
     "DeepEval-Driven Output Validation",
+    "Auto Duplicate Scenario Detection",
+    "Test Case Generation: JIRA + Figma → TFS",
+    "Automation Generation into an Existing Framework",
+    "Skills.md-Driven Automation Recipes",
+    "Live DOM Healing via MCP Playwright",
+    "Generated Specs, Page Files & Helpers",
     "Playwright + TypeScript Frameworks",
     "Figma → Requirements → Test Cases",
     "TFS / Azure DevOps Integration",
@@ -43,6 +56,48 @@ export const profileKnowledge: ProfileKnowledge = {
     "Framework Architecture & Mentorship",
     "MCP Protocol for Tool Integration",
   ],
+  pipelines: [
+    {
+      name: "Pipeline 1 — Test Case Generation",
+      purpose:
+        "Turns JIRA stories and Figma designs into reviewed, de-duplicated test cases published to TFS.",
+      inputs: ["JIRA stories", "Figma designs"],
+      steps: [
+        "JIRA stories and Figma designs are ingested as the requirement source",
+        "Requirements are generated and refined from the designs",
+        "A generation agent converts each requirement into test cases",
+        "Duplicate and near-identical scenarios are auto-detected and merged before they multiply",
+        "Every AI output is evaluated against quality metrics with DeepEval (LLM-as-a-judge)",
+        "Reviewed cases are published to TFS over REST APIs using token auth",
+      ],
+      outputs: ["Test cases in TFS", "Traceable to the source story"],
+    },
+    {
+      name: "Pipeline 2 — Automation Code Generation",
+      purpose:
+        "Takes selected test cases and generates working Playwright automation into the existing TypeScript framework, runs it, heals its own failures against the live DOM, and pushes the code to a new branch.",
+      inputs: [
+        "Figma",
+        "Test cases",
+        "Existing TypeScript + Playwright framework",
+        "Product code",
+      ],
+      steps: [
+        "Inputs are assembled: Figma, the selected test cases, the existing TypeScript + Playwright framework and the product code",
+        "Product-code information and the live DOM are read to capture the elements each test acts on",
+        "A Skills.md file is generated — the automation recipe for the selected test cases",
+        "Automation code is generated: new specs, page files, helpers and whatever artifacts the tests need, following the existing framework structure",
+        "The generated tests are executed",
+        "Failures are fixed using live DOM element capture over MCP Playwright",
+        "Tests are re-run until green, then the code is pushed to a new branch for review",
+      ],
+      outputs: [
+        "New specs, page files and helpers",
+        "Run-verified build",
+        "Pushed to a new branch",
+      ],
+    },
+  ],
   roles: [
     {
       date: "Aug 2026 — Present",
@@ -52,9 +107,11 @@ export const profileKnowledge: ProfileKnowledge = {
       tag: "Current",
       details: [
         "Built a Playwright + TypeScript UI test automation framework for a Blazor-based application, using Azure DevOps, TFS, and YAML pipelines for CI",
-        "Building a Multi-Agent Orchestration Framework that generates requirements from Figma designs, converts them into test cases, and publishes them to TFS through REST APIs using token auth",
-        "Every AI-generated output is evaluated against quality metrics with DeepEval, with auto-duplicate scenario/test detection to stop similar scenarios from multiplying",
-        "Generating automation code that follows the framework structure on Azure DevOps, with the full UI automation pipeline in place",
+        "Pipeline 1 — Test Case Generation: JIRA stories and Figma designs are turned into requirements and then into test cases, with auto-detection of duplicate and near-identical scenarios so they never multiply, and publishing to TFS over REST APIs using token auth",
+        "Every AI-generated output — requirements, test cases and automation code — is evaluated against quality metrics with DeepEval, with model-driven decisions made through agentic prompting",
+        "Pipeline 2 — Automation Generation: test cases, Figma, the existing TypeScript + Playwright framework and the product code are the inputs; product-code and live-DOM information is read to capture the elements each test has to act on",
+        "It generates a Skills.md automation recipe for the selected test cases, then generates the automation code — new specs, page files, helpers and whatever other artifacts the tests need — following the existing framework structure",
+        "Generated tests are executed, failures are fixed using live DOM element capture over MCP Playwright, tests are re-run until green, and the code is pushed to a new branch for review",
         "Reading user stories and converting them into test cases — identifying which existing tests belong to each story by reading the test-case repository",
         "Triggering automation runs automatically based on the scenarios under test, and presenting reports built with Cursor",
       ],
@@ -244,6 +301,16 @@ Hackathon: 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon (
 ## Highlights
 ${k.highlights.map((h) => `- ${h}`).join("\n")}
 
+## AI QA Platform — the two pipelines
+${k.pipelines
+  .map(
+    (p) =>
+      `### ${p.name}\nWhat it does: ${p.purpose}\nInputs: ${p.inputs.join(", ")}\nSteps:\n${p.steps
+        .map((s, i) => `${i + 1}. ${s}`)
+        .join("\n")}\nOutput: ${p.outputs.join(", ")}`
+  )
+  .join("\n\n")}
+
 ## Career
 ${k.roles
   .map(
@@ -290,7 +357,9 @@ A visitor is chatting with you to learn about ${profileKnowledge.owner}. Answer 
 Rules:
 - Be friendly, concise, and professional. Use short markdown (bold, bullets) for readability.
 - If asked about anything covered by the profile (experience, skills, projects, education, contact, stats, location), answer directly from it.
-- If asked about his current work or role, mention he works at Coforge Limited for client Xplor Technologies, building multi-agent AI QA frameworks (Figma → requirements → test cases on TFS via REST API, DeepEval evaluation, Playwright + TypeScript, Azure DevOps YAML pipelines).
+- If asked about his current work or role, mention he works at Coforge Limited for client Xplor Technologies, building a multi-agent AI QA platform made of TWO pipelines.
+- If asked about the test case generation pipeline (JIRA + Figma → test cases), describe Pipeline 1 exactly as in the PROFILE KNOWLEDGE: JIRA stories + Figma designs → requirements → test cases → duplicate and near-identical scenario detection → DeepEval evaluation → published to TFS over REST APIs with token auth.
+- If asked about the automation generation pipeline (test cases → automation code), describe Pipeline 2 exactly as in the PROFILE KNOWLEDGE: inputs are Figma + the selected test cases + the existing TypeScript + Playwright framework + the product code; product-code and live-DOM information is read to capture the elements each test acts on; a Skills.md recipe is generated for the selected test cases; then specs, page files, helpers and other artifacts are generated into the existing framework; the tests are run; failures are fixed using live DOM element capture over MCP Playwright; tests are re-run until green; and the code is pushed to a new branch.
 - If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline).
 - When a visitor asks how to reach or contact Tarun, ALWAYS output the contact list as markdown links, one per line, with WhatsApp FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the number/username as the link text — never the word "link". Example format (use these exact URLs):
   - 💬 [WhatsApp: +91 9623252365](https://wa.me/919623252365)
