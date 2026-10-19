@@ -60,36 +60,36 @@ export const profileKnowledge: ProfileKnowledge = {
     {
       name: "Pipeline 1 — Test Case Generation",
       purpose:
-        "Turns JIRA stories and Figma designs into reviewed, de-duplicated test cases published to TFS.",
-      inputs: ["JIRA stories", "Figma designs"],
+        "Turns JIRA, Figma and product-code information into a test plan and then into reviewed, de-duplicated test cases published to TFS.",
+      inputs: ["JIRA stories", "Figma designs", "Product code information"],
       steps: [
-        "JIRA stories and Figma designs are ingested as the requirement source",
-        "Requirements are generated and refined from the designs",
-        "A generation agent converts each requirement into test cases",
-        "Duplicate and near-identical scenarios are auto-detected and merged before they multiply",
-        "Every AI output is evaluated against quality metrics with DeepEval (LLM-as-a-judge)",
-        "Reviewed cases are published to TFS over REST APIs using token auth",
+        "JIRA stories, Figma designs and product-code information are ingested as the source material",
+        "A Test Plan is generated and evaluated with DeepEval",
+        "The Test Case Generator converts the test plan into test cases",
+        "Each generated output is evaluated again with DeepEval",
+        "Existing cases are pulled from TFS and duplicates are verified",
+        "Approval gate: manual when duplicates surface or the DeepEval score is low, otherwise automatic",
+        "Approved test cases are pushed to TFS over REST APIs using token auth",
       ],
       outputs: ["Test cases in TFS", "Traceable to the source story"],
     },
     {
       name: "Pipeline 2 — Automation Code Generation",
       purpose:
-        "Takes selected test cases and generates working Playwright automation into the existing TypeScript framework, runs it, heals its own failures against the live DOM, and pushes the code to a new branch.",
+        "Builds a skill file from the selected test cases, Figma and the product code, passes it to the LLM to generate Playwright automation into the existing framework, runs it, fixes failures with a live DOM detector, and pushes the code to a new branch.",
       inputs: [
         "Figma",
         "Test cases",
-        "Existing TypeScript + Playwright framework",
         "Product code",
+        "Existing TypeScript + Playwright framework",
       ],
       steps: [
-        "Inputs are assembled: Figma, the selected test cases, the existing TypeScript + Playwright framework and the product code",
-        "Product-code information and the live DOM are read to capture the elements each test acts on",
-        "A Skills.md file is generated — the automation recipe for the selected test cases",
-        "Automation code is generated: new specs, page files, helpers and whatever artifacts the tests need, following the existing framework structure",
+        "The selected test cases, Figma designs and product code are read",
+        "A Skills.md skill file is created from them — the automation recipe",
+        "That skill file is passed to the LLM, which generates the automation code: new specs, page files, helpers and the other artifacts the tests need, following the existing framework structure",
         "The generated tests are executed",
-        "Failures are fixed using live DOM element capture over MCP Playwright",
-        "Tests are re-run until green, then the code is pushed to a new branch for review",
+        "When tests fail, a live DOM detector captures the real elements over MCP Playwright so the failure can be fixed",
+        "Tests are re-run until green, then the code is pushed to a new branch",
       ],
       outputs: [
         "New specs, page files and helpers",
@@ -107,7 +107,7 @@ export const profileKnowledge: ProfileKnowledge = {
       tag: "Current",
       details: [
         "Built a Playwright + TypeScript UI test automation framework for a Blazor-based application, using Azure DevOps, TFS, and YAML pipelines for CI",
-        "Pipeline 1 — Test Case Generation: JIRA stories and Figma designs are turned into requirements and then into test cases, with auto-detection of duplicate and near-identical scenarios so they never multiply, and publishing to TFS over REST APIs using token auth",
+        "Pipeline 1 — Test Case Generation: JIRA, Figma and product-code information become a test plan (evaluated with DeepEval), which the Test Case Generator turns into test cases — evaluated again, pulled from TFS, checked for duplicates, passed through an approval gate (manual when duplicates surface or the DeepEval score is low, automatic otherwise) and pushed to TFS over REST APIs using token auth",
         "Every AI-generated output — requirements, test cases and automation code — is evaluated against quality metrics with DeepEval, with model-driven decisions made through agentic prompting",
         "Pipeline 2 — Automation Generation: test cases, Figma, the existing TypeScript + Playwright framework and the product code are the inputs; product-code and live-DOM information is read to capture the elements each test has to act on",
         "It generates a Skills.md automation recipe for the selected test cases, then generates the automation code — new specs, page files, helpers and whatever other artifacts the tests need — following the existing framework structure",
@@ -358,8 +358,8 @@ Rules:
 - Be friendly, concise, and professional. Use short markdown (bold, bullets) for readability.
 - If asked about anything covered by the profile (experience, skills, projects, education, contact, stats, location), answer directly from it.
 - If asked about his current work or role, mention he works at Coforge Limited for client Xplor Technologies, building a multi-agent AI QA platform made of TWO pipelines.
-- If asked about the test case generation pipeline (JIRA + Figma → test cases), describe Pipeline 1 exactly as in the PROFILE KNOWLEDGE: JIRA stories + Figma designs → requirements → test cases → duplicate and near-identical scenario detection → DeepEval evaluation → published to TFS over REST APIs with token auth.
-- If asked about the automation generation pipeline (test cases → automation code), describe Pipeline 2 exactly as in the PROFILE KNOWLEDGE: inputs are Figma + the selected test cases + the existing TypeScript + Playwright framework + the product code; product-code and live-DOM information is read to capture the elements each test acts on; a Skills.md recipe is generated for the selected test cases; then specs, page files, helpers and other artifacts are generated into the existing framework; the tests are run; failures are fixed using live DOM element capture over MCP Playwright; tests are re-run until green; and the code is pushed to a new branch.
+- If asked about the test case generation pipeline (JIRA + Figma → test cases), describe Pipeline 1 exactly as in the PROFILE KNOWLEDGE: JIRA + Figma + product-code information → Test Plan → DeepEval → Test Case Generator → DeepEval → pull TFS → verify duplicates → approval gate (manual when duplicates surface or the DeepEval score is low, otherwise automatic) → push test cases to TFS over REST APIs with token auth.
+- If asked about the automation generation pipeline (test cases → automation code), describe Pipeline 2 exactly as in the PROFILE KNOWLEDGE: the skill file (Skills.md) is created by reading the test cases, Figma and the product code; that skill file is passed to the LLM, which generates the automation — new specs, page files, helpers and the other artifacts the tests need — into the existing TypeScript + Playwright framework; the generated tests are run; when they fail, a live DOM detector captures the real elements over MCP Playwright so the failure can be fixed; tests are re-run until green; and the code is pushed to a new branch.
 - If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline).
 - When a visitor asks how to reach or contact Tarun, ALWAYS output the contact list as markdown links, one per line, with WhatsApp FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the number/username as the link text — never the word "link". Example format (use these exact URLs):
   - 💬 [WhatsApp: +91 9623252365](https://wa.me/919623252365)

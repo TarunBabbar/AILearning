@@ -23,6 +23,29 @@ const highlights = [
   "MCP Protocol for Tool Integration",
 ];
 
+type IntroPoint = { title: string; body: string; flow?: string };
+
+const introPoints: IntroPoint[] = [
+  {
+    title: "Test cases from the source",
+    flow: "JIRA + Figma + product code → Test Plan → DeepEval → Test Case Generator → DeepEval → pull TFS → verify duplicates → approval → push test cases",
+    body: "The approval gate stays automatic unless duplicates surface or the DeepEval score is low — then it waits for a human.",
+  },
+  {
+    title: "Automation generated, not hand-written",
+    flow: "test cases + Figma + product code → Skills.md (skill file) → LLM generates automation → run tests → on failure: live DOM detector → fix → re-run → new branch",
+    body: "The skill file is built by reading the test cases, Figma and the product code, then handed to the LLM to generate specs, page files and helpers into our existing Playwright + TypeScript framework. Failures are detected against the live DOM and fixed before the code is pushed to a new branch.",
+  },
+  {
+    title: "Impact",
+    body: "Teams taken from no automation to 100% adoption — now building one scalable platform multiple teams onboard to.",
+  },
+  {
+    title: "🏆 1st place",
+    body: "The Testing Academy's AI Tester Blueprint 3x hackathon, for QAE2E — an agentic QA pipeline judged end-to-end by an AI.",
+  },
+];
+
 export default function About() {
   return (
     <section id="about" className="py-12 sm:py-16 bg-bg">
@@ -40,58 +63,32 @@ export default function About() {
             <h2 className="text-[clamp(1.5rem,2.6vw,2rem)] font-extrabold tracking-[-0.02em] mb-3 leading-tight">
               Architect of Quality. Builder of AI Systems.
             </h2>
-            <p className="text-sm text-text-secondary leading-relaxed mb-3">
+            <p className="text-sm text-text-secondary leading-relaxed mb-4">
               I&apos;m an AI QA Architect and Test Automation Engineer with 18+
               years of experience — currently designing AI-driven quality
               engineering at{" "}
               <strong className="text-text">Coforge Limited</strong> for client{" "}
-              <strong className="text-text">Xplor Technologies, Pune</strong>.
-              I build multi-agent pipelines where AI writes requirements,
-              converts them into test cases —{" "}
-              <strong className="text-text">
-                auto-detecting duplicate or near-identical scenarios
-              </strong>{" "}
-              before they multiply — evaluates every output with
-              <strong className="text-text"> DeepEval</strong>, and makes
-              model-driven decisions through{" "}
-              <strong className="text-text">agentic prompting</strong> — before
-              driving the automation itself.
+              <strong className="text-text">Xplor Technologies, Pune</strong>,
+              building multi-agent pipelines that take QA from requirement to
+              running automation.
             </p>
-            <p className="text-sm text-text-secondary leading-relaxed mb-3">
-              That work is split into{" "}
-              <strong className="text-text">two pipelines</strong>. The first
-              takes <strong className="text-text">JIRA stories and Figma
-              designs</strong>, turns them into requirements and then into test
-              cases, de-duplicates near-identical scenarios, and publishes the
-              result to TFS. The second takes the selected test cases and{" "}
-              <strong className="text-text">generates the automation</strong> —
-              new specs, page files and helpers written into our existing
-              Playwright + TypeScript framework from the test cases, the
-              framework and the product code, run, healed against the{" "}
-              <strong className="text-text">live DOM over MCP Playwright</strong>,
-              and pushed to a new branch.
-            </p>
-            <p className="text-sm text-text-secondary leading-relaxed">
-              From service-based orgs to product companies, I&apos;ve taken teams
-              from <strong className="text-text">no automation to 100%
-              automation adoption</strong>. Today I combine enterprise Playwright
-              + TypeScript frameworks with agentic AI — turning QA from a
-              bottleneck into an accelerator. My focus now is{" "}
-              <strong className="text-text">
-                organisation-wide impact
-              </strong>
-              : one scalable, maintainable AI platform that multiple teams
-              onboard to, delivering consistent quality outputs across the
-              enterprise.
-            </p>
-            <p className="text-sm text-text-secondary leading-relaxed mt-3">
-              <strong className="text-text">1st place</strong> at The Testing
-              Academy&apos;s <em>AI Tester Blueprint 3x</em> hackathon (60+
-              participants) for{" "}
-              <strong className="text-text">QAE2E</strong>, an agentic QA pipeline
-              that ships requirements to release-confidence — evaluated and
-              refined end-to-end by an AI judge.
-            </p>
+
+            <ul className="space-y-3">
+              {introPoints.map((point) => (
+                <li key={point.title} className="flex gap-2.5">
+                  <span className="mt-[7px] h-1.5 w-1.5 min-w-[6px] rounded-full bg-amber-500" />
+                  <span className="min-w-0 text-sm text-text-secondary leading-relaxed">
+                    <strong className="text-text">{point.title}</strong>
+                    {point.flow && (
+                      <span className="mt-1.5 block rounded-md border border-border bg-bg-soft px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-text-secondary">
+                        {point.flow}
+                      </span>
+                    )}
+                    <span className="mt-1 block">{point.body}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </motion.div>
 
           <motion.div
