@@ -41,7 +41,7 @@ const roles: Role[] = [
   },
   {
     date: "Jul 2025 — Jul 2026",
-    title: "Career Transition — AI + Test Automation R&D",
+    title: "Career Break — AI + Test Automation R&D",
     company: "Self-Directed Learning, Pune",
     details: [
       "Deep-dived into LLMs, RAG, MCP, AI agents and orchestration tools while strengthening LangChain, Playwright and TypeScript.",
