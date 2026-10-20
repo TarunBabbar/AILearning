@@ -23,26 +23,32 @@ const highlights = [
   "MCP Protocol for Tool Integration",
 ];
 
-type IntroPoint = { title: string; body: string; flow?: string };
+type IntroPoint = { title: string; body: string };
 
 const introPoints: IntroPoint[] = [
   {
-    title: "Test cases from the source",
-    flow: "JIRA + Figma + product code → Test Plan → DeepEval → Test Case Generator → DeepEval → pull TFS → verify duplicates → approval → push test cases",
-    body: "The approval gate stays automatic unless duplicates surface or the DeepEval score is low — then it waits for a human.",
+    title: "18+ years in QA engineering",
+    body: "Service orgs to product companies — Infosys, TCS, Varian and Coupa — now AI-native quality engineering.",
   },
   {
-    title: "Automation generated, not hand-written",
-    flow: "test cases + Figma + product code → Skills.md (skill file) → LLM generates automation → run tests → on failure: live DOM detector → fix → re-run → new branch",
-    body: "The skill file is built by reading the test cases, Figma and the product code, then handed to the LLM to generate specs, page files and helpers into our existing Playwright + TypeScript framework. Failures are detected against the live DOM and fixed before the code is pushed to a new branch.",
+    title: "Solutions Architect at Coforge Limited",
+    body: "Based in Pune, currently at client location Xplor Technologies, Kharadi.",
   },
   {
-    title: "Impact",
-    body: "Teams taken from no automation to 100% adoption — now building one scalable platform multiple teams onboard to.",
+    title: "10+ AI apps and agentic systems shipped",
+    body: "RAG pipelines, agentic QA copilots, and the QAE2E pipeline that took the hackathon.",
   },
   {
-    title: "🏆 1st place",
-    body: "The Testing Academy's AI Tester Blueprint 3x hackathon, for QAE2E — an agentic QA pipeline judged end-to-end by an AI.",
+    title: "🏆 1st place — AI Tester Blueprint 3x hackathon",
+    body: "60+ participants, for QAE2E — an agentic QA pipeline judged end-to-end by an AI.",
+  },
+  {
+    title: "0 → 100% automation adoption",
+    body: "Teams taken from fully manual regression to fully automated across 3+ product lines.",
+  },
+  {
+    title: "Open to Architect / Principal SDET / QA Head roles",
+    body: "Focused on one scalable AI platform that multiple teams onboard to.",
   },
 ];
 
@@ -73,18 +79,13 @@ export default function About() {
               running automation.
             </p>
 
-            <ul className="space-y-3">
+            <ul className="space-y-2.5">
               {introPoints.map((point) => (
                 <li key={point.title} className="flex gap-2.5">
                   <span className="mt-[7px] h-1.5 w-1.5 min-w-[6px] rounded-full bg-amber-500" />
-                  <span className="min-w-0 text-sm text-text-secondary leading-relaxed">
+                  <span className="min-w-0 text-sm leading-relaxed text-text-secondary">
                     <strong className="text-text">{point.title}</strong>
-                    {point.flow && (
-                      <span className="mt-1.5 block rounded-md border border-border bg-bg-soft px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-text-secondary">
-                        {point.flow}
-                      </span>
-                    )}
-                    <span className="mt-1 block">{point.body}</span>
+                    <span className="mt-0.5 block">{point.body}</span>
                   </span>
                 </li>
               ))}

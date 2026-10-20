@@ -2,7 +2,18 @@
 
 import { motion } from "framer-motion";
 
-const roles = [
+type PipelineDetail = { name: string; flow: string; note: string };
+
+type Role = {
+  date: string;
+  title: string;
+  company: string;
+  tag?: string;
+  details: string[];
+  pipelines?: PipelineDetail[];
+};
+
+const roles: Role[] = [
   {
     date: "Aug 2026 — Present",
     title: "Solutions Architect",
@@ -11,13 +22,21 @@ const roles = [
     tag: "Current",
     details: [
       "Built a Playwright + TypeScript UI test automation framework for a Blazor-based application — with Azure DevOps, TFS, and YAML pipelines for CI.",
-      "Pipeline 1 — Test Case Generation: JIRA, Figma and product-code information become a test plan (evaluated with DeepEval), which the Test Case Generator turns into test cases — evaluated again, pulled from TFS, checked for duplicates, passed through an approval gate (manual when duplicates surface or the DeepEval score is low, automatic otherwise) and pushed to TFS over REST APIs using token auth.",
       "Every AI-generated output — requirements, test cases and automation code — is evaluated against quality metrics with DeepEval, with model-driven decisions made through agentic prompting.",
-      "Pipeline 2 — Automation Generation: test cases, Figma, the existing TypeScript + Playwright framework and the product code are the inputs.",
-      "A skill file (Skills.md) is created by reading the test cases, Figma and the product code — that skill file is what gets passed to the LLM to generate the automation: new specs, page files, helpers and the other artifacts the tests need, following the existing framework structure.",
-      "Generated tests are executed; when they fail, a live-DOM detector captures the real elements over MCP Playwright so the failure can be fixed, the tests are re-run until green, and the code is pushed to a new branch for review.",
       "Reading user stories and converting them into test cases — identifying which existing tests belong to each story by reading the test-case repository.",
       "Triggering automation runs automatically based on the scenarios under test, and presenting reports built with Cursor.",
+    ],
+    pipelines: [
+      {
+        name: "Pipeline 1 — Test Case Generation",
+        flow: "JIRA + Figma + product code → Test Plan → DeepEval → Test Case Generator → DeepEval → pull TFS → verify duplicates → approval → push test cases",
+        note: "The approval gate stays automatic unless duplicates surface or the DeepEval score is low — then it waits for a human. Approved cases are pushed to TFS over REST APIs using token auth.",
+      },
+      {
+        name: "Pipeline 2 — Automation Generation",
+        flow: "test cases + Figma + product code → Skills.md (skill file) → LLM generates automation → run tests → on failure: live DOM detector → fix → re-run → new branch",
+        note: "The skill file is built by reading the test cases, Figma and the product code, then handed to the LLM to generate specs, page files and helpers into our existing Playwright + TypeScript framework. Failures are detected against the live DOM and fixed before the code is pushed to a new branch.",
+      },
     ],
   },
   {
@@ -135,6 +154,25 @@ export default function Career() {
                   </li>
                 ))}
               </ul>
+
+              {r.pipelines && (
+                <div className="mt-4 grid gap-3">
+                  {r.pipelines.map((p) => (
+                    <div
+                      key={p.name}
+                      className="rounded-lg border border-border bg-bg-card px-3.5 py-3"
+                    >
+                      <div className="text-[10px] font-bold uppercase tracking-[1.2px] text-amber-600">
+                        {p.name}
+                      </div>
+                      <div className="mt-2 rounded-md border border-border bg-bg-soft px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-text-secondary">
+                        {p.flow}
+                      </div>
+                      <p className="mt-2 text-[13px] leading-relaxed text-text-muted">{p.note}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
