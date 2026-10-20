@@ -107,13 +107,7 @@ export const profileKnowledge: ProfileKnowledge = {
       tag: "Current",
       details: [
         "Built a Playwright + TypeScript UI test automation framework for a Blazor-based application, using Azure DevOps, TFS, and YAML pipelines for CI",
-        "Pipeline 1 — Test Case Generation: JIRA, Figma and product-code information become a test plan (evaluated with DeepEval), which the Test Case Generator turns into test cases — evaluated again, pulled from TFS, checked for duplicates, passed through an approval gate (manual when duplicates surface or the DeepEval score is low, automatic otherwise) and pushed to TFS over REST APIs using token auth",
         "Every AI-generated output — requirements, test cases and automation code — is evaluated against quality metrics with DeepEval, with model-driven decisions made through agentic prompting",
-        "Pipeline 2 — Automation Generation: test cases, Figma, the existing TypeScript + Playwright framework and the product code are the inputs; product-code and live-DOM information is read to capture the elements each test has to act on",
-        "It generates a Skills.md automation recipe for the selected test cases, then generates the automation code — new specs, page files, helpers and whatever other artifacts the tests need — following the existing framework structure",
-        "Generated tests are executed, failures are fixed using live DOM element capture over MCP Playwright, tests are re-run until green, and the code is pushed to a new branch for review",
-        "Reading user stories and converting them into test cases — identifying which existing tests belong to each story by reading the test-case repository",
-        "Triggering automation runs automatically based on the scenarios under test, and presenting reports built with Cursor",
       ],
     },
     {

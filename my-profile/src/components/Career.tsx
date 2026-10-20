@@ -23,8 +23,6 @@ const roles: Role[] = [
     details: [
       "Built a Playwright + TypeScript UI test automation framework for a Blazor-based application — with Azure DevOps, TFS, and YAML pipelines for CI.",
       "Every AI-generated output — requirements, test cases and automation code — is evaluated against quality metrics with DeepEval, with model-driven decisions made through agentic prompting.",
-      "Reading user stories and converting them into test cases — identifying which existing tests belong to each story by reading the test-case repository.",
-      "Triggering automation runs automatically based on the scenarios under test, and presenting reports built with Cursor.",
     ],
     pipelines: [
       {
