@@ -37,7 +37,6 @@ function buildWaLink(summary: string): string {
 export async function POST(req: NextRequest) {
   let body: {
     messages?: { role: string; content: string }[];
-    mode?: "question" | "message";
   };
   try {
     body = await req.json();
@@ -60,10 +59,6 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-
-  // "message" mode → forward straight to WhatsApp (user explicitly chose to
-  // message Tarun). "question" mode → the LLM ALWAYS answers; never forward.
-  const explicitMode = body.mode === "message" ? "message" : "question";
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (rateLimited(ip)) {
@@ -109,18 +104,6 @@ export async function POST(req: NextRequest) {
     { role: "system", content: buildSystemPrompt() },
     ...trimmed,
   ];
-
-  // "message" mode → the user explicitly chose to message Tarun. Forward
-  // directly to WhatsApp — no LLM call, no marker detection.
-  if (explicitMode === "message") {
-    const summary = userMessage.slice(0, 600);
-    return NextResponse.json({
-      type: "forward",
-      content: `Thanks! Your message has been prepared for Tarun. Tap below to send it to him on WhatsApp — he'll get back to you.`,
-      waLink: buildWaLink(summary),
-      summary,
-    });
-  }
 
   try {
     const { content, model, modelName } = await chatCompletionWithFallback(llmMessages, cfg.freeModels);
