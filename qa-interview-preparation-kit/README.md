@@ -1,5 +1,7 @@
 # QA Interview Preparation Kit
 
+> **🔗 Live app:** **[qa-interview-preparation.vercel.app](https://qa-interview-preparation.vercel.app)**
+
 A RAG (Retrieval-Augmented Generation) application for preparing QA interview questions. PDF/DOCX documents are indexed into a vector database (Pinecone), and you can ask questions or browse topics — answers are grounded in your uploaded knowledge base.
 
 ## Architecture

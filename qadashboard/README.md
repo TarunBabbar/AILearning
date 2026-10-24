@@ -1,5 +1,7 @@
 # QA AI Dashboard
 
+> **🔗 Live app:** **[qadashboard-lime.vercel.app](https://qadashboard-lime.vercel.app)**
+
 A unified QA platform that brings six tools into one Claude-inspired UI: resume & job matching, AI interview prep, document RAG, test case generation, and an AI learning tutor.
 
 Built with **Next.js 15**, **Tailwind CSS v4**, **OpenRouter (free AI models only)**, **Pinecone (vector search)**, and **Neon PostgreSQL**.

@@ -1,5 +1,7 @@
 # Tarun Kumar Babbar — Personal Profile
 
+> **🔗 Live site:** **[tarunkumarbabbar.com](https://www.tarunkumarbabbar.com)**
+
 A warm, Claude-inspired portfolio website built with **Next.js 16**, **Tailwind CSS v4**, and **Framer Motion**. Showcases 18+ years of QA engineering experience, AI-powered QA applications, an agentic QA pipeline that took **1st place at the AI Tester Blueprint 3x hackathon**, and the current work at **Coforge Limited for client Xplor Technologies**.
 
 ## Tech Stack
