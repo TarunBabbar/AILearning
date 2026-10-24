@@ -2,6 +2,8 @@
 
 > Upload job listing PDFs, extract structured job details with **free OpenRouter models**, and browse companies — all in a Claude-style beige UI.
 
+> **🔗 Live app:** **[qajobs.vercel.app](https://qajobs.vercel.app)** · Source: [`AILearning/job-details`](https://github.com/TarunBabbar/AILearning/tree/main/job-details)
+
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)

@@ -1,5 +1,7 @@
 # QA RAG Platform
 
+> **🔗 Live app:** **[qaragplatform.vercel.app](https://qaragplatform.vercel.app)**
+
 A single-page Retrieval-Augmented Generation (RAG) demo: upload a document, it is chunked and embedded, the vectors are stored in Pinecone, and an LLM answers questions strictly from the retrieved chunks — with the sources cited. Built with Next.js 14, OpenRouter (embeddings + LLM) and Pinecone.
 
 ## How it works

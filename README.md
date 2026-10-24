@@ -6,19 +6,34 @@ A multi-project monorepo of **AI-powered QA engineering tools** built by Tarun K
 
 ## 📂 Projects at a Glance
 
-| # | Project | What it does | Stack |
-|---|---------|--------------|-------|
-| 1 | **`resume-parser/`** | Upload resume + job PDFs → LLM extracts jobs, scores matches, tracks hiring pipeline, sends emails | React 19 + Vite, Express, OpenRouter, Gmail SMTP |
-| 2 | **`job-details/`** | Job PDF extractor: browser-side text extraction → LLM parsing into structured jobs → PostgreSQL dashboard with auto-resolved company info | Next.js 16, Prisma 7, PostgreSQL, OpenRouter free models |
-| 3 | **`qadashboard/`** | Unified QA platform: resume matching, AI interview prep (510+ Q&A), document RAG, test case generation, AI tutor — one Claude-style UI | Next.js 15, Pinecone, Neon Postgres, OpenRouter |
-| 4 | **`qae2e/`** | **Agentic QA platform**: 6 specialist AI agents turn a PRD into test coverage → Playwright scripts → real Docker runs → release confidence. Ships a real MCP server (27 tools) | Next.js, 6-agent LLM orchestration, Docker, Vercel Postgres |
-| 5 | **`qa-interview-preparation-kit/`** | RAG app for QA interview prep: index PDF/DOCX into Pinecone, ask questions, get grounded answers with citations | Next.js 14, Pinecone, OpenRouter |
-| 6 | **`qaragplatform/`** | Document RAG: upload docs, ask questions with citations, plus Migration Studio (import 20+ sources) and Project Scanner | Next.js 14, Pinecone / in-memory, OpenRouter |
-| 7 | **`ai-testarchitect/`** | **QA Copilot**: multi-agent test-case generator from PRDs, regression selection, JIRA/Zephyr/TestRail/GitHub MCP integration, framework migration | Next.js 16 + FastAPI, LangGraph, ChromaDB |
-| 8 | **`ai-video-generation/`** | Mom & Son cartoon video generator: topic → script → 3D-style animated scenes → Edge-TTS voice-over → ffmpeg vertical video | Python, OpenRouter (image/video), Edge-TTS, ffmpeg |
-| 9 | **`my-profile/`** | Claude-themed portfolio website with a floating "Tarun Bot" AI chatbot (OpenRouter free-model fallback chain, WhatsApp escalation) | Next.js 16, Framer Motion, OpenRouter |
-| 10 | **`learning-playwright-typescript-framework/`** | Step-by-step learning journey: builds a production Playwright + TypeScript framework from zero (POM, fixtures, BDD, MCP, CI/CD phases) | TypeScript, Playwright, Cucumber (planned) |
-| 11 | **`interview-preparation/`** | Senior AI QA Engineer interview prep: prioritized study plan (Python/Pytest, SQL & NL2SQL validation, LLM evals) + hands-on pytest exercise suites | Python, Pytest |
+| # | Project | What it does | Stack | Live |
+|---|---------|--------------|-------|------|
+| 1 | **[`resume-parser/`](https://github.com/TarunBabbar/AILearning/tree/main/resume-parser)** | Upload resume + job PDFs → LLM extracts jobs, scores matches, tracks hiring pipeline, sends emails | React 19 + Vite, Express, OpenRouter, Gmail SMTP | — |
+| 2 | **[`job-details/`](https://github.com/TarunBabbar/AILearning/tree/main/job-details)** | Job PDF extractor: browser-side text extraction → LLM parsing into structured jobs → PostgreSQL dashboard with auto-resolved company info | Next.js 16, Prisma 7, PostgreSQL, OpenRouter free models | [🌐 Live](https://qajobs.vercel.app) |
+| 3 | **[`qadashboard/`](https://github.com/TarunBabbar/AILearning/tree/main/qadashboard)** | Unified QA platform: resume matching, AI interview prep (510+ Q&A), document RAG, test case generation, AI tutor — one Claude-style UI | Next.js 15, Pinecone, Neon Postgres, OpenRouter | [🌐 Live](https://qadashboard-lime.vercel.app) |
+| 4 | **[`qae2e/`](https://github.com/TarunBabbar/AILearning/tree/main/qae2e)** | **Agentic QA platform**: 6 specialist AI agents turn a PRD into test coverage → Playwright scripts → real Docker runs → release confidence. Ships a real MCP server (27 tools) | Next.js, 6-agent LLM orchestration, Docker, Vercel Postgres | [🌐 Live](https://qae2e.vercel.app) |
+| 5 | **[`qa-interview-preparation-kit/`](https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit)** | RAG app for QA interview prep: index PDF/DOCX into Pinecone, ask questions, get grounded answers with citations | Next.js 14, Pinecone, OpenRouter | [🌐 Live](https://qa-interview-preparation.vercel.app) |
+| 6 | **[`qaragplatform/`](https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform)** | Document RAG: upload docs, ask questions with citations, plus Migration Studio (import 20+ sources) and Project Scanner | Next.js 14, Pinecone / in-memory, OpenRouter | [🌐 Live](https://qaragplatform.vercel.app) |
+| 7 | **[`ai-testarchitect/`](https://github.com/TarunBabbar/AILearning/tree/main/ai-testarchitect)** | **QA Copilot**: multi-agent test-case generator from PRDs, regression selection, JIRA/Zephyr/TestRail/GitHub MCP integration, framework migration | Next.js 16 + FastAPI, LangGraph, ChromaDB | — |
+| 8 | **[`ai-video-generation/`](https://github.com/TarunBabbar/AILearning/tree/main/ai-video-generation)** | Mom & Son cartoon video generator: topic → script → 3D-style animated scenes → Edge-TTS voice-over → ffmpeg vertical video | Python, OpenRouter (image/video), Edge-TTS, ffmpeg | — |
+| 9 | **[`my-profile/`](https://github.com/TarunBabbar/AILearning/tree/main/my-profile)** | Claude-themed portfolio website with a floating "Tarun Bot" AI chatbot (OpenRouter free-model fallback chain, WhatsApp escalation) | Next.js 16, Framer Motion, OpenRouter | [🌐 Live](https://www.tarunkumarbabbar.com) |
+| 10 | **[`learning-playwright-typescript-framework/`](https://github.com/TarunBabbar/AILearning/tree/main/learning-playwright-typescript-framework)** | Step-by-step learning journey: builds a production Playwright + TypeScript framework from zero (POM, fixtures, BDD, MCP, CI/CD phases) | TypeScript, Playwright, Cucumber (planned) | — |
+| 11 | **[`interview-preparation/`](https://github.com/TarunBabbar/AILearning/tree/main/interview-preparation)** | Senior AI QA Engineer interview prep: prioritized study plan (Python/Pytest, SQL & NL2SQL validation, LLM evals) + hands-on pytest exercise suites | Python, Pytest | — |
+
+---
+
+## 🌐 Live Apps
+
+Every deployed app is hosted on Vercel (the portfolio runs on its own domain) — click through and try them:
+
+| App | Live | Source |
+|-----|------|--------|
+| **QAE2E — Agentic Quality Engineering** (🏆 1st Place, AI Tester Blueprint 3x) | **[qae2e.vercel.app](https://qae2e.vercel.app)** | [`qae2e/`](https://github.com/TarunBabbar/AILearning/tree/main/qae2e) |
+| **QA Jobs Portal** (Job Details — AI job extractor) | **[qajobs.vercel.app](https://qajobs.vercel.app)** | [`job-details/`](https://github.com/TarunBabbar/AILearning/tree/main/job-details) |
+| **QA AI Dashboard** | **[qadashboard-lime.vercel.app](https://qadashboard-lime.vercel.app)** | [`qadashboard/`](https://github.com/TarunBabbar/AILearning/tree/main/qadashboard) |
+| **QA RAG Platform** | **[qaragplatform.vercel.app](https://qaragplatform.vercel.app)** | [`qaragplatform/`](https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform) |
+| **QA Interview Preparation Kit** | **[qa-interview-preparation.vercel.app](https://qa-interview-preparation.vercel.app)** | [`qa-interview-preparation-kit/`](https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit) |
+| **Tarun Kumar Babbar — Portfolio** | **[tarunkumarbabbar.com](https://www.tarunkumarbabbar.com)** | [`my-profile/`](https://github.com/TarunBabbar/AILearning/tree/main/my-profile) |
 
 ---
 
@@ -127,7 +142,7 @@ Senior AI QA Engineer interview prep — a prioritized study plan plus hands-on 
 - Each project is **fully standalone** — its own README, package.json/requirements, and env setup.
 - Most AI apps use **OpenRouter free models only** (`:free` guard where hardcoded) — no paid spend by default.
 - Claude-inspired warm-cream/beige or amber UI theme is a consistent design signature.
-- Vercel deployments set the subfolder as **Root Directory** (e.g. `job-details`, `qadashboard`, `qae2e`, `my-profile`).
+- Vercel deployments set the subfolder as **Root Directory**. Live apps: [qae2e](https://qae2e.vercel.app), [qajobs (job-details)](https://qajobs.vercel.app), [qadashboard](https://qadashboard-lime.vercel.app), [qaragplatform](https://qaragplatform.vercel.app), [qa-interview-preparation](https://qa-interview-preparation.vercel.app), and [my-profile](https://www.tarunkumarbabbar.com).
 
 ## 📄 License
 
