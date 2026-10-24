@@ -20,6 +20,18 @@ export type ProfileKnowledge = {
   education: string;
   skills: { title: string; top: string[]; rest: string[] }[];
   projects: { title: string; desc: string; tech: string[]; repo: string; demo: string | null }[];
+  github: {
+    org: string;
+    orgUrl: string;
+    summary: string;
+    monorepo: {
+      name: string;
+      url: string;
+      summary: string;
+      subprojects: { folder: string; what: string }[];
+    };
+    standaloneRepos: { name: string; url: string; what: string }[];
+  };
   contact: { label: string; value: string; href: string }[];
 };
 
@@ -201,42 +213,42 @@ export const profileKnowledge: ProfileKnowledge = {
   projects: [
     {
       title: "QAE2E — AI-Powered QA Pipeline (1st Place, AI Tester Blueprint 3x)",
-      desc: "An agentic QA platform that takes a requirement end-to-end — generating test cases, Playwright automation, executing them, and scoring release confidence. A team of specialist agents works each stage while an AI judge evaluates and refines every step. 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon.",
+      desc: "An agentic QA platform that takes a requirement end-to-end — six specialist agents (Requirement Intelligence → Manual Test Cases → Automation Scripts → Execution & Defects → DevOps Evidence → Release Confidence) generate test coverage, produce Playwright scripts, run them in real Docker, and score release confidence, with an AI judge evaluating and refining every step. Ships a real MCP server exposing 27 QA tools and connectors for Jira, Confluence, Figma, GitHub, Zephyr and TestRail. Took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon (60+ participants).",
       tech: ["Next.js", "OpenRouter", "Agent Orchestration", "Pinecone", "MCP", "Docker"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/qae2e",
       demo: "https://qae2e.vercel.app",
     },
     {
       title: "QABuddy — Hybrid RAG QA Assistant",
-      desc: "Ask one question, get one cited answer from the whole QA knowledge base — Jira stories, test cases and bugs plus the real Playwright automation code. Hybrid dense + BM25 retrieval fused client-side, hosted reranking, and model-agnostic grounding that verifies every answer against the sources it was given.",
+      desc: "Ask one QA question, get one cited answer from the whole QA knowledge base — Jira stories, test cases and bugs plus the real Playwright UI and API automation code. Hybrid dense + BM25 retrieval fused client-side, hosted reranking, and model-agnostic grounding that verifies every answer against the sources it was given.",
       tech: ["FastAPI", "Pinecone", "OpenRouter", "Hybrid RAG", "Vercel"],
       repo: "https://github.com/TarunBabbar/qa-rag",
       demo: "https://qa-rag-five.vercel.app",
     },
     {
       title: "QA Jobs Portal",
-      desc: "Free daily India QA jobs portal — AI-extracted QA listings from multiple sources, curated and refreshed every day.",
+      desc: "Free daily India QA jobs portal — AI-extracted QA listings from multiple sources, parsed into structured jobs and refreshed every day.",
       tech: ["Next.js", "PostgreSQL", "Prisma", "OpenRouter", "AI Extraction"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/job-details",
       demo: "https://qajobs.vercel.app",
     },
     {
       title: "QA AI Dashboard",
-      desc: "Unified AI platform — LLM-scored resume-job matcher, QA interview RAG chat, PRD test-case generator, AI tutor and document Q&A.",
+      desc: "Unified AI platform — LLM-scored resume–job matcher, QA interview RAG chat grounded in 510+ Q&A pairs, PRD test-case generator, AI tutor and document Q&A, all behind a Claude-style UI.",
       tech: ["Next.js", "PostgreSQL", "Prisma", "Pinecone", "OpenRouter"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/qadashboard",
       demo: "https://qadashboard-lime.vercel.app",
     },
     {
       title: "QA RAG Platform",
-      desc: "Upload documents and ask AI questions with grounded citations — smart chunking, configurable embeddings and Pinecone vector search.",
+      desc: "Upload documents and ask AI questions with grounded citations — smart chunking with overlap, configurable embeddings and Pinecone vector search, plus a Migration Studio that imports suites from 20+ enterprise sources and a Project Scanner for framework/locator readiness.",
       tech: ["Next.js", "OpenRouter", "Pinecone", "Vector Search"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/qaragplatform",
       demo: "https://qaragplatform.vercel.app",
     },
     {
       title: "QA Interview Preparation Kit",
-      desc: "RAG-powered interview prep — PDF/DOCX knowledge base indexed into Pinecone with a streaming QA assistant and grounded citations.",
+      desc: "RAG-powered interview preparation — PDF/DOCX knowledge base indexed into Pinecone with a streaming QA assistant and grounded citations.",
       tech: ["Next.js", "OpenRouter", "Pinecone", "RAG"],
       repo: "https://github.com/TarunBabbar/AILearning/tree/main/qa-interview-preparation-kit",
       demo: "https://qa-interview-preparation.vercel.app",
@@ -257,14 +269,14 @@ export const profileKnowledge: ProfileKnowledge = {
     },
     {
       title: "Chroma RAG Pipeline Visualizer",
-      desc: "RAG visualizer with a live 3-panel UI — ingest PDFs/DOCX, embed via OpenRouter, vector search, and see the LLM answer with real-time progress.",
+      desc: "RAG visualizer with a live 3-panel UI — ingest PDFs/DOCX, embed via OpenRouter, vector search, and watch the LLM answer with real-time progress.",
       tech: ["React", "Express", "ChromaDB", "SSE"],
       repo: "https://github.com/TarunBabbar/chroma-react-rag-pipeline",
       demo: null,
     },
     {
       title: "8-Layer Playwright Framework",
-      desc: "Enterprise-grade Playwright framework with strict 8-layer architecture — POM, fixtures, API layer, reporting, Docker and CI-ready.",
+      desc: "Enterprise-grade Playwright framework with a strict 8-layer architecture — POM, fixtures, API layer, reporting, Docker and CI-ready.",
       tech: ["Playwright", "TypeScript", "Docker", "CI/CD"],
       repo: "https://github.com/TarunBabbar/8layer-advance-playwright-framework",
       demo: null,
@@ -277,6 +289,39 @@ export const profileKnowledge: ProfileKnowledge = {
       demo: null,
     },
   ],
+  github: {
+    org: "github.com/TarunBabbar",
+    orgUrl: "https://github.com/TarunBabbar",
+    summary:
+      "Tarun's public GitHub. The profile features 11 flagship apps and frameworks; his account holds 30+ repositories in total, including Selenium and Appium suites, API automation, C#/.NET frameworks and agent experiments.",
+    monorepo: {
+      name: "AILearning",
+      url: "https://github.com/TarunBabbar/AILearning",
+      summary:
+        "A monorepo of AI and QA engineering projects — every folder is a standalone app with its own README, package.json/requirements and env setup. Most AI apps use OpenRouter free models only, and they share a Claude-inspired warm-cream/beige or amber UI theme.",
+      subprojects: [
+        { folder: "resume-parser", what: "Resume + job PDF matcher — LLM job extraction, match scoring, a hiring pipeline and Gmail SMTP outreach agents" },
+        { folder: "job-details", what: "Job-listing PDF/DOCX extractor that parses listings into structured jobs in PostgreSQL — powers the QA Jobs Portal" },
+        { folder: "qadashboard", what: "QA AI Dashboard — resume matcher, interview prep, document RAG, test-case generation and AI tutor in one UI" },
+        { folder: "qae2e", what: "QAE2E agentic QA platform (1st place, AI Tester Blueprint 3x) with a 27-tool MCP server" },
+        { folder: "qa-interview-preparation-kit", what: "RAG interview prep over a PDF/DOCX knowledge base with grounded citations" },
+        { folder: "qaragplatform", what: "Document RAG platform with Migration Studio and Project Scanner" },
+        { folder: "ai-testarchitect", what: "QA Copilot — a LangGraph multi-agent test-case generator with a FastAPI backend" },
+        { folder: "ai-video-generation", what: "Mom & Son cartoon video generator (Python, OpenRouter, Edge-TTS, ffmpeg)" },
+        { folder: "my-profile", what: "This portfolio site, including the AI assistant chatbot" },
+        { folder: "learning-playwright-typescript-framework", what: "A from-zero Playwright + TypeScript framework learning journey" },
+        { folder: "interview-preparation", what: "Senior AI QA Engineer interview prep (Python/Pytest exercise suites)" },
+      ],
+    },
+    standaloneRepos: [
+      { name: "qa-rag", url: "https://github.com/TarunBabbar/qa-rag", what: "QABuddy — hybrid RAG QA assistant (FastAPI + Pinecone)" },
+      { name: "jira-qa-crew-next", url: "https://github.com/TarunBabbar/jira-qa-crew-next", what: "Jira QA Crew — an agent-crew QA pipeline" },
+      { name: "resume-job-rag", url: "https://github.com/TarunBabbar/resume-job-rag", what: "Resume → job RAG pipeline (React + Express + ChromaDB)" },
+      { name: "chroma-react-rag-pipeline", url: "https://github.com/TarunBabbar/chroma-react-rag-pipeline", what: "Chroma RAG pipeline visualizer" },
+      { name: "8layer-advance-playwright-framework", url: "https://github.com/TarunBabbar/8layer-advance-playwright-framework", what: "8-layer Playwright framework" },
+      { name: "SelfHealingPlaywrightFramework", url: "https://github.com/TarunBabbar/SelfHealingPlaywrightFramework", what: "Self-healing Playwright framework" },
+    ],
+  },
   contact: [
     { label: "LinkedIn", value: "linkedin.com/in/tarunbabbar", href: "https://linkedin.com/in/tarunbabbar" },
     { label: "GitHub", value: "github.com/TarunBabbar", href: "https://github.com/TarunBabbar" },
@@ -332,6 +377,17 @@ ${k.projects
   )
   .join("\n\n")}
 
+## GitHub & Repositories
+${k.github.org} — ${k.github.summary}
+Every app above links here; below is where each one lives.
+
+Monorepo: ${k.github.monorepo.name} (${k.github.monorepo.url})
+${k.github.monorepo.summary}
+${k.github.monorepo.subprojects.map((s) => `- ${s.folder}: ${s.what}`).join("\n")}
+
+Standalone repositories:
+${k.github.standaloneRepos.map((r) => `- ${r.name} (${r.url}): ${r.what}`).join("\n")}
+
 ## Contact
 ${k.contact
   .map((c) => `- ${c.label}: [${c.value}](${c.href})`)
@@ -346,22 +402,26 @@ ${k.stats.map((s) => `${s.label}: ${s.num}`).join(" | ")}`;
 export function buildSystemPrompt(): string {
   return `You are ${profileKnowledge.owner}'s AI assistant — "Tarun's AI Assistant" — embedded in his personal profile website.
 
-A visitor is chatting with you to learn about ${profileKnowledge.owner}. Answer ONLY using the profile knowledge below. Never invent facts about him that are not present here.
+A visitor can ask you ANYTHING about ${profileKnowledge.owner}: his experience, career history, skills, education, the AI apps shown on the page, the GitHub repositories behind them, their tech stacks, what each app does and how it works, his current role and pipelines, awards, and how to reach him. Answer using ONLY the profile knowledge below. Never invent facts about him that are not present here.
 
 Rules:
 - Be friendly, concise, and professional. Use short markdown (bold, bullets) for readability.
-- If asked about anything covered by the profile (experience, skills, projects, education, contact, stats, location), answer directly from it.
+- If asked about anything covered by the knowledge (experience, skills, projects, GitHub repos, education, contact, stats, location, appearances), answer directly from it.
+- The page links live apps and GitHub repositories. When a question names a specific app, repo or technology, answer from the matching entry in PROJECTS / GITHUB & REPOSITORIES, and include its live demo and/or GitHub link when that helps the visitor.
+- If asked what he has built, or about his AI apps or repos as a group, cover the projects in the knowledge (QAE2E, QABuddy, QA Jobs Portal, QA AI Dashboard, QA RAG Platform, QA Interview Prep Kit, Jira QA Crew, Resume → Job RAG Pipeline, Chroma RAG Pipeline Visualizer, 8-Layer Playwright Framework, Self-Healing Playwright), one line each, and point to ${profileKnowledge.github.org} for the rest.
+- If asked where code lives, explain the AILearning monorepo and the standalone repositories exactly as listed in GITHUB & REPOSITORIES.
 - If asked about his current work or role, mention he works at Coforge Limited for client Xplor Technologies, building a multi-agent AI QA platform made of TWO pipelines.
 - If asked about the test case generation pipeline (JIRA + Figma → test cases), describe Pipeline 1 exactly as in the PROFILE KNOWLEDGE: JIRA + Figma + product-code information → Test Plan → DeepEval → Test Case Generator → DeepEval → pull TFS → verify duplicates → approval gate (manual when duplicates surface or the DeepEval score is low, otherwise automatic) → push test cases to TFS over REST APIs with token auth.
 - If asked about the automation generation pipeline (test cases → automation code), describe Pipeline 2 exactly as in the PROFILE KNOWLEDGE: the skill file (Skills.md) is created by reading the test cases, Figma and the product code; that skill file is passed to the LLM, which generates the automation — new specs, page files, helpers and the other artifacts the tests need — into the existing TypeScript + Playwright framework; the generated tests are run; when they fail, a live DOM detector captures the real elements over MCP Playwright so the failure can be fixed; tests are re-run until green; and the code is pushed to a new branch.
 - If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline).
+- If asked about hiring, roles or availability, mention he is open to Architect / Principal SDET / Senior Principal SDET / QA Head roles.
 - When a visitor asks how to reach or contact Tarun, ALWAYS output the contact list as markdown links, one per line, with WhatsApp FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the number/username as the link text — never the word "link". Example format (use these exact URLs):
   - 💬 [WhatsApp: +91 9623252365](https://wa.me/919623252365)
   - 📞 [Phone: +91 9623252365](tel:+919623252365)
   - 🔗 [LinkedIn: linkedin.com/in/tarunbabbar](https://linkedin.com/in/tarunbabbar)
   - 🐙 [GitHub: github.com/TarunBabbar](https://github.com/TarunBabbar)
   Then say he's generally responsive on WhatsApp or LinkedIn. Never mention X, Twitter, Medium, email, or any channel not in the list above.
-- If you are asked about something NOT covered by the profile — general chat, unrelated help, advice, coding tasks, personal questions, or anything the profile cannot answer — respond with the marker line below followed by ONE clean sentence (no tags, no brackets, no explanations) that summarizes what the visitor is asking about. Then stop:
+- If you are asked about something NOT covered anywhere in the knowledge below — unrelated chit-chat, personal advice, coding help on the visitor's own project, or any fact about Tarun the profile does not contain — respond with the marker line below followed by ONE clean sentence (no tags, no brackets, no explanations) that summarizes what the visitor is asking about. Then stop:
   [FORWARD_TO_TARUN]
   Example: [FORWARD_TO_TARUN]
   The visitor is asking for help fixing a bug in their React code.

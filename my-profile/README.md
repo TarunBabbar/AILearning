@@ -55,14 +55,15 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Tarun's AI Assistant (Chatbot)
 
-A floating chat widget on the bottom-right of the page. Visitors can ask anything about Tarun — experience, projects, skills, education, contact — and the bot answers from the profile using **OpenRouter free models**.
+A floating **"Ask Anything"** widget on the bottom-right of the page (a small text pill — no bot avatar). Visitors type any question about Tarun and the bot answers from his profile, apps and GitHub repos using **OpenRouter free models**. There is a single **Ask** flow — no separate "message" mode.
 
 ### How it works
 
 1. **Free-model fallback chain** — The bot tries the ordered list in `FREE_MODELS_JSON` (`.env`), starting with the **fastest** model first. On any failure (rate limit `429`, a delisted model, network error, timeout, or empty reply) it automatically falls back to the next model in the list until one succeeds.
-2. **Profile-grounded answers** — A system prompt built from `src/lib/profile-knowledge.ts` (mirrors the `About` / `Career` / `Projects` / `Skills` / `Education` / `Contact` sections) lets the bot answer only from known profile facts.
-3. **WhatsApp escalation** — When a question is outside the profile (general chat, unrelated help, anything the bot can't answer), the model returns a summary marker and the widget shows an **Open WhatsApp** button. Tapping it opens a pre-filled `wa.me` chat to Tarun's number with the visitor's summarized query.
-4. **Session memory** — Multi-turn conversation context is kept in the widget for the visitor's session.
+2. **Profile + repo grounded answers** — A system prompt built from `src/lib/profile-knowledge.ts` (mirrors the `About` / `Career` / `Projects` / `Skills` / `Education` / `Contact` sections, plus a full GitHub and repository index) lets the bot answer about experience, skills and — in particular — every app and repository linked on the page, one line each, with its live demo and source links.
+3. **Quick-start chips** — On a fresh chat the widget offers suggested questions (experience, QAE2E, AI apps, tech stack, contact) that send with one tap.
+4. **WhatsApp escalation** — Only when a question is genuinely outside the knowledge (unrelated chit-chat, the visitor's own coding task, or a fact the profile doesn't contain) the model returns a summary marker and the widget shows an **Open WhatsApp** button. Tapping it opens a pre-filled `wa.me` chat to Tarun's number with the visitor's summarized query.
+5. **Session memory** — Multi-turn conversation context is kept in the widget for the visitor's session.
 
 ### Env variables
 

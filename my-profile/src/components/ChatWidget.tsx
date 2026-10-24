@@ -14,20 +14,26 @@ type ApiResponse = {
   summary?: string;
 };
 
-type ChatMode = "question" | "message" | null;
-
 const WELCOME: ChatMsg = {
   role: "assistant",
   content:
-    "Hi! I'm **Tarun's AI Assistant** — here to help you learn about Tarun's experience, projects, skills, or how to get in touch. If I can't answer, I'll ping Tarun on WhatsApp for you. 🤖",
+    "Hi! I'm **Tarun's AI Assistant**. Ask me anything — his 18+ years in QA engineering, the AI apps and GitHub repositories shown on this page, his skills, career, or how to reach him.",
 };
+
+// One-tap starters so a visitor can see what this helper knows.
+const SUGGESTIONS = [
+  "What's Tarun's experience?",
+  "Tell me about QAE2E",
+  "Which AI apps has he built?",
+  "What's his tech stack?",
+  "How do I contact him?",
+];
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<ChatMode>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,31 +50,20 @@ export default function ChatWidget() {
     setInput("");
     setLoading(true);
 
-    const currentMode = mode ?? "question";
-
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [...history, { role: "user", content: trimmed }],
-          mode: currentMode,
         }),
       });
       const data: ApiResponse = await res.json();
 
-      let reply: ChatMsg;
-      if (data.type === "forward") {
-        reply = {
-          role: "assistant",
-          content: data.content,
-          waLink: data.waLink,
-        };
-      } else if (data.type === "error") {
-        reply = { role: "assistant", content: data.content, waLink: data.waLink };
-      } else {
-        reply = { role: "assistant", content: data.content };
-      }
+      const reply: ChatMsg =
+        data.type === "answer"
+          ? { role: "assistant", content: data.content }
+          : { role: "assistant", content: data.content, waLink: data.waLink };
       setMessages((prev) => [...prev, reply]);
     } catch {
       setMessages((prev) => [
@@ -76,13 +71,16 @@ export default function ChatWidget() {
         {
           role: "assistant",
           content:
-            "Something went wrong reaching the bot. Please try again, or contact Tarun directly on WhatsApp.",
+            "Something went wrong reaching the assistant. Please try again, or reach Tarun directly on WhatsApp.",
         },
       ]);
     } finally {
       setLoading(false);
     }
   }
+
+  // Suggestions only show on a fresh, empty chat.
+  const showSuggestions = messages.length === 1 && !loading;
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
@@ -97,42 +95,15 @@ export default function ChatWidget() {
           >
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-400 text-white">
-              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg">
-                🤖
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                <SparkIcon className="w-4 h-4" />
               </div>
-              <div className="flex-1">
-                <div className="text-sm font-bold leading-tight">Tarun Kumar Babbar</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold leading-tight">Ask about Tarun</div>
                 <div className="text-[11px] text-white/80 leading-tight">
-                  AI assistant · answers from the profile
+                  Experience · Projects · Repos · Skills
                 </div>
               </div>
-
-              {/* Mode switch — flip between Ask / Message Tarun */}
-              {mode !== null && (
-                <div className="flex items-center rounded-lg bg-white/20 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setMode("question")}
-                    title="Ask the AI a question"
-                    className={`rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-                      mode === "question" ? "bg-white text-amber-700" : "text-white/80 hover:text-white"
-                    }`}
-                  >
-                    Ask
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("message")}
-                    title="Send a message to Tarun"
-                    className={`rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-                      mode === "message" ? "bg-white text-amber-700" : "text-white/80 hover:text-white"
-                    }`}
-                  >
-                    Message
-                  </button>
-                </div>
-              )}
-
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close chat"
@@ -142,96 +113,54 @@ export default function ChatWidget() {
               </button>
             </div>
 
-            {/* Welcome screen — pick a mode before chatting */}
-            {mode === null ? (
-              <div className="h-80 overflow-y-auto px-4 py-4 bg-bg-soft/80">
-                <div className="mb-1 text-sm font-semibold text-text">
-                  Hi! 👋 What would you like to do?
-                </div>
-                <p className="mb-3 text-xs leading-relaxed text-text-secondary">
-                  Ask a question and I&apos;ll answer from Tarun&apos;s profile.
-                  Or send a message directly to Tarun — he&apos;ll get back to you
-                  on WhatsApp.
-                </p>
+            {/* Messages */}
+            <div ref={scrollRef} className="h-80 overflow-y-auto px-4 py-4 space-y-3 bg-bg-soft/80">
+              {messages.map((m, i) => (
+                <MessageBubble key={i} msg={m} />
+              ))}
 
-                <button
-                  type="button"
-                  onClick={() => setMode("question")}
-                  className="mb-2 w-full flex items-start gap-2.5 rounded-xl border border-border bg-bg-card px-3 py-2.5 text-left transition-colors hover:border-amber-500/60 hover:bg-bg-soft"
-                >
-                  <span className="mt-0.5 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 text-sm">
-                    💬
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[13px] font-semibold text-text">
-                      Ask a question
-                    </span>
-                    <span className="block text-[11px] text-text-muted">
-                      About Tarun&apos;s experience, projects, skills, or how to get in touch.
-                    </span>
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMode("message")}
-                  className="w-full flex items-start gap-2.5 rounded-xl border border-border bg-bg-card px-3 py-2.5 text-left transition-colors hover:border-amber-500/60 hover:bg-bg-soft"
-                >
-                  <span className="mt-0.5 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 text-sm">
-                    ✉️
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[13px] font-semibold text-text">
-                      Send a message to Tarun
-                    </span>
-                    <span className="block text-[11px] text-text-muted">
-                      A message, question, or hello — goes straight to his WhatsApp.
-                    </span>
-                  </span>
-                </button>
-
-                <div className="mt-3 rounded-xl bg-bg-card border border-border px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
-                  {WELCOME.content.replace(/\*\*/g, "")}
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Messages */}
-                <div ref={scrollRef} className="h-80 overflow-y-auto px-4 py-4 space-y-3 bg-bg-soft/80">
-                  {messages.map((m, i) => (
-                    <MessageBubble key={i} msg={m} />
+              {showSuggestions && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => send(s)}
+                      className="text-[11.5px] font-medium text-text-secondary bg-bg-card border border-border rounded-full px-3 py-1.5 hover:border-amber-500/60 hover:text-amber-700 transition-colors"
+                    >
+                      {s}
+                    </button>
                   ))}
-                  {loading && <TypingBubble />}
                 </div>
+              )}
 
-                {/* Input */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    send(input);
-                  }}
-                  className="flex items-center gap-2 px-3 py-3 border-t border-border bg-bg-card"
-                >
-                  <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder={
-                      mode === "message" ? "Message for Tarun…" : "Ask about Tarun…"
-                    }
-                    disabled={loading}
-                    className="flex-1 text-sm px-3 py-2 rounded-lg bg-bg-soft border border-border outline-none focus:border-amber-500/60 text-text placeholder:text-text-muted disabled:opacity-50"
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading || !input.trim()}
-                    aria-label="Send"
-                    className="w-9 h-9 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
-                  >
-                    ↑
-                  </button>
-                </form>
-              </>
-            )}
+              {loading && <TypingBubble />}
+            </div>
+
+            {/* Input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                send(input);
+              }}
+              className="flex items-center gap-2 px-3 py-3 border-t border-border bg-bg-card"
+            >
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask anything about Tarun…"
+                disabled={loading}
+                className="flex-1 text-sm px-3 py-2 rounded-lg bg-bg-soft border border-border outline-none focus:border-amber-500/60 text-text placeholder:text-text-muted disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                aria-label="Send"
+                className="w-9 h-9 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
+              >
+                ↑
+              </button>
+            </form>
           </motion.div>
         )}
       </AnimatePresence>
@@ -241,11 +170,11 @@ export default function ChatWidget() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen((v) => !v)}
-        aria-label="Open Tarun's AI Assistant chat"
-        className="flex items-center gap-2.5 px-4 py-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm shadow-xl shadow-amber-500/30 transition-colors"
+        aria-label="Ask about Tarun"
+        className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm shadow-xl shadow-amber-500/30 transition-colors"
       >
-        <span className="text-lg">🤖</span>
-        {!open && <span>Have a question?</span>}
+        <SparkIcon className="w-4 h-4" />
+        <span>{open ? "Close" : "Ask Anything"}</span>
       </motion.button>
     </div>
   );
@@ -318,5 +247,13 @@ function TypingBubble() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SparkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 2l2.2 6.6L21 10.8l-6.8 2.2L12 19.6l-2.2-6.6L3 10.8l6.8-2.2L12 2z" />
+    </svg>
   );
 }
