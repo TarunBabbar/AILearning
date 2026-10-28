@@ -1,37 +1,18 @@
+import type { Metadata } from "next";
 import Hero from "@/components/Hero";
-import Header from "@/components/Header";
-import About from "@/components/About";
-import Projects from "@/components/Projects";
-import Skills from "@/components/Skills";
-import Career from "@/components/Career";
-import Education from "@/components/Education";
-import PersonalInterests from "@/components/PersonalInterests";
-import Contact from "@/components/Contact";
+import HomeOverview from "@/components/HomeOverview";
+
+export const metadata: Metadata = {
+  title: "Tarun Kumar Babbar — AI QA Architect | 1st Place, AI Tester Blueprint 3x",
+  description:
+    "AI QA Architect and Test Automation Architect with 18+ years in quality engineering. Builder of multi-agent QA platforms and 10+ live AI apps, including the QAE2E hackathon winner.",
+};
 
 export default function Home() {
   return (
     <>
-      <Header />
       <Hero />
-      <About />
-      <Projects />
-      <Skills />
-      <Career />
-      <Education />
-      <PersonalInterests />
-      <Contact />
-
-      <footer className="text-center py-10 text-sm text-text-muted border-t border-border bg-bg-card">
-        <div className="max-w-6xl mx-auto px-6">
-          <p className="font-semibold text-text">
-            Tarun Kumar Babbar — AI QA Architect | Test Automation Architect
-          </p>
-          <p className="mt-2 text-xs">
-            🏆 1st Place — AI Tester Blueprint 3x Hackathon · © {new Date().getFullYear()} Tarun
-            Kumar Babbar
-          </p>
-        </div>
-      </footer>
+      <HomeOverview />
     </>
   );
 }

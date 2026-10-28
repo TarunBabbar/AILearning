@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 
 const fadeUp = {
@@ -90,13 +91,13 @@ export default function Hero() {
                 variants={fadeUp}
                 className="flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-7"
               >
-                <a
-                  href="#apps"
+                <Link
+                  href="/apps"
                   className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-[13px] px-4 py-2 rounded-lg transition-all shadow-sm"
                 >
                   Explore My AI Apps
                   <span aria-hidden>→</span>
-                </a>
+                </Link>
                 <a
                   href="https://qae2e.vercel.app"
                   target="_blank"

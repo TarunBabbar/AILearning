@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import ChatWidget from "@/components/ChatWidget";
 
 export const metadata: Metadata = {
@@ -33,9 +35,13 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full">
+      <body className="min-h-full flex flex-col">
         <header className="sr-only"><h1>Tarun Kumar Babbar — AI QA Architect</h1></header>
-        {children}
+        <Header />
+        <main id="top" className="flex-1 pt-16">
+          {children}
+        </main>
+        <Footer />
         <ChatWidget />
         <Analytics />
       </body>
