@@ -9,6 +9,7 @@ const navLinks = [
   { label: "AI Apps", href: "#apps" },
   { label: "Skills", href: "#skills" },
   { label: "Career", href: "#career" },
+  { label: "Interests", href: "#interests" },
   { label: "Contact", href: "#contact" },
 ];
 

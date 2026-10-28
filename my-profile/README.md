@@ -32,6 +32,7 @@ A warm, Claude-inspired portfolio website built with **Next.js 16**, **Tailwind 
 - **Skills** — 6 category grids: AI & Agentic QA (DeepEval, multi-agent orchestration), Test Automation, Platforms & Workflow (Azure DevOps, TFS, YAML pipelines, Blazor), Languages, Vector DBs & Data, Frameworks & Architecture
 - **Career** — Timeline: Solutions Architect at Coforge Limited (client: Xplor Technologies), AI + Test Automation R&D, Coupa Software, Varian Medical Systems, TCS, Infosys
 - **Education** — BE Computer Science, Modi Institute of Technology, Kota
+- **Personal Interests** (`#interests`) — Beyond work: a deep interest in astrology and the occult sciences, practising disciplines and offering guidance to people in need across Astrology, Numerology, Watch Analysis, Vastu, Akashic Records and Psychic Mastery, plus a lifelong-learning commitment
 - **Contact** — LinkedIn, GitHub, WhatsApp, Phone, plus org-level positioning (open to Architect / Principal SDET / QA Head roles building org-wide QA AI platforms)
 - **Header** — Sticky nav with scroll-aware background, mobile hamburger menu
 

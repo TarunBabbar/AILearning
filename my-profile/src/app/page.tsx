@@ -5,6 +5,7 @@ import Projects from "@/components/Projects";
 import Skills from "@/components/Skills";
 import Career from "@/components/Career";
 import Education from "@/components/Education";
+import PersonalInterests from "@/components/PersonalInterests";
 import Contact from "@/components/Contact";
 
 export default function Home() {
@@ -17,6 +18,7 @@ export default function Home() {
       <Skills />
       <Career />
       <Education />
+      <PersonalInterests />
       <Contact />
 
       <footer className="text-center py-10 text-sm text-text-muted border-t border-border bg-bg-card">
