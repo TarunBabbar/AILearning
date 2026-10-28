@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import About from "@/components/About";
 import Education from "@/components/Education";
-import ExploreNav from "@/components/ExploreNav";
 
 export const metadata: Metadata = {
   title: "About — Tarun Kumar Babbar | AI QA Architect",
@@ -14,7 +13,6 @@ export default function AboutPage() {
     <>
       <About />
       <Education />
-      <ExploreNav />
     </>
   );
 }

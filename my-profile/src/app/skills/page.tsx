@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Skills from "@/components/Skills";
-import ExploreNav from "@/components/ExploreNav";
 
 export const metadata: Metadata = {
   title: "Skills — Tarun Kumar Babbar | AI & Test Automation",
@@ -12,7 +11,6 @@ export default function SkillsPage() {
   return (
     <>
       <Skills />
-      <ExploreNav />
     </>
   );
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Contact from "@/components/Contact";
-import ExploreNav from "@/components/ExploreNav";
 
 export const metadata: Metadata = {
   title: "Contact — Tarun Kumar Babbar | Let's Build Something",
@@ -12,7 +11,6 @@ export default function ContactPage() {
   return (
     <>
       <Contact />
-      <ExploreNav />
     </>
   );
 }

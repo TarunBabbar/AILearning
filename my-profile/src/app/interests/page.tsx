@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import PersonalInterests from "@/components/PersonalInterests";
-import ExploreNav from "@/components/ExploreNav";
 
 export const metadata: Metadata = {
   title: "Interests — Tarun Kumar Babbar | Beyond Work",
@@ -12,7 +11,6 @@ export default function InterestsPage() {
   return (
     <>
       <PersonalInterests />
-      <ExploreNav />
     </>
   );
 }
