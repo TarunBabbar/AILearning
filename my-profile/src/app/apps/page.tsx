@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Projects from "@/components/Projects";
-import ExploreNav from "@/components/ExploreNav";
 
 export const metadata: Metadata = {
   title: "AI Apps — Tarun Kumar Babbar | Live AI QA Applications",
@@ -12,7 +11,6 @@ export default function AppsPage() {
   return (
     <>
       <Projects />
-      <ExploreNav />
     </>
   );
 }
