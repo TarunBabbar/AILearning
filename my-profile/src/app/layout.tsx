@@ -38,7 +38,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <header className="sr-only"><h1>Tarun Kumar Babbar — AI QA Architect</h1></header>
         <Header />
-        <main id="top" className="flex-1 pt-16">
+        <main id="top" className="flex-1 pt-16 pb-28">
           {children}
         </main>
         <Footer />

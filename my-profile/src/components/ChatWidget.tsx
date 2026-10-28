@@ -83,7 +83,7 @@ export default function ChatWidget() {
   const showSuggestions = messages.length === 1 && !loading;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
+    <div className="fixed bottom-24 right-5 z-50 flex flex-col items-end">
       <AnimatePresence>
         {open && (
           <motion.div
