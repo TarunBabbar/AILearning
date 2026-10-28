@@ -44,9 +44,7 @@ export default function HomeOverview() {
               Quality Engineering, Rebuilt for the AI Era
             </h2>
             <p className="text-sm text-text-secondary leading-relaxed">
-              I combine 18+ years of test architecture with modern agentic AI —
-              so quality is generated, evaluated and maintained by systems that
-              scale far beyond manual effort.
+              I combine 18+ years of test architecture with modern agentic AI — so quality is generated, evaluated and maintained by systems that scale far beyond manual effort.
             </p>
           </motion.div>
 
