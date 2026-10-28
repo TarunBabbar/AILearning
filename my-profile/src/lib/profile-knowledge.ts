@@ -18,6 +18,11 @@ export type ProfileKnowledge = {
   }[];
   roles: { date: string; title: string; company: string; tag?: string; details: string[] }[];
   education: string;
+  personalInterests: {
+    summary: string;
+    disciplines: { title: string; desc: string }[];
+    learner: string;
+  };
   skills: { title: string; top: string[]; rest: string[] }[];
   projects: { title: string; desc: string; tech: string[]; repo: string; demo: string | null }[];
   github: {
@@ -178,6 +183,38 @@ export const profileKnowledge: ProfileKnowledge = {
     },
   ],
   education: "Bachelor of Engineering, Computer Science — Modi Institute of Technology, Kota",
+  personalInterests: {
+    summary:
+      "My personal interests lie in astrology and the occult sciences — the timeless study of how energy and unseen forces are believed to shape our lives. What began as curiosity has grown into a deep and enduring passion, one I pursue through both quiet study and hands-on practice. In my personal time I practise these disciplines and offer guidance to people in need, across traditions that share a common belief: that subtle energies and hidden patterns influence our health, relationships and choices.",
+    disciplines: [
+      {
+        title: "Astrology",
+        desc: "Reading the movement of the planets and stars to understand character, timing and the rhythms of life.",
+      },
+      {
+        title: "Numerology",
+        desc: "Interpreting the meaning carried by numbers, names and dates, and how they shape a person's path.",
+      },
+      {
+        title: "Watch Analysis",
+        desc: "Reading the subtle energies and numerological signals carried by the watches we wear and the time we keep.",
+      },
+      {
+        title: "Vastu",
+        desc: "Aligning homes and spaces with natural forces so that surroundings support balance, harmony and wellbeing.",
+      },
+      {
+        title: "Akashic Records",
+        desc: "Exploring the unseen record of a soul's journey to uncover insight, purpose and healing.",
+      },
+      {
+        title: "Psychic Mastery",
+        desc: "Developing intuition and the capacity to sense and work with energies beyond the physical world.",
+      },
+    ],
+    learner:
+      "A continuous learner committed to the occult sciences — devoting time to ongoing research and study, deepening understanding of these traditions, refining the craft, and staying open to what each new line of inquiry reveals. For him, learning here is never finished; it is a lifelong journey into the unseen.",
+  },
   skills: [
     {
       title: "AI & Agentic QA",
@@ -361,6 +398,11 @@ ${k.roles
 ## Education
 ${k.education}
 
+## Personal Interests
+${k.personalInterests.summary}
+${k.personalInterests.disciplines.map((d) => `- ${d.title}: ${d.desc}`).join("\n")}
+${k.personalInterests.learner}
+
 ## Skills
 ${k.skills
   .map(
@@ -415,6 +457,7 @@ Rules:
 - If asked about the automation generation pipeline (test cases → automation code), describe Pipeline 2 exactly as in the PROFILE KNOWLEDGE: the skill file (Skills.md) is created by reading the test cases, Figma and the product code; that skill file is passed to the LLM, which generates the automation — new specs, page files, helpers and the other artifacts the tests need — into the existing TypeScript + Playwright framework; the generated tests are run; when they fail, a live DOM detector captures the real elements over MCP Playwright so the failure can be fixed; tests are re-run until green; and the code is pushed to a new branch.
 - If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline).
 - If asked about hiring, roles or availability, mention he is open to Architect / Principal SDET / Senior Principal SDET / QA Head roles.
+- If asked about his personal interests or hobbies, describe them exactly as in the PERSONAL INTERESTS section: a deep interest in astrology and the occult sciences, practising disciplines and offering guidance to people in need across Astrology, Numerology, Watch Analysis, Vastu, Akashic Records and Psychic Mastery, and his commitment to lifelong learning in these traditions.
 - When a visitor asks how to reach or contact Tarun, ALWAYS output the contact list as markdown links, one per line, with WhatsApp FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the number/username as the link text — never the word "link". Example format (use these exact URLs):
   - 💬 [WhatsApp: +91 9623252365](https://wa.me/919623252365)
   - 📞 [Phone: +91 9623252365](tel:+919623252365)
