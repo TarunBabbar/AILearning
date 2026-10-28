@@ -1,27 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-
-const navLinks = [
-  { label: "Home", href: "#" },
-  { label: "About", href: "#about" },
-  { label: "AI Apps", href: "#apps" },
-  { label: "Skills", href: "#skills" },
-  { label: "Career", href: "#career" },
-  { label: "Interests", href: "#interests" },
-  { label: "Contact", href: "#contact" },
-];
+import { PAGES } from "@/lib/site";
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   return (
     <motion.header
@@ -35,24 +34,34 @@ export default function Header() {
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <a
-          href="#"
+        <Link
+          href="/"
           className="text-sm font-bold tracking-tight text-text hover:text-amber-600 transition-colors"
         >
           Tarun Kumar <span className="text-amber-600">Babbar</span>
-        </a>
+        </Link>
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-5">
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="text-sm font-medium text-text-secondary hover:text-amber-600 transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
+          {PAGES.map((link) => {
+            const active = pathname === link.href;
+            return (
+              <Link
+                key={link.label}
+                href={link.href}
+                className={`relative py-1 text-sm font-medium transition-colors ${
+                  active
+                    ? "text-amber-600"
+                    : "text-text-secondary hover:text-amber-600"
+                }`}
+              >
+                {link.label}
+                {active && (
+                  <span className="absolute -bottom-0.5 left-0 right-0 h-0.5 rounded-full bg-amber-500" />
+                )}
+              </Link>
+            );
+          })}
           <a
             href="https://github.com/TarunBabbar"
             target="_blank"
@@ -69,6 +78,7 @@ export default function Header() {
           className="md:hidden text-text-muted hover:text-amber-600 text-2xl p-1"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
         >
           ☰
         </button>
@@ -81,22 +91,29 @@ export default function Header() {
           animate={{ opacity: 1, y: 0 }}
           className="md:hidden bg-bg-card border-b border-border shadow-lg"
         >
-          <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-2">
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="text-sm font-medium text-text-secondary hover:text-amber-600 px-3 py-2 rounded-md hover:bg-bg-soft transition-colors"
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.label}
-              </a>
-            ))}
+          <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-1">
+            {PAGES.map((link) => {
+              const active = pathname === link.href;
+              return (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className={`text-sm font-medium px-3 py-2 rounded-md transition-colors ${
+                    active
+                      ? "text-amber-600 bg-amber-500/10"
+                      : "text-text-secondary hover:text-amber-600 hover:bg-bg-soft"
+                  }`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
             <a
               href="https://github.com/TarunBabbar"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-amber-500 text-white px-3 py-2 rounded-md mt-1"
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-amber-500 text-white px-3 py-2 rounded-md mt-2"
             >
               <GitHubIcon className="w-4 h-4" />
               GitHub

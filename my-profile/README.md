@@ -15,11 +15,13 @@ A warm, Claude-inspired portfolio website built with **Next.js 16**, **Tailwind 
 | Fonts | Inter (UI), JetBrains Mono (code tags) |
 | Deployment | Vercel |
 
-## Sections
+## Pages
 
-- **Hero** — Name-first intro with photo, 1st-place hackathon badge, AI QA Architect / Test Automation Architect headline, CTAs (Explore AI Apps, QAE2E Live Demo, GitHub), and stats bar (18+ years, 10+ AI apps built, #1 hackathon, 100% automation adoption)
+Each navigation item is its own route, all sharing one fixed header and footer: `/` (Home), `/about`, `/apps`, `/skills`, `/career`, `/interests` and `/contact`. A reusable "keep exploring" strip cross-links every page, and the AI assistant widget is mounted globally in the root layout.
+
+- **Home** (`/`) — Hero (name-first intro with photo, 1st-place hackathon badge, AI QA Architect / Test Automation Architect headline, CTAs (Explore AI Apps, QAE2E Live Demo, GitHub), and stats bar (18+ years, 10+ AI apps built, #1 hackathon, 100% automation adoption)
 - **About** — Bio focused on multi-agent pipelines: AI-generated requirements → test cases with auto duplicate-scenario detection → DeepEval output evaluation → model-driven decisions via agentic prompting → automation. Highlights grid included.
-- **AI Applications** (`#apps`) — Featured spotlight for **QAE2E** (1st place, AI Tester Blueprint 3x) with live demo, source links, and pipeline chips, followed by cards for live AI apps:
+- **AI Applications** (`/apps`) — Featured spotlight for **QAE2E** (1st place, AI Tester Blueprint 3x) with live demo, source links, and pipeline chips, followed by cards for live AI apps:
   - QA Jobs Portal
   - QA AI Dashboard
   - QA RAG Platform
@@ -29,12 +31,12 @@ A warm, Claude-inspired portfolio website built with **Next.js 16**, **Tailwind 
   - Chroma RAG Pipeline Visualizer
   - 8-Layer Playwright Framework
   - Self-Healing Playwright
-- **Skills** — 6 category grids: AI & Agentic QA (DeepEval, multi-agent orchestration), Test Automation, Platforms & Workflow (Azure DevOps, TFS, YAML pipelines, Blazor), Languages, Vector DBs & Data, Frameworks & Architecture
-- **Career** — Timeline: Solutions Architect at Coforge Limited (client: Xplor Technologies), AI + Test Automation R&D, Coupa Software, Varian Medical Systems, TCS, Infosys
-- **Education** — BE Computer Science, Modi Institute of Technology, Kota
-- **Personal Interests** (`#interests`) — Beyond work: a deep interest in astrology and the occult sciences, practising disciplines and offering guidance to people in need across Astrology, Numerology, Watch Analysis, Vastu, Akashic Records and Psychic Mastery, plus a lifelong-learning commitment
-- **Contact** — LinkedIn, GitHub, WhatsApp, Phone, plus org-level positioning (open to Architect / Principal SDET / QA Head roles building org-wide QA AI platforms)
-- **Header** — Sticky nav with scroll-aware background, mobile hamburger menu
+- **Skills** (`/skills`) — 6 category grids: AI & Agentic QA (DeepEval, multi-agent orchestration), Test Automation, Platforms & Workflow (Azure DevOps, TFS, YAML pipelines, Blazor), Languages, Vector DBs & Data, Frameworks & Architecture
+- **Career** (`/career`) — Timeline: Solutions Architect at Coforge Limited (client: Xplor Technologies), AI + Test Automation R&D, Coupa Software, Varian Medical Systems, TCS, Infosys
+- **Education** (on the `/about` page) — BE Computer Science, Modi Institute of Technology, Kota
+- **Personal Interests** (`/interests`) — Beyond work: a deep interest in astrology and the occult sciences, practising disciplines and offering guidance to people in need across Astrology, Numerology, Watch Analysis, Vastu, Akashic Records and Psychic Mastery, plus a lifelong-learning commitment
+- **Contact** (`/contact`) — LinkedIn, GitHub, WhatsApp, Phone, plus org-level positioning (open to Architect / Principal SDET / QA Head roles building org-wide QA AI platforms)
+- **Header & Footer** — Fixed sticky nav with scroll-aware background and active-page highlighting, plus a shared footer with page links, socials and a back-to-top link
 
 ## Design
 

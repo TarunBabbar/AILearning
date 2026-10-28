@@ -17,7 +17,7 @@ type ApiResponse = {
 const WELCOME: ChatMsg = {
   role: "assistant",
   content:
-    "Hi! I'm **Tarun's AI Assistant**. Ask me anything — his 18+ years in QA engineering, the AI apps and GitHub repositories shown on this page, his skills, career, or how to reach him.",
+    "Hi! I'm **Tarun's AI Assistant**. Ask me anything — his 18+ years in QA engineering, the AI apps and GitHub repositories shown on this site, his skills, career, or how to reach him.",
 };
 
 // One-tap starters so a visitor can see what this helper knows.
