@@ -17,9 +17,9 @@ A warm, Claude-inspired portfolio website built with **Next.js 16**, **Tailwind 
 
 ## Pages
 
-Each navigation item is its own route, all sharing one fixed header and footer: `/` (Home), `/about`, `/apps`, `/skills`, `/career`, `/interests` and `/contact`. A reusable "keep exploring" strip cross-links every page, and the AI assistant widget is mounted globally in the root layout.
+Each navigation item is its own route, all sharing one fixed header and footer: `/` (Home), `/about`, `/apps`, `/skills`, `/career`, `/interests` and `/contact`. The Home page closes with an "Explore the Portfolio" grid that cross-links every section, and the AI assistant widget is mounted globally in the root layout.
 
-- **Home** (`/`) — Hero (name-first intro with photo, 1st-place hackathon badge, AI QA Architect / Test Automation Architect headline, CTAs (Explore AI Apps, QAE2E Live Demo, GitHub), and stats bar (18+ years, 10+ AI apps built, #1 hackathon, 100% automation adoption)
+- **Home** (`/`) — Hero (name-first intro with photo, 1st-place hackathon badge, AI QA Architect / Test Automation Architect headline, CTAs (Explore AI Apps, QAE2E Live Demo, GitHub), and stats bar (18+ years, 10+ AI apps built, #1 hackathon, 100% automation adoption). Below that, a "What I Do" pillars grid and an "Explore the Portfolio" grid linking out to every other page.
 - **About** — Bio focused on multi-agent pipelines: AI-generated requirements → test cases with auto duplicate-scenario detection → DeepEval output evaluation → model-driven decisions via agentic prompting → automation. Highlights grid included.
 - **AI Applications** (`/apps`) — Featured spotlight for **QAE2E** (1st place, AI Tester Blueprint 3x) with live demo, source links, and pipeline chips, followed by cards for live AI apps:
   - QA Jobs Portal
@@ -36,7 +36,7 @@ Each navigation item is its own route, all sharing one fixed header and footer: 
 - **Education** (on the `/about` page) — BE Computer Science, Modi Institute of Technology, Kota
 - **Personal Interests** (`/interests`) — Beyond work: a deep interest in astrology and the occult sciences, practising disciplines and offering guidance to people in need across Astrology, Numerology, Watch Analysis, Vastu, Akashic Records and Psychic Mastery, plus a lifelong-learning commitment
 - **Contact** (`/contact`) — LinkedIn, GitHub, WhatsApp, Phone, plus org-level positioning (open to Architect / Principal SDET / QA Head roles building org-wide QA AI platforms)
-- **Header & Footer** — Fixed sticky nav with scroll-aware background and active-page highlighting, plus a shared footer with page links, socials and a back-to-top link
+- **Header & Footer** — Fixed sticky header with scroll-aware background, active-page highlighting, a GitHub CTA and a mobile dropdown; the footer is a single compact fixed bottom bar (name, role, 1st-place badge, socials and copyright), with the main content padded so nothing hides behind it
 
 ## Design
 
