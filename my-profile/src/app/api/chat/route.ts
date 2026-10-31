@@ -27,13 +27,6 @@ function rateLimited(ip: string): boolean {
   return bucket.count > RATE_LIMIT;
 }
 
-function buildWaLink(summary: string): string {
-  const cfg = getConfig();
-  if (!cfg.whatsappNumber) return "";
-  const text = `Hello Tarun! A visitor on your profile asked: ${summary} — Tarun's AI Assistant`;
-  return `https://wa.me/${cfg.whatsappNumber}?text=${encodeURIComponent(text)}`;
-}
-
 export async function POST(req: NextRequest) {
   let body: {
     messages?: { role: string; content: string }[];
@@ -79,8 +72,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         type: "error",
-        content: "Sorry, I'm unable to chat right now. Please try again later, or message Tarun directly on WhatsApp.",
-        waLink: buildWaLink(userMessage.slice(0, 300)),
+        content: "Sorry, I'm unable to chat right now. Please try again later.",
         botName: cfg.botName,
         profileOwner: cfg.profileOwner,
       },
@@ -110,25 +102,13 @@ export async function POST(req: NextRequest) {
 
     const markerIndex = content.indexOf(FORWARD_MARKER);
     if (markerIndex !== -1) {
-      // LLM decided this is outside profile knowledge → summarize + forward to WhatsApp.
-      // Take everything after the LAST marker (models sometimes echo the marker
-      // mid-answer), then clean up template scaffolding the model may copy.
-      const lastMarker = content.lastIndexOf(FORWARD_MARKER);
-      const rawSummary = content.slice(lastMarker + FORWARD_MARKER.length);
-      const cleaned = rawSummary
-        .replace(/<[^>]*>/g, " ") // strip any <summary>…</summary> tags
-        .replace(/[\[\]]/g, "") // strip stray brackets
-        .replace(/\s+/g, " ")
-        .trim();
-      const summary = cleaned.length >= 10 ? cleaned : userMessage;
-      const safeSummary = summary.slice(0, 600);
+      // LLM decided this is outside profile knowledge → point the visitor to LinkedIn.
       return NextResponse.json({
         type: "forward",
-        content: `That's outside what I can answer from the profile, but I've prepared a message for Tarun. Tap below to send it to him on WhatsApp — he'll get back to you.`,
+        content:
+          "That's outside what I can answer from the profile — connect with Tarun on LinkedIn ([linkedin.com/in/tarunbabbar](https://linkedin.com/in/tarunbabbar)) and he'll get back to you.",
         model,
         modelName,
-        waLink: buildWaLink(safeSummary),
-        summary: safeSummary,
       });
     }
 
@@ -140,8 +120,7 @@ export async function POST(req: NextRequest) {
       {
         type: "error",
         content:
-          "All my AI models are temporarily unavailable (free-tier limits or maintenance). Please try again in a bit, or message Tarun directly on WhatsApp.",
-        waLink: buildWaLink(userMessage.slice(0, 300)),
+          "All my AI models are temporarily unavailable (free-tier limits or maintenance). Please try again in a bit.",
         debug: err instanceof Error ? err.message : String(err),
       },
       { status: 200 }
