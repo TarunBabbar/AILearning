@@ -28,14 +28,14 @@ export default function HomeOverview() {
   return (
     <>
       {/* What I do */}
-      <section className="py-16 sm:py-20 bg-bg">
+      <section className="py-12 sm:py-14 bg-bg">
         <div className="max-w-6xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="mb-10 max-w-2xl"
+            className="mb-8 max-w-2xl"
           >
             <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">
               What I Do
@@ -70,14 +70,14 @@ export default function HomeOverview() {
       </section>
 
       {/* Explore the pages */}
-      <section className="py-16 sm:py-20 bg-bg-soft border-t border-border">
+      <section className="py-12 sm:py-14 bg-bg-soft border-t border-border">
         <div className="max-w-6xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4"
+            className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4"
           >
             <div>
               <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">

@@ -128,37 +128,25 @@ const BADGE: Record<string, string> = {
 
 export default function Projects() {
   return (
-    <section id="apps" className="py-12 sm:py-16 bg-bg-soft">
+    <section id="apps" className="py-10 sm:py-12 bg-bg-soft">
       <div className="max-w-6xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-5"
+          className="mb-6 max-w-2xl"
         >
-          <div>
-            <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">
-              AI Applications
-            </div>
-            <h2 className="text-[clamp(1.5rem,2.6vw,2rem)] font-extrabold tracking-[-0.02em] mb-2">
-              AI Apps You Can Run Today
-            </h2>
-            <p className="text-sm text-text-secondary max-w-2xl leading-relaxed">
-              Live applications I designed and built end-to-end. No code walls
-              here — every card opens a working demo, its source on GitHub, or
-              both.
-            </p>
+          <div className="text-xs font-semibold text-amber-600 tracking-[1.5px] uppercase mb-2">
+            AI Applications
           </div>
-          <a
-            href="https://github.com/TarunBabbar"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 inline-flex items-center gap-2 text-sm font-semibold text-amber-600 border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 px-4 py-2 rounded-lg transition-all w-fit"
-          >
-            Explore all repos on GitHub
-            <span aria-hidden>→</span>
-          </a>
+          <h2 className="text-[clamp(1.5rem,2.6vw,2rem)] font-extrabold tracking-[-0.02em] mb-2">
+            AI Apps You Can Run Today
+          </h2>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            Live applications I designed and built end-to-end. No code walls
+            here — every card opens a working demo, its source, or both.
+          </p>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -166,19 +154,6 @@ export default function Projects() {
             <ProjectCard key={p.title} project={p} i={i} />
           ))}
         </div>
-
-        <p className="mt-6 text-center text-xs text-text-muted">
-          Plus 20+ more repositories — Selenium & Appium suites, API automation,
-          C#/.NET frameworks and agent experiments.{" "}
-          <a
-            href="https://github.com/TarunBabbar"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-600 hover:underline font-medium"
-          >
-            Explore everything on GitHub →
-          </a>
-        </p>
       </div>
     </section>
   );
@@ -263,10 +238,3 @@ function ProjectCard({ project, i }: { project: Project; i: number }) {
   );
 }
 
-function GitHubIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
-      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
-    </svg>
-  );
-}
