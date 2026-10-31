@@ -362,8 +362,6 @@ export const profileKnowledge: ProfileKnowledge = {
   contact: [
     { label: "LinkedIn", value: "linkedin.com/in/tarunbabbar", href: "https://linkedin.com/in/tarunbabbar" },
     { label: "GitHub", value: "github.com/TarunBabbar", href: "https://github.com/TarunBabbar" },
-    { label: "WhatsApp", value: "+91 9623252365", href: "https://wa.me/919623252365" },
-    { label: "Phone", value: "+91 9623252365", href: "tel:+919623252365" },
   ],
 };
 
@@ -458,12 +456,10 @@ Rules:
 - If asked about the hackathon or awards, mention he took 1st place at The Testing Academy's AI Tester Blueprint 3x hackathon with QAE2E (AI-powered QA pipeline).
 - If asked about hiring, roles or availability, mention he is open to Architect / Principal SDET / Senior Principal SDET / QA Head roles.
 - If asked about his personal interests or hobbies, describe them exactly as in the PERSONAL INTERESTS section: a deep interest in astrology and the occult sciences, practising disciplines and offering guidance to people in need across Astrology, Numerology, Watch Analysis, Vastu, Akashic Records and Psychic Mastery, and his commitment to lifelong learning in these traditions.
-- When a visitor asks how to reach or contact Tarun, ALWAYS output the contact list as markdown links, one per line, with WhatsApp FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the number/username as the link text — never the word "link". Example format (use these exact URLs):
-  - 💬 [WhatsApp: +91 9623252365](https://wa.me/919623252365)
-  - 📞 [Phone: +91 9623252365](tel:+919623252365)
+- When a visitor asks how to reach or contact Tarun, output the contact list as markdown links, one per line, with LinkedIn FIRST. Copy the exact link targets from the PROFILE KNOWLEDGE. Use the username as the link text — never the word "link". Example format (use these exact URLs):
   - 🔗 [LinkedIn: linkedin.com/in/tarunbabbar](https://linkedin.com/in/tarunbabbar)
   - 🐙 [GitHub: github.com/TarunBabbar](https://github.com/TarunBabbar)
-  Then say he's generally responsive on WhatsApp or LinkedIn. Never mention X, Twitter, Medium, email, or any channel not in the list above.
+  Then say he's generally responsive on LinkedIn. NEVER share, invent or guess a phone number or WhatsApp number for Tarun — he does not expose those publicly. Never mention X, Twitter, Medium, email, or any channel not in the list above.
 - If you are asked about something NOT covered anywhere in the knowledge below — unrelated chit-chat, personal advice, coding help on the visitor's own project, or any fact about Tarun the profile does not contain — respond with the marker line below followed by ONE clean sentence (no tags, no brackets, no explanations) that summarizes what the visitor is asking about. Then stop:
   [FORWARD_TO_TARUN]
   Example: [FORWARD_TO_TARUN]

@@ -35,7 +35,7 @@ Each navigation item is its own route, all sharing one fixed header and footer: 
 - **Career** (`/career`) — Timeline: Solutions Architect at Coforge Limited (client: Xplor Technologies), AI + Test Automation R&D, Coupa Software, Varian Medical Systems, TCS, Infosys
 - **Education** (on the `/about` page) — BE Computer Science, Modi Institute of Technology, Kota
 - **Personal Interests** (`/interests`) — Beyond work: a deep interest in astrology and the occult sciences, practising disciplines and offering guidance to people in need across Astrology, Numerology, Watch Analysis, Vastu, Akashic Records and Psychic Mastery, plus a lifelong-learning commitment
-- **Contact** (`/contact`) — LinkedIn, GitHub, WhatsApp, Phone, plus org-level positioning (open to Architect / Principal SDET / QA Head roles building org-wide QA AI platforms)
+- **Contact** (`/contact`) — LinkedIn and GitHub, plus org-level positioning (open to Architect / Principal SDET / QA Head roles building org-wide QA AI platforms)
 - **Header & Footer** — Fixed sticky header with scroll-aware background, active-page highlighting, a GitHub CTA and a mobile dropdown; the footer is a single compact fixed bottom bar (name, role, 1st-place badge, socials and copyright), with the main content padded so nothing hides behind it
 
 ## Design
@@ -65,7 +65,7 @@ A floating **"Ask Anything"** widget on the bottom-right of the page (a small te
 1. **Free-model fallback chain** — The bot tries the ordered list in `FREE_MODELS_JSON` (`.env`), starting with the **fastest** model first. On any failure (rate limit `429`, a delisted model, network error, timeout, or empty reply) it automatically falls back to the next model in the list until one succeeds.
 2. **Profile + repo grounded answers** — A system prompt built from `src/lib/profile-knowledge.ts` (mirrors the `About` / `Career` / `Projects` / `Skills` / `Education` / `Contact` sections, plus a full GitHub and repository index) lets the bot answer about experience, skills and — in particular — every app and repository linked on the page, one line each, with its live demo and source links.
 3. **Quick-start chips** — On a fresh chat the widget offers suggested questions (experience, QAE2E, AI apps, tech stack, contact) that send with one tap.
-4. **WhatsApp escalation** — Only when a question is genuinely outside the knowledge (unrelated chit-chat, the visitor's own coding task, or a fact the profile doesn't contain) the model returns a summary marker and the widget shows an **Open WhatsApp** button. Tapping it opens a pre-filled `wa.me` chat to Tarun's number with the visitor's summarized query.
+4. **LinkedIn fallback** — Only when a question is genuinely outside the knowledge (unrelated chit-chat, the visitor's own coding task, or a fact the profile doesn't contain) the model returns a marker and the widget points the visitor to Tarun's LinkedIn profile.
 5. **Session memory** — Multi-turn conversation context is kept in the widget for the visitor's session.
 
 ### Env variables
@@ -75,8 +75,6 @@ A floating **"Ask Anything"** widget on the bottom-right of the page (a small te
 | `OPENROUTER_API_KEY` | OpenRouter API key (**required**). Get one at [openrouter.ai](https://openrouter.ai). |
 | `OPENROUTER_BASE_URL` | OpenRouter base URL (default `https://openrouter.ai/api/v1`). |
 | `FREE_MODELS_JSON` | Ordered JSON array of `{id, name}` free models. **Index 0 = fastest, tried first.** Reorder/add/remove freely. Only `:free` endpoints are allowed. |
-| `WHATSAPP_NUMBER` | WhatsApp number (digits only, country code first) that unanswered queries are forwarded to. |
-| `WHATSAPP_PREFIX` | Display prefix (default `+91`). |
 | `BOT_NAME` / `PROFILE_OWNER` | Bot persona labels. |
 
 ### Updating the model chain

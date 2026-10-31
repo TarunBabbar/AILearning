@@ -7,14 +7,6 @@ const socials = [
     label: "GitHub",
     href: "https://github.com/TarunBabbar",
   },
-  {
-    label: "WhatsApp",
-    href: "https://wa.me/919623252365",
-  },
-  {
-    label: "Phone",
-    href: "tel:+919623252365",
-  },
 ];
 
 export default function Footer() {

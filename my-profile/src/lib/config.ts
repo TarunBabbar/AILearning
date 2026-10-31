@@ -59,9 +59,6 @@ export function getConfig() {
     openrouterBaseUrl: env("OPENROUTER_BASE_URL") || "https://openrouter.ai/api/v1",
     // Ordered free models — index 0 = fastest, tried first; falls to next on failure
     freeModels,
-    // WhatsApp
-    whatsappNumber: env("WHATSAPP_NUMBER") || "",
-    whatsappPrefix: env("WHATSAPP_PREFIX") || "+91",
     // Bot persona
     botName: env("BOT_NAME") || "Tarun's AI Assistant",
     profileOwner: env("PROFILE_OWNER") || "Tarun Kumar Babbar",

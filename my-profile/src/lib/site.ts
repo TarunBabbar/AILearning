@@ -46,6 +46,6 @@ export const PAGES: SitePage[] = [
     label: "Contact",
     href: "/contact",
     icon: "✉️",
-    blurb: "LinkedIn, GitHub, WhatsApp and phone — open to Architect / QA Head roles.",
+    blurb: "LinkedIn and GitHub — open to Architect / QA Head roles.",
   },
 ];

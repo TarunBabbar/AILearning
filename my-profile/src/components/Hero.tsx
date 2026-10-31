@@ -124,11 +124,8 @@ export default function Hero() {
                 <a href="https://linkedin.com/in/tarunbabbar" target="_blank" rel="noopener noreferrer" className="hover:text-amber-600 transition-colors">
                   in /tarunbabbar
                 </a>
-                <a href="https://wa.me/919623252365" target="_blank" rel="noopener noreferrer" className="hover:text-amber-600 transition-colors">
-                  WhatsApp
-                </a>
-                <a href="tel:+919623252365" className="hover:text-amber-600 transition-colors">
-                  +91 9623252365
+                <a href="https://github.com/TarunBabbar" target="_blank" rel="noopener noreferrer" className="hover:text-amber-600 transition-colors">
+                  github.com/TarunBabbar
                 </a>
                 <span>📍 Pune, India</span>
               </motion.div>
