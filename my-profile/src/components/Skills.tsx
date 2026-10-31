@@ -43,7 +43,7 @@ const categories = [
 
 export default function Skills() {
   return (
-    <section id="skills" className="py-20 sm:py-24 bg-bg">
+    <section id="skills" className="py-14 sm:py-16 bg-bg">
       <div className="max-w-6xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -57,7 +57,7 @@ export default function Skills() {
           <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] font-extrabold tracking-[-0.02em] mb-3">
             Skills & Technologies
           </h2>
-          <p className="text-text-secondary mb-12 leading-relaxed">
+          <p className="text-text-secondary mb-8 leading-relaxed">
             Enterprise-grade automation meets modern AI — agent orchestration, evaluated LLM output, and full-stack testing.
           </p>
         </motion.div>

@@ -95,7 +95,7 @@ const roles: Role[] = [
 
 export default function Career() {
   return (
-    <section id="career" className="py-20 sm:py-24 bg-bg-soft">
+    <section id="career" className="py-14 sm:py-16 bg-bg-soft">
       <div className="max-w-6xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -109,7 +109,7 @@ export default function Career() {
           <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] font-extrabold tracking-[-0.02em] mb-3">
             Professional Path
           </h2>
-          <p className="text-text-secondary max-w-xl mb-12 leading-relaxed">
+          <p className="text-text-secondary max-w-xl mb-8 leading-relaxed">
             From quality engineering to AI-augmented test architecture — building
             systems that ship quality at scale.
           </p>

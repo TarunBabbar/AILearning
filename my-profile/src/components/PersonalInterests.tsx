@@ -37,7 +37,7 @@ const disciplines = [
 
 export default function PersonalInterests() {
   return (
-    <section id="interests" className="py-20 sm:py-24 bg-bg-soft border-t border-border">
+    <section id="interests" className="py-14 sm:py-16 bg-bg-soft border-t border-border">
       <div className="max-w-6xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -65,7 +65,7 @@ export default function PersonalInterests() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="mt-12"
+          className="mt-10"
         >
           <h3 className="text-lg font-bold tracking-[-0.01em] mb-3">
             Practising and Helping Others
@@ -101,7 +101,7 @@ export default function PersonalInterests() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.15 }}
-          className="mt-12 card-accent bg-bg-card border border-border rounded-xl p-6 sm:p-8 max-w-4xl"
+          className="mt-10 card-accent bg-bg-card border border-border rounded-xl p-6 sm:p-8 max-w-4xl"
         >
           <h3 className="text-lg font-bold tracking-[-0.01em] mb-3">A Continuous Learner</h3>
           <p className="text-text-secondary leading-relaxed">

@@ -46,6 +46,26 @@ export const PAGES: SitePage[] = [
     label: "Contact",
     href: "/contact",
     icon: "✉️",
-    blurb: "LinkedIn and GitHub — open to Architect / QA Head roles.",
+    blurb: "Open to Architect / QA Head roles — reach out and let's talk quality.",
+  },
+];
+
+export type SocialLink = {
+  label: string;
+  href: string;
+  handle: string;
+};
+
+// Single source of truth for Tarun's social profiles.
+export const SOCIALS: SocialLink[] = [
+  {
+    label: "LinkedIn",
+    href: "https://linkedin.com/in/tarunbabbar",
+    handle: "in/tarunbabbar",
+  },
+  {
+    label: "GitHub",
+    href: "https://github.com/TarunBabbar",
+    handle: "github.com/TarunBabbar",
   },
 ];
