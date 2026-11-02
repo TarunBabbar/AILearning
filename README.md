@@ -19,6 +19,10 @@ A multi-project monorepo of **AI-powered QA engineering tools** built by Tarun K
 | 9 | **[`my-profile/`](https://github.com/TarunBabbar/AILearning/tree/main/my-profile)** | Claude-themed portfolio website with a floating "Tarun Bot" AI chatbot (OpenRouter free-model fallback chain, WhatsApp escalation) | Next.js 16, Framer Motion, OpenRouter | [🌐 Live](https://www.tarunkumarbabbar.com) |
 | 10 | **[`learning-playwright-typescript-framework/`](https://github.com/TarunBabbar/AILearning/tree/main/learning-playwright-typescript-framework)** | Step-by-step learning journey: builds a production Playwright + TypeScript framework from zero (POM, fixtures, BDD, MCP, CI/CD phases) | TypeScript, Playwright, Cucumber (planned) | — |
 | 11 | **[`interview-preparation/`](https://github.com/TarunBabbar/AILearning/tree/main/interview-preparation)** | Senior AI QA Engineer interview prep: prioritized study plan (Python/Pytest, SQL & NL2SQL validation, LLM evals) + hands-on pytest exercise suites | Python, Pytest | — |
+| 12 | **[`ai-qa-automation-platform/`](https://github.com/TarunBabbar/AILearning/tree/main/ai-qa-automation-platform)** | Multi-tenant SaaS that runs the full STLC autonomously: connect GitHub + Jira + DB, a supervisor + 7 phase agents generate → execute → evaluate tests and gate releases, with a CI webhook that blocks | Next.js 16, NextAuth, Prisma + Neon Postgres, OpenRouter, Octokit, Vercel cron | — |
+| 13 | **[`figma-ui-automation/`](https://github.com/TarunBabbar/AILearning/tree/main/figma-ui-automation)** | Figma → Playwright multi-agent system: Pipeline A validates built screens against the Figma design (pixel + structural drift reports); Pipeline B shift-left generates test cases + automation before dev ships. Optional Next.js dashboard | Node 20+, TypeScript, Playwright, OpenRouter, Figma REST, SQLite, DeepEval | — |
+| 14 | **[`mcp-connections/`](https://github.com/TarunBabbar/AILearning/tree/main/mcp-connections)** | Figma → Playwright agent pipeline: 3 agents over the official Figma MCP server + OpenRouter turn a design into a runnable Playwright + TypeScript suite | TypeScript, Figma MCP, OpenRouter | — |
+| 15 | **[`glassdoor-company-details/`](https://github.com/TarunBabbar/AILearning/tree/main/glassdoor-company-details)** | Job-seeker portal: companies by type with Glassdoor ratings, pros/cons from real reviews, consolidated salaries (₹ LPA) — Glassdoor → JSON → OpenRouter → enriched JSON → UI | Next.js · React 19 · Tailwind 4, Playwright scraper, OpenRouter, Zod | — |
 
 ---
 
@@ -135,11 +139,47 @@ Senior AI QA Engineer interview prep — a prioritized study plan plus hands-on 
 - **Exercises:** runnable pytest suites (`exercises/`) covering fixtures, parametrize, markers, conftest, and test scopes
 - **Stack:** Python · Pytest (+ xdist, html plugins)
 
+### 12. AI QA Automation Platform — `ai-qa-automation-platform/`
+Multi-tenant SaaS platform that runs the **full Software Testing Life Cycle autonomously** — from requirement to release decision, with human review checkpoints.
+
+- Connect **GitHub (Octokit)**, **Jira (REST)**, and a **database**; per-workspace secrets are **AES-256-GCM** encrypted
+- **Supervisor + 7 STLC phase agents:** RequirementsAnalyst → TestPlanner → TestDesigner → AutomationBuilder → Executor → DefectReporter → ReleaseGater
+- Test cases derived from real requirements/code with traceability; failures feed a closed-loop review queue
+- Five **LLM-judge eval metrics** with a **hard/soft release gate** and a CI webhook that blocks a release on hard-gate failure
+- Vercel-native (Next.js Route Handlers), nightly regression via **Vercel cron**; swappable LLM provider (OpenRouter or Command Code)
+- **Stack:** Next.js 16 · NextAuth · Prisma + Neon Postgres · OpenRouter · Octokit · Jira REST · Vercel cron
+
+### 13. Figma → Playwright Multi-Agent System — `figma-ui-automation/`
+Six LLM/rule-based agents + one deterministic orchestrator over a shared **Playwright + TypeScript** framework, covering two pipelines.
+
+- **Pipeline A (regression validation):** diff the live/staging UI against the Figma design (pixel diff + structural token diff, LLM vision only on flagged deltas) → HTML drift report
+- **Pipeline B (shift-left):** generate Gherkin/YAML test cases from the design spec → human approval gate → compile-gated `.spec.ts` codegen before the screen ships
+- Quality gates: **schema**, **eval** (DeepEval sidecar or deterministic mock judge), **human approval**, and **`tsc` compile**
+- **Sample mode** runs every agent on bundled data — no keys needed
+- Optional **Next.js 16 web dashboard** (`webapp/`) wrapping the CLI with live SSE progress, drift-report viewer, and test-case approval
+- **Stack:** Node 20+ · TypeScript · Playwright · OpenRouter · Figma REST · SQLite · DeepEval · Next.js 16
+
+### 14. Figma → Playwright Agent Pipeline — `mcp-connections/`
+Turns a Figma UI design into a runnable **Playwright + TypeScript** test suite, driven end-to-end by AI agents over the official **Figma MCP server**.
+
+- Three agents: Design Analysis → Test Cases → Automation (emits `.spec.ts` + page objects, scaffolded into a project that runs with `npm test`)
+- Orchestrator spawns the Framelink `figma-developer-mcp` server over stdio and calls `get_figma_data` — auth stays inside the MCP server
+- **Stack:** TypeScript · @modelcontextprotocol/sdk · OpenRouter · Figma MCP
+
+### 15. Glassdoor Company Details Portal — `glassdoor-company-details/`
+Job-seeker-facing portal (beige theme) showing companies by type with their Glassdoor star ratings, pros vs cons from real employee reviews, and consolidated salaries per designation (₹ LPA).
+
+- Data flow: **Glassdoor → JSON dump → OpenRouter LLM → enriched JSON → UI**; the JSON dump is the source of truth
+- `npm run scrape` (Playwright login) → raw JSON; `npm run analyze` classifies type/industry, summarizes good vs bad bullets, and consolidates salaries
+- Works without scraping — edit `data/companies.raw.json` by hand, or use on-demand "Re-analyze with LLM" per company
+- **Stack:** Next.js · React 19 · Tailwind CSS 4 · Playwright · OpenRouter · Zod
+
 ---
 
 ## 🚀 Monorepo Conventions
 
 - Each project is **fully standalone** — its own README, package.json/requirements, and env setup.
+- **`save-tokens/`** is a shared **token-frugal prompting ruleset** (`.cursorrules`) for UI-test automation/fix requests — typed `[AUTO]`/`[FIX]`/`[FIX-ASSERT]`/`[DEBUG]` prompts with a minimal-context contract and capped output.
 - Most AI apps use **OpenRouter free models only** (`:free` guard where hardcoded) — no paid spend by default.
 - Claude-inspired warm-cream/beige or amber UI theme is a consistent design signature.
 - Vercel deployments set the subfolder as **Root Directory**. Live apps: [qae2e](https://qae2e.vercel.app), [qajobs (job-details)](https://qajobs.vercel.app), [qadashboard](https://qadashboard-lime.vercel.app), [qaragplatform](https://qaragplatform.vercel.app), [qa-interview-preparation](https://qa-interview-preparation.vercel.app), and [my-profile](https://www.tarunkumarbabbar.com).
